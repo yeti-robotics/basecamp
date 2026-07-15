@@ -1,163 +1,109 @@
-# Turborepo starter
+# Basecamp
 
-This Turborepo starter is maintained by the Turborepo core team.
+Basecamp is the web platform for managing and interacting with the Yeti Robotics offical Discord bot. It replaces Discord-only commands with a modern dashboard, providing administrators, mentors, students, and team members with an intuitive interface to manage robotics team data and update students attendance hours, outreach hours, and other things within its reach.
 
-## Using this example
+The project is built as a Turborepo monorepo to share code, tooling, and types across multiple applications and packages.
 
-Run the following command:
+---
 
-```sh
-npx create-turbo@latest
+## Tech Stack
+
+### Frontend
+- Next.js 16
+- React 19
+- TypeScript
+- Tailwind CSS
+
+### Backend *(coming soon)*
+- NestJS
+- TypeScript
+- REST API
+
+### Database *(coming soon)*
+- PostgreSQL
+
+
+### Tooling
+- Turborepo
+- pnpm Workspaces
+- biome.js
+
+---
+
+## Repository Structure
+
+```text
+apps/
+├── dashboard/      # Next.js web dashboard
+└── api/            # NestJS backend (planned) to work as middle man from discord bot to the dashboards incoming requests 
+
+packages/
+├── ui/             # Shared UI components
+|-> shared biome configuration
+└── typescript-config/ # Shared TypeScript configuration
 ```
 
-## What's inside?
+---
 
-This Turborepo includes the following packages/apps:
+## Getting Started
 
-### Apps and Packages
+### Prerequisites
 
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `eslint-config-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
+- Node.js 20+
+- pnpm 10+
 
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
+Install dependencies:
 
-### Utilities
-
-This Turborepo has some additional tools already setup for you:
-
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
-
-### Build
-
-To build all apps and packages, run the following command:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo build
+```bash
+pnpm install
 ```
 
-Without global `turbo`, use your package manager:
+Start all development servers:
 
-```sh
-cd my-turborepo
-npx turbo build
-pnpm dlx turbo build
-pnpm exec turbo build
+```bash
+pnpm dev
 ```
 
-You can build a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
+Build every application and package:
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo build --filter=docs
+```bash
+pnpm build
 ```
 
-Without global `turbo`:
+Run linting:
 
-```sh
-npx turbo build --filter=docs
-pnpm exec turbo build --filter=docs
-pnpm exec turbo build --filter=docs
+```bash
+pnpm lint or using biome run lint
 ```
 
-### Develop
+Format the repository:
 
-To develop all apps and packages, run the following command:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo dev
+```bash
+pnpm format
 ```
 
-Without global `turbo`, use your package manager:
+---
 
-```sh
-cd my-turborepo
-npx turbo dev
-pnpm exec turbo dev
-pnpm exec turbo dev
-```
+## Development
 
-You can develop a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
+This repository uses **Turborepo** to orchestrate builds, development servers, and caching across applications and shared packages.
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
+As the project grows, additional services such as the NestJS API and PostgreSQL database will integrate seamlessly into the existing workspace.
 
-```sh
-turbo dev --filter=web
-```
+---
 
-Without global `turbo`:
 
-```sh
-npx turbo dev --filter=web
-pnpm exec turbo dev --filter=web
-pnpm exec turbo dev --filter=web
-```
+---
 
-### Remote Caching
+## Contributing
 
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
+1. Create a feature branch.
+2. Make your changes.
+3. Open a pull request.
+4. Ensure linting and builds pass before merging.
 
-Turborepo can use a technique known as [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
+---
 
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
+## License
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo login
-```
-
-Without global `turbo`, use your package manager:
-
-```sh
-cd my-turborepo
-npx turbo login
-pnpm exec turbo login
-pnpm exec turbo login
-```
-
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
-
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo link
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo link
-pnpm exec turbo link
-pnpm exec turbo link
-```
-
-## Useful Links
-
-Learn more about the power of Turborepo:
-
-- [Tasks](https://turborepo.dev/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.dev/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.dev/docs/reference/configuration)
-- [CLI Usage](https://turborepo.dev/docs/reference/command-line-reference)
-# basecamp
-# basecamp
-# basecamp
-# basecamp
+Private repository. All rights reserved.
