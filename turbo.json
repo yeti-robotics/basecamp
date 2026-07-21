@@ -1,6 +1,7 @@
 {
   "$schema": "https://turborepo.dev/schema.json",
   "ui": "tui",
+
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
@@ -18,8 +19,14 @@
       "persistent": true
     },
     "test": {
-      "dependsOn": ["^test"]
-    }
+      "dependsOn": ["^test"],
+      "outputs": ["coverage/**"]
 
+    },
+    "start": {
+      "dependsOn": ["build"],
+      "cache": false,
+      "persistent": true
+    }
   }
 }
