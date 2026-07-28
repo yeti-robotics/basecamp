@@ -1,0 +1,69 @@
+name: Status Checks
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build and test
+    runs-on: ubuntu-latest
+    environment: ci
+    env:
+      TURBO_SCM_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          filter: "blob:none"
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Cache turbo build setup
+        uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: ${{ runner.os }}-turbo-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-turbo-${{ github.ref_name }}-
+            ${{ runner.os }}-turbo-
+
+      - name: Cache Next.js build (scouting)
+        uses: actions/cache@v4
+        with:
+          path: apps/scouting/.next/cache
+          key: ${{ runner.os }}-nextjs-scouting-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('apps/scouting/**/*.ts', 'apps/scouting/**/*.tsx') }}
+          restore-keys: |
+            ${{ runner.os }}-nextjs-scouting-${{ hashFiles('pnpm-lock.yaml') }}-
+
+      - name: Cache Next.js build (basecamp-fe)
+        uses: actions/cache@v4
+        with:
+          path: apps/basecamp-fe/.next/cache
+          key: ${{ runner.os }}-nextjs-basecamp-fe-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('apps/basecamp-fe/**/*.ts', 'apps/basecamp-fe/**/*.tsx') }}
+          restore-keys: |
+            ${{ runner.os }}-nextjs-basecamp-fe-${{ hashFiles('pnpm-lock.yaml') }}-
+
+      - name: Setup Node.js environment
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Lint, format, test, and build
+        run: pnpm turbo run lint build test typecheck --affected
