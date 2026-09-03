@@ -3,10 +3,11 @@ import { events } from "./events";
 import { seasons } from "./seasons";
 import { memberStatus } from "./enums";
 import { eventCategory } from "./enums";
+import { user } from "./auth";
 
 export const attendance = pgTable("attendance", {
     id: serial("id").primaryKey(),
-    user_id: text("user_id").references(() => users.id),
+    user_id: text("user_id").references(() => user.id),
     event_id: integer("event_id").references(() => events.id),
     checked_in_at: timestamp("checked_in_at").notNull(),
     checked_out_at: timestamp("checked_out_at"),
