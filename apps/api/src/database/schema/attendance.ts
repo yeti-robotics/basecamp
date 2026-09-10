@@ -1,4 +1,4 @@
-import { pgTable, timestamp, pgEnum, serial, text, integer, boolean } from "drizzle-orm/pg-core";
+import { pgTable, timestamp, serial, text, integer, boolean } from "drizzle-orm/pg-core";
 import { events } from "./events";
 import { seasons } from "./seasons";
 import { memberStatus } from "./enums";
