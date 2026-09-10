@@ -23,6 +23,7 @@
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
+
     "@better-auth/drizzle-adapter": "^1.7.2",
     "@nestjs/common": "^11.0.1",
     "@nestjs/core": "^11.0.1",
@@ -31,6 +32,8 @@
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",
     "pg": "^8.22.0",
+    "@discord-nestjs/core": "^5.5.1",
+    "discord.js": "^14.27.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1"
   },
