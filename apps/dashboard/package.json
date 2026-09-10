@@ -9,7 +9,7 @@
     "start": "next start",
     "lint": "eslint --max-warnings 0",
     "check-types": "next typegen && tsc --noEmit",
-    "test": "jest",
+    "test": "jest --passWithNoTests",
     "test:cov": "jest --coverage --passWithNoTests"
   },
   "dependencies": {
