@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { Context, SlashCommand } from 'necord';
 import type { SlashCommandContext } from 'necord';
+import { Context, SlashCommand } from 'necord';
 
 @Injectable()
 export class PingCommand {

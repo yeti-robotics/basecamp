@@ -1,14 +1,13 @@
-/* eslint-disable @typescript-eslint/no-require-imports, no-undef */
-const nextJest = require("next/jest");
+const nextJest = require('next/jest');
 
 const createJestConfig = nextJest({
-  dir: "./",
+  dir: './',
 });
 
 module.exports = createJestConfig({
-  coverageDirectory: "coverage",
-  collectCoverageFrom: ["src/**/*.{js,jsx,ts,tsx}"],
+  coverageDirectory: 'coverage',
+  collectCoverageFrom: ['src/**/*.{js,jsx,ts,tsx}'],
   passWithNoTests: true,
-  testEnvironment: "jsdom",
-  testMatch: ["<rootDir>/src/**/*.(test|spec).{js,jsx,ts,tsx}"],
+  testEnvironment: 'jsdom',
+  testMatch: ['<rootDir>/src/**/*.(test|spec).{js,jsx,ts,tsx}'],
 });

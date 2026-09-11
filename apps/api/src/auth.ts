@@ -1,9 +1,9 @@
-import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from '@better-auth/drizzle-adapter';
-import * as schema from './database/schema/auth.js';
+import { betterAuth } from 'better-auth';
+import { admin } from 'better-auth/plugins';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
-import { admin } from 'better-auth/plugins';
+import * as schema from './database/schema/auth.js';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -11,6 +11,7 @@ const pool = new Pool({
 
 export const db = drizzle(pool);
 
+// biome-ignore lint/suspicious/noExplicitAny: better-auth's inferred type is too complex to annotate here
 export const auth: any = betterAuth({
   database: drizzleAdapter(db, {
     provider: 'pg',

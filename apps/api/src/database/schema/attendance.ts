@@ -1,16 +1,8 @@
-import {
-  pgTable,
-  timestamp,
-  serial,
-  text,
-  integer,
-  boolean,
-} from 'drizzle-orm/pg-core';
+import { boolean, integer, pgTable, serial, text, timestamp } from 'drizzle-orm/pg-core';
+import { user } from './auth.js';
+import { eventCategory, memberStatus } from './enums.js';
 import { events } from './events.js';
 import { seasons } from './seasons.js';
-import { memberStatus } from './enums.js';
-import { eventCategory } from './enums.js';
-import { user } from './auth.js';
 
 export const attendance = pgTable('attendance', {
   id: serial('id').primaryKey(),
