@@ -1,66 +1,91 @@
-import { Command, Handler, InteractionEvent } from "@discord-nestjs/core";
-import { ChatInputCommandInteraction } from "discord.js";
+import { Injectable } from '@nestjs/common';
+import { Context, SlashCommand } from 'necord';
+import type { SlashCommandContext } from 'necord';
 
-@Command({name: "attendance", description: "Get your current attendance"})
+@Injectable()
 export class AttendanceCommand {
-    @Handler()
-    async onCommand(@InteractionEvent() interaction: ChatInputCommandInteraction) {
-        await interaction.reply("Attendance command");
-    }
+  @SlashCommand({
+    name: 'attendance',
+    description: 'Get your current attendance',
+  })
+  async onCommand(@Context() [interaction]: SlashCommandContext) {
+    await interaction.reply('Attendance command');
+  }
 }
 
-@Command({name: "outreach", description: "Get your current outreach progress"})
+@Injectable()
 export class OutreachCommand {
-    @Handler()
-    async onCommand(@InteractionEvent() interaction: ChatInputCommandInteraction) {
-        await interaction.reply("Outreach command");
-    }
+  @SlashCommand({
+    name: 'outreach',
+    description: 'Get your current outreach progress',
+  })
+  async onCommand(@Context() [interaction]: SlashCommandContext) {
+    await interaction.reply('Outreach command');
+  }
 }
 
-@Command({name: "attendance-leaderboard", description: "Show the top 5 members by attendance hours"})
+@Injectable()
 export class AttendanceLeaderboardCommand {
-    @Handler()
-    async onCommand(@InteractionEvent() interaction: ChatInputCommandInteraction) {
-        await interaction.reply("Attendance leaderboard command");
-    }
+  @SlashCommand({
+    name: 'attendance-leaderboard',
+    description: 'Show the top 5 members by attendance hours',
+  })
+  async onCommand(@Context() [interaction]: SlashCommandContext) {
+    await interaction.reply('Attendance leaderboard command');
+  }
 }
 
-@Command({name: "outreach-leaderboard", description: "Show the top 5 members by outreach hours"})
+@Injectable()
 export class OutreachLeaderboardCommand {
-    @Handler()
-    async onCommand(@InteractionEvent() interaction: ChatInputCommandInteraction) {
-        await interaction.reply("Outreach leaderboard command");
-    }
+  @SlashCommand({
+    name: 'outreach-leaderboard',
+    description: 'Show the top 5 members by outreach hours',
+  })
+  async onCommand(@Context() [interaction]: SlashCommandContext) {
+    await interaction.reply('Outreach leaderboard command');
+  }
 }
 
-@Command({name: "signin", description: "Sign in to a YETI meeting at the zone"})
+@Injectable()
 export class SigninCommand {
-    @Handler()
-    async onCommand(@InteractionEvent() interaction: ChatInputCommandInteraction) {
-        await interaction.reply("Signin command");
-    }
+  @SlashCommand({
+    name: 'signin',
+    description: 'Sign in to a YETI meeting at the zone',
+  })
+  async onCommand(@Context() [interaction]: SlashCommandContext) {
+    await interaction.reply('Signin command');
+  }
 }
 
-@Command({name: "signout", description: "Sign out of a YETI meeting at the zone"})
+@Injectable()
 export class SignoutCommand {
-    @Handler()
-    async onCommand(@InteractionEvent() interaction: ChatInputCommandInteraction) {
-        await interaction.reply("Signout command");
-    }
+  @SlashCommand({
+    name: 'signout',
+    description: 'Sign out of a YETI meeting at the zone',
+  })
+  async onCommand(@Context() [interaction]: SlashCommandContext) {
+    await interaction.reply('Signout command');
+  }
 }
 
-@Command({name: "admin-signin", description: "Sign in another user (admin only)"})
+@Injectable()
 export class AdminSigninCommand {
-    @Handler()
-    async onCommand(@InteractionEvent() interaction: ChatInputCommandInteraction) {
-        await interaction.reply("Admin signin command");
-    }
+  @SlashCommand({
+    name: 'admin-signin',
+    description: 'Sign in another user (admin only)',
+  })
+  async onCommand(@Context() [interaction]: SlashCommandContext) {
+    await interaction.reply('Admin signin command');
+  }
 }
 
-@Command({name: "admin-signout", description: "Sign out another user (admin only)"})
+@Injectable()
 export class AdminSignoutCommand {
-    @Handler()
-    async onCommand(@InteractionEvent() interaction: ChatInputCommandInteraction) {
-        await interaction.reply("Admin signout command");
-    }
+  @SlashCommand({
+    name: 'admin-signout',
+    description: 'Sign out another user (admin only)',
+  })
+  async onCommand(@Context() [interaction]: SlashCommandContext) {
+    await interaction.reply('Admin signout command');
+  }
 }
