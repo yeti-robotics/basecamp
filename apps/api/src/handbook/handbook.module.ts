@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
-import { HandbookCommand } from './handbook.commands';
+import { HandbookCommand } from './handbook.commands.js';
 
 @Module({
-    providers: [HandbookCommand],
+  providers: [HandbookCommand],
 })
 export class HandbookModule {}

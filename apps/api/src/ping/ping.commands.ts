@@ -1,10 +1,11 @@
-import { Command, Handler, InteractionEvent } from "@discord-nestjs/core";
-import { ChatInputCommandInteraction } from "discord.js";
+import { Injectable } from '@nestjs/common';
+import { Context, SlashCommand } from 'necord';
+import type { SlashCommandContext } from 'necord';
 
-@Command({name: "ping", description: "Ping the bot"})
+@Injectable()
 export class PingCommand {
-    @Handler()
-    async onCommand(@InteractionEvent() interaction: ChatInputCommandInteraction) {
-        await interaction.reply("Pong!");
-    }
+  @SlashCommand({ name: 'ping', description: 'Ping the bot' })
+  async onPing(@Context() [interaction]: SlashCommandContext) {
+    await interaction.reply('Pong!');
+  }
 }
