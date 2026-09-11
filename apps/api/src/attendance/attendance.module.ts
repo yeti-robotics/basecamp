@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
-import { AttendanceCommand, OutreachCommand, AttendanceLeaderboardCommand, OutreachLeaderboardCommand, AdminSigninCommand, AdminSignoutCommand, SigninCommand, SignoutCommand } from './attendance.commands';
+import { AttendanceCommands } from './attendance.commands';
 
 @Module({
-    providers: [AttendanceCommand, OutreachCommand, AttendanceLeaderboardCommand, OutreachLeaderboardCommand, SigninCommand, SignoutCommand, AdminSigninCommand, AdminSignoutCommand],
+    providers: [AttendanceCommands],
 })
 export class AttendanceModule {}
