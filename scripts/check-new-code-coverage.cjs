@@ -1,14 +1,12 @@
-const { execFileSync } = require("node:child_process");
-const fs = require("node:fs");
-const path = require("node:path");
+const { execFileSync } = require('node:child_process');
+const fs = require('node:fs');
+const path = require('node:path');
 
-const SOURCE_ROOTS = ["apps/api/src", "apps/dashboard/src"];
+const SOURCE_ROOTS = ['apps/api/src', 'apps/dashboard/src'];
 const DEFAULT_THRESHOLD = 60;
 
 function isUnderSourceRoot(file, sourceRoots) {
-  return sourceRoots.some(
-    (root) => file === root || file.startsWith(`${root}/`),
-  );
+  return sourceRoots.some((root) => file === root || file.startsWith(`${root}/`));
 }
 
 function parseAddedLines(diff, sourceRoots) {
@@ -16,13 +14,10 @@ function parseAddedLines(diff, sourceRoots) {
   let currentFile;
   let currentLine;
 
-  for (const line of diff.split("\n")) {
-    if (line.startsWith("+++ b/")) {
-      const file = line.slice("+++ b/".length);
-      currentFile =
-        file !== "/dev/null" && isUnderSourceRoot(file, sourceRoots)
-          ? file
-          : undefined;
+  for (const line of diff.split('\n')) {
+    if (line.startsWith('+++ b/')) {
+      const file = line.slice('+++ b/'.length);
+      currentFile = file !== '/dev/null' && isUnderSourceRoot(file, sourceRoots) ? file : undefined;
       continue;
     }
 
@@ -36,7 +31,7 @@ function parseAddedLines(diff, sourceRoots) {
       continue;
     }
 
-    if (line.startsWith("+") && !line.startsWith("+++")) {
+    if (line.startsWith('+') && !line.startsWith('+++')) {
       if (currentFile) {
         if (!addedLines.has(currentFile)) {
           addedLines.set(currentFile, new Set());
@@ -44,9 +39,8 @@ function parseAddedLines(diff, sourceRoots) {
         addedLines.get(currentFile).add(currentLine);
       }
       currentLine += 1;
-    } else if (line.startsWith("\\")) {
-      continue;
-    } else if (!line.startsWith("-")) {
+    } else if (line.startsWith('\\')) {
+    } else if (!line.startsWith('-')) {
       currentLine += 1;
     }
   }
@@ -55,7 +49,7 @@ function parseAddedLines(diff, sourceRoots) {
 }
 
 function normalizeCoveragePath(file) {
-  return file.split(path.sep).join("/");
+  return file.split(path.sep).join('/');
 }
 
 function getFileCoverage(coverage, relativeFile) {
@@ -120,7 +114,7 @@ function readCoverageFile(coverageFile) {
   if (!fs.existsSync(coverageFile)) {
     return {};
   }
-  return JSON.parse(fs.readFileSync(coverageFile, "utf8"));
+  return JSON.parse(fs.readFileSync(coverageFile, 'utf8'));
 }
 
 function getBaseRef() {
@@ -132,25 +126,23 @@ function getBaseRef() {
     return `origin/${process.env.GITHUB_BASE_REF}`;
   }
 
-  return "origin/main";
+  return 'origin/main';
 }
 
 function main() {
   const baseRef = getBaseRef();
   const diff = execFileSync(
-    "git",
-    ["diff", "--unified=0", `${baseRef}...HEAD`, "--", ...SOURCE_ROOTS],
-    { encoding: "utf8" },
+    'git',
+    ['diff', '--unified=0', `${baseRef}...HEAD`, '--', ...SOURCE_ROOTS],
+    { encoding: 'utf8' },
   );
   const addedLines = parseAddedLines(diff, SOURCE_ROOTS);
   const coverage = {
-    ...readCoverageFile("apps/api/coverage/coverage-final.json"),
-    ...readCoverageFile("apps/dashboard/coverage/coverage-final.json"),
+    ...readCoverageFile('apps/api/coverage/coverage-final.json'),
+    ...readCoverageFile('apps/dashboard/coverage/coverage-final.json'),
   };
   const result = calculateNewLineCoverage(addedLines, coverage);
-  const threshold = Number(
-    process.env.NEW_CODE_COVERAGE_THRESHOLD ?? DEFAULT_THRESHOLD,
-  );
+  const threshold = Number(process.env.NEW_CODE_COVERAGE_THRESHOLD ?? DEFAULT_THRESHOLD);
 
   console.log(
     `New source lines: ${result.covered}/${result.total} covered (${result.percentage}%). ` +

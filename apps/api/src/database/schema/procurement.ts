@@ -1,11 +1,4 @@
-import {
-  date,
-  integer,
-  pgTable,
-  serial,
-  text,
-  timestamp,
-} from 'drizzle-orm/pg-core';
+import { date, integer, pgTable, serial, text, timestamp } from 'drizzle-orm/pg-core';
 import { user } from './auth.js';
 
 export const orders = pgTable('orders', {

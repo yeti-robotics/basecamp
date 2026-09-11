@@ -1,11 +1,11 @@
 import { Module } from '@nestjs/common';
 import {
-  AttendanceCommand,
-  OutreachCommand,
-  AttendanceLeaderboardCommand,
-  OutreachLeaderboardCommand,
   AdminSigninCommand,
   AdminSignoutCommand,
+  AttendanceCommand,
+  AttendanceLeaderboardCommand,
+  OutreachCommand,
+  OutreachLeaderboardCommand,
   SigninCommand,
   SignoutCommand,
 } from './attendance.commands.js';

@@ -1,6 +1,6 @@
 import { integer, pgTable, serial, text, timestamp } from 'drizzle-orm/pg-core';
-import { memberStatus } from './enums.js';
 import { user } from './auth.js';
+import { memberStatus } from './enums.js';
 
 export const seasons = pgTable('seasons', {
   id: serial('id').primaryKey(),
