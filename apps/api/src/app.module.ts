@@ -3,10 +3,12 @@ import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { AttendanceModule } from './attendance/attendance.module.js';
 import { HandbookModule } from './handbook/handbook.module.js';
-import { PingModule } from './ping/ping.module.js';
+import { LifecycleModule } from './lifecycle/lifecycle.module.js';
+import { OutreachModule } from './outreach/outreach.module.js';
+import { HealthModule } from './health/health.module.js';
 
 @Module({
-  imports: [AttendanceModule, PingModule, HandbookModule],
+  imports: [AttendanceModule, LifecycleModule, HandbookModule, OutreachModule, HealthModule],
   controllers: [AppController],
   providers: [AppService],
 })
