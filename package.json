@@ -5,16 +5,19 @@
     "build": "turbo run build",
     "dev": "turbo run dev",
     "lint": "turbo run lint",
-    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
-    "check-types": "turbo run check-types"
+    "format": "biome format --write .",
+    "check-types": "turbo run check-types",
+    "test": "turbo run test",
+    "coverage:new": "pnpm test:coverage-helper && pnpm --filter api test:cov && pnpm --filter web test:cov && node scripts/check-new-code-coverage.cjs",
+    "test:coverage-helper": "node --test scripts/check-new-code-coverage.test.cjs"
   },
   "devDependencies": {
-    "prettier": "^3.7.4",
+    "@biomejs/biome": "^2.5.13",
     "turbo": "^2.10.4",
     "typescript": "5.9.2"
   },
   "packageManager": "pnpm@9.0.0",
   "engines": {
-    "node": ">=18"
+    "node": ">=20.19"
   }
 }
