@@ -5,9 +5,10 @@ import { AttendanceModule } from './attendance/attendance.module.js';
 import { HandbookModule } from './handbook/handbook.module.js';
 import { LifecycleModule } from './lifecycle/lifecycle.module.js';
 import { OutreachModule } from './outreach/outreach.module.js';
+import { HealthModule } from './health/health.module.js';
 
 @Module({
-  imports: [AttendanceModule, LifecycleModule, HandbookModule, OutreachModule],
+  imports: [AttendanceModule, LifecycleModule, HandbookModule, OutreachModule, HealthModule],
   controllers: [AppController],
   providers: [AppService],
 })
