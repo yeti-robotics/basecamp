@@ -4,9 +4,10 @@ import { AppService } from './app.service.js';
 import { AttendanceModule } from './attendance/attendance.module.js';
 import { HandbookModule } from './handbook/handbook.module.js';
 import { LifecycleModule } from './lifecycle/lifecycle.module.js';
+import { OutreachModule } from './outreach/outreach.module.js';
 
 @Module({
-  imports: [AttendanceModule, LifecycleModule, HandbookModule],
+  imports: [AttendanceModule, LifecycleModule, HandbookModule, OutreachModule],
   controllers: [AppController],
   providers: [AppService],
 })

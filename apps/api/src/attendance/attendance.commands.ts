@@ -13,27 +13,11 @@ export class AttendanceCommands {
   }
 
   @SlashCommand({
-    name: 'outreach',
-    description: 'Get your current outreach progress',
-  })
-  async OutreachCommand(@Context() [interaction]: SlashCommandContext) {
-    await interaction.reply('Outreach command');
-  }
-
-  @SlashCommand({
     name: 'attendance-leaderboard',
     description: 'Show the top 5 members by attendance hours',
   })
   async AttendanceLeaderboardCommand(@Context() [interaction]: SlashCommandContext) {
     await interaction.reply('Attendance leaderboard command');
-  }
-
-  @SlashCommand({
-    name: 'outreach-leaderboard',
-    description: 'Show the top 5 members by outreach hours',
-  })
-  async OutreachLeaderboardCommand(@Context() [interaction]: SlashCommandContext) {
-    await interaction.reply('Outreach leaderboard command');
   }
 
   @SlashCommand({
