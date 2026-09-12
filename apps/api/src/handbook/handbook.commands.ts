@@ -3,12 +3,12 @@ import type { SlashCommandContext } from 'necord';
 import { Context, SlashCommand } from 'necord';
 
 @Injectable()
-export class HandbookCommand {
+export class HandbookCommands {
   @SlashCommand({
     name: 'handbook',
     description: 'Ask the handbook a question',
   })
-  async onCommand(@Context() [interaction]: SlashCommandContext) {
+  async HandbookCommand(@Context() [interaction]: SlashCommandContext) {
     await interaction.reply('Handbook command');
   }
 }

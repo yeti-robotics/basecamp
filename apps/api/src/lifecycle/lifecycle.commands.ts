@@ -3,7 +3,7 @@ import type { SlashCommandContext } from 'necord';
 import { Context, SlashCommand } from 'necord';
 
 @Injectable()
-export class PingCommand {
+export class LifecycleCommands {
   @SlashCommand({ name: 'ping', description: 'Ping the bot' })
   async onPing(@Context() [interaction]: SlashCommandContext) {
     await interaction.reply('Pong!');
