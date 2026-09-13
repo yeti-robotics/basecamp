@@ -1,11 +1,18 @@
-import { Injectable } from '@nestjs/common';
-import type { SlashCommandContext } from 'necord';
-import { Context, SlashCommand } from 'necord';
+import { Injectable } from "@nestjs/common";
+import { MessageFlags } from "discord.js";
+import { Context, SlashCommand, type SlashCommandContext } from "necord";
 
 @Injectable()
 export class LifecycleCommands {
-  @SlashCommand({ name: 'ping', description: 'Ping the bot' })
-  async onPing(@Context() [interaction]: SlashCommandContext) {
-    await interaction.reply('Pong!');
+  @SlashCommand({
+    name: "ping",
+    description: "Ping the bot",
+    dmPermission: true,
+  })
+  public async onPing(@Context() [interaction]: SlashCommandContext) {
+    return interaction.reply({
+      content: `Pong! ${interaction.client.ws.ping}ms`,
+      flags: [MessageFlags.Ephemeral],
+    });
   }
 }
