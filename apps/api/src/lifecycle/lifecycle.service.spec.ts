@@ -2,6 +2,7 @@ import { Test, type TestingModule } from "@nestjs/testing";
 import { ActivityType } from "discord.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LifecycleService } from "./lifecycle.service.js";
+import { db } from "src/auth.js";
 
 // ─── Client helper ────────────────────────────────────────────────────────────
 
@@ -11,7 +12,6 @@ function makeClient(username = "TestBot") {
       username,
       setActivity: vi.fn(),
     },
-    checkConnection: vi.fn(),
   };
 }
 
@@ -94,7 +94,7 @@ describe("LifecycleService", () => {
   // ─── checkConnection ──────────────────────────────────────────────────────────────
   describe("checkConnection", () => {
     it("returns true when the database connection is working", async () => {
-      const executeSpy = vi.spyOn(service["db"], "execute");
+      const executeSpy = vi.spyOn(db, "execute");
       executeSpy.mockResolvedValue({ rows: [{ connected: 1 }] } as never);
 
       const result = await service.checkConnection();
@@ -103,7 +103,7 @@ describe("LifecycleService", () => {
     });
 
     it("returns false when the database connection is not working", async () => {
-      const executeSpy = vi.spyOn(service["db"], "execute");
+      const executeSpy = vi.spyOn(db, "execute");
       executeSpy.mockRejectedValue(new Error("Database connection error"));
 
       const result = await service.checkConnection();
