@@ -2,7 +2,7 @@ import { Test, type TestingModule } from "@nestjs/testing";
 import { MessageFlags } from "discord.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LifecycleCommands } from "./lifecycle.commands.js";
-import { DatabaseService } from "./lifecycle.service.js";
+import { LifecycleService } from "./lifecycle.service.js";
 
 // ─── Interaction helper ───────────────────────────────────────────────────────
 
@@ -20,15 +20,15 @@ function makeInteraction(ping = 42, username = "TestUser") {
 
 // ─── Module factory ───────────────────────────────────────────────────────────
 
-const databaseService = {
+const lifecycleService = {
   checkConnection: vi.fn(),
 };
 
 async function makeModule(): Promise<TestingModule> {
   return Test.createTestingModule({
     providers: [LifecycleCommands, {
-      provide: DatabaseService,
-      useValue: databaseService,
+      provide: LifecycleService,
+      useValue: lifecycleService,
     }],
   }).compile();
 }
@@ -121,7 +121,7 @@ describe("LifecycleCommands", () => {
   describe("onGreet", () => {
     it("replies with Hello, followed by the username and a positive message about the database connection if it's successful", async () => {
       const interaction = makeInteraction(50, "TestUser");
-      databaseService.checkConnection.mockResolvedValue(true);
+      lifecycleService.checkConnection.mockResolvedValue(true);
 
       await commands.onGreet([interaction] as never);
 
@@ -134,7 +134,7 @@ describe("LifecycleCommands", () => {
 
     it("replies with Sorry, followed by the username and a negative message about the database connection if it's unsuccessful", async () => {
       const interaction = makeInteraction(50, "TestUser");
-      databaseService.checkConnection.mockResolvedValue(false);
+      lifecycleService.checkConnection.mockResolvedValue(false);
 
       await commands.onGreet([interaction] as never);
 
@@ -147,7 +147,7 @@ describe("LifecycleCommands", () => {
 
     it("replies with Sorry, followed by the username and a clarifying message about lack of info if the connection checker fails", async () => {
       const interaction = makeInteraction(50, "TestUser");
-      databaseService.checkConnection.mockResolvedValue(null);
+      lifecycleService.checkConnection.mockResolvedValue(null);
 
       await commands.onGreet([interaction] as never);
 
@@ -180,7 +180,7 @@ describe("LifecycleCommands", () => {
 
     it("reflects the actual username in the reply", async () => {
       const interaction = makeInteraction(400, "OtherTestName");
-      databaseService.checkConnection.mockResolvedValue(false);
+      lifecycleService.checkConnection.mockResolvedValue(false);
 
       await commands.onGreet([interaction] as never);
 

@@ -1,13 +1,13 @@
 import { Injectable } from "@nestjs/common";
 import { MessageFlags } from "discord.js";
 import { Context, SlashCommand, type SlashCommandContext } from "necord";
-import { DatabaseService } from "./lifecycle.service.js";
+import { LifecycleService } from "./lifecycle.service.js";
 
 @Injectable()
 export class LifecycleCommands {
 
   constructor(
-  private readonly databaseService: DatabaseService,
+  private readonly service: LifecycleService,
 ) {}
 
   @SlashCommand({
@@ -28,7 +28,7 @@ export class LifecycleCommands {
     dmPermission: true,
   })
   public async onGreet(@Context() [interaction]: SlashCommandContext) {
-    const connected = await this.databaseService.checkConnection();
+    const connected = await this.service.checkConnection();
     let message: string;
 
     switch (connected) {

@@ -11,6 +11,7 @@ function makeClient(username = "TestBot") {
       username,
       setActivity: vi.fn(),
     },
+    checkConnection: vi.fn(),
   };
 }
 

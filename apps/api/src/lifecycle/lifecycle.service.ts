@@ -14,11 +14,8 @@ export class LifecycleService {
 
     client.user.setActivity("YETI ARE YOU READY?", { type: ActivityType.Custom });
   }
-}
 
-@Injectable()
-export class DatabaseService {
-  async checkConnection(): Promise<boolean> {
+  public async checkConnection(): Promise<boolean> {
     try {
       await db.execute(sql`SELECT 1 AS connected`);
       return true;
