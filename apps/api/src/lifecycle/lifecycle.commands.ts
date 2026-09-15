@@ -5,6 +5,11 @@ import { DatabaseService } from "./lifecycle.service.js";
 
 @Injectable()
 export class LifecycleCommands {
+
+  constructor(
+  private readonly databaseService: DatabaseService,
+) {}
+
   @SlashCommand({
     name: "ping",
     description: "Ping the bot",
@@ -23,17 +28,22 @@ export class LifecycleCommands {
     dmPermission: true,
   })
   public async onGreet(@Context() [interaction]: SlashCommandContext) {
-    const connected = await new DatabaseService().checkConnection();
+    const connected = await this.databaseService.checkConnection();
+    let message: string;
 
-    if (connected) {
-      return interaction.reply({
-        content: `Hello, ${interaction.user.username}! The database connection is working.`,
-        flags: [MessageFlags.Ephemeral],
-      });
+    switch (connected) {
+      case true:
+        message = `Hello, ${interaction.user.username}! The database connection is working.`;
+        break;
+      case false:
+        message = `Sorry, ${interaction.user.username}! The database connection is not working.`;
+        break;
+      default:
+        message = `Sorry, ${interaction.user.username}! The database connection checker failed to determine the connection status.`;
     }
 
     return interaction.reply({
-      content: `Hello, ${interaction.user.username}! The database connection is not working.`,
+      content: message,
       flags: [MessageFlags.Ephemeral],
     });
   }

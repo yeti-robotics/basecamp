@@ -20,7 +20,7 @@ export class LifecycleService {
 export class DatabaseService {
   async checkConnection(): Promise<boolean> {
     try {
-      await db.execute(sql`SELECT 1`);
+      await db.execute(sql`SELECT 1 AS connected`);
       return true;
     } catch {
       return false;
