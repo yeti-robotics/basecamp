@@ -90,4 +90,25 @@ describe("LifecycleService", () => {
       expect(result).toBeUndefined();
     });
   });
+
+  // ─── checkConnection ──────────────────────────────────────────────────────────────
+  describe("checkConnection", () => {
+    it("returns true when the database connection is working", async () => {
+      const executeSpy = vi.spyOn(service["db"], "execute");
+      executeSpy.mockResolvedValue({ rows: [{ connected: 1 }] } as never);
+
+      const result = await service.checkConnection();
+
+      expect(result).toBe(true);
+    });
+
+    it("returns false when the database connection is not working", async () => {
+      const executeSpy = vi.spyOn(service["db"], "execute");
+      executeSpy.mockRejectedValue(new Error("Database connection error"));
+
+      const result = await service.checkConnection();
+
+      expect(result).toBe(false);
+    });
+  });
 });

@@ -1,6 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ActivityType } from "discord.js";
-import { sql } from "drizzle-orm/sql/sql";
+import { sql } from "drizzle-orm";
 import { Context, type ContextOf, Once } from "necord";
 import { db } from "src/auth.js";
 
