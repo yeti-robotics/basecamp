@@ -2,7 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { ActivityType } from "discord.js";
 import { sql } from "drizzle-orm";
 import { Context, type ContextOf, Once } from "necord";
-import { db } from "src/auth.js";
+import { db } from "../auth.js";
 
 @Injectable()
 export class LifecycleService {

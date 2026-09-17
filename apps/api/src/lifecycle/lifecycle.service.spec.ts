@@ -2,7 +2,7 @@ import { Test, type TestingModule } from "@nestjs/testing";
 import { ActivityType } from "discord.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LifecycleService } from "./lifecycle.service.js";
-import { db } from "src/auth.js";
+import { db } from "../auth.js";
 
 // ─── Client helper ────────────────────────────────────────────────────────────
 
