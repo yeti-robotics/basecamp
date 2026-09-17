@@ -1,10 +1,10 @@
-import { Controller, Get, HttpCode, HttpStatus } from "@nestjs/common";
+import { Controller, Get, HttpCode, HttpStatus } from '@nestjs/common';
 
-@Controller("health")
+@Controller('health')
 export class HealthController {
   @Get()
   @HttpCode(HttpStatus.OK)
   health() {
-    return { status: "ok" };
+    return { status: 'ok' };
   }
 }

@@ -9,6 +9,10 @@ function isUnderSourceRoot(file, sourceRoots) {
   return sourceRoots.some((root) => file === root || file.startsWith(`${root}/`));
 }
 
+function isTestFile(file) {
+  return /\.(?:spec|test)\.[cm]?[jt]sx?$/.test(file);
+}
+
 function parseAddedLines(diff, sourceRoots) {
   const addedLines = new Map();
   let currentFile;
@@ -17,7 +21,10 @@ function parseAddedLines(diff, sourceRoots) {
   for (const line of diff.split('\n')) {
     if (line.startsWith('+++ b/')) {
       const file = line.slice('+++ b/'.length);
-      currentFile = file !== '/dev/null' && isUnderSourceRoot(file, sourceRoots) ? file : undefined;
+      currentFile =
+        file !== '/dev/null' && isUnderSourceRoot(file, sourceRoots) && !isTestFile(file)
+          ? file
+          : undefined;
       continue;
     }
 
