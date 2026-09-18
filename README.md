@@ -49,7 +49,7 @@ packages/
 
 ### Prerequisites
 
-- Node.js 20+
+- Node.js 24 LTS
 - pnpm 10+
 
 Install dependencies:
