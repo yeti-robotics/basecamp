@@ -16,7 +16,7 @@ import { ConfigService } from '@nestjs/config';
       NecordModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
-        token: config.getOrThrow<string>('DISCORD_BOT_TOKEN'),
+        token: config.getOrThrow<string>('DISCORD_TOKEN'),
         intents: [IntentsBitField.Flags.Guilds],
         development: [config.getOrThrow<string>('DISCORD_DEVELOPMENT_GUILD_ID')]
       })
