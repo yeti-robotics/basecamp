@@ -8,14 +8,23 @@ import { OutreachModule } from './outreach/outreach.module.js';
 import { HealthModule } from './health/health.module.js';
 import { IntentsBitField } from 'discord.js';
 import { NecordModule } from 'necord';
+import { ConfigModule } from '@nestjs/config';
+import { ConfigService } from '@nestjs/config';
 
 @Module({
   imports: [
-    NecordModule.forRoot({
-            token: process.env.DISCORD_BOT_TOKEN!,
-            intents: [ IntentsBitField.Flags.Guilds],
-            development: [process.env.DISCORD_DEVELOPMENT_GUILD_ID!]
-        }),
+      NecordModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        token: config.getOrThrow<string>('DISCORD_BOT_TOKEN'),
+        intents: [IntentsBitField.Flags.Guilds],
+        development: [config.getOrThrow<string>('DISCORD_DEVELOPMENT_GUILD_ID')]
+      })
+    }),
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: ['.env', '.env.local']
+    }),
     AttendanceModule,
     LifecycleModule,
     HandbookModule,
