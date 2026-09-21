@@ -24,12 +24,10 @@ export class AttendanceService {
 
   private readonly ServerId: string;
   private readonly devGuildId: string;
-  private readonly attendanceRepository: AttendanceRepository;
 
-  constructor() {
+  constructor(private readonly attendanceRepository: AttendanceRepository,) {
     this.ServerId = process.env.DISCORD_GUILD_ID || "";
     this.devGuildId = process.env.DISCORD_DEVELOPMENT_GUILD_ID || "";
-    this.attendanceRepository = new AttendanceRepository();
   }
 
   private getTeam(guildId: string) {

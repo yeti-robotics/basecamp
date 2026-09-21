@@ -27,17 +27,26 @@ export class AttendanceCommands {
     name: 'signin',
     description: 'Sign in to a YETI meeting at the zone',
   })
-  async SigninCommand(@Context() [interaction]: SlashCommandContext) {
-    try {
-      await this.attendanceService.recordAttendance(1, interaction.user.id, 'meeting', 0,);
-      await interaction.reply('<@' + interaction.user.id + '> has signed in.');
-    } catch (error: unknown) {
-      const message = error instanceof Error
-    ? error.message
-    : String(error);
+    async SigninCommand(@Context() [interaction]: SlashCommandContext) {
+      const result = await this.attendanceService.recordAttendance(
+    1,
+    interaction.user.id,
+    "meeting",
+    0,
+    );
 
-      await interaction.reply({content: `Error signing in: ${message}. Please try again later or contact a web dev mentor if issue persists.`, flags: ["Ephemeral"]});
-    }
+  if (result.isErr()) {
+    await interaction.reply({
+      content: `Error signing in: ${result.error.message}. Please try again later or contact a web dev mentor if issue persists.`,
+      flags: ["Ephemeral"],
+    });
+
+  return;
+}
+
+await interaction.reply(
+  `<@${interaction.user.id}> has signed in.`,
+);
   }
 
   @SlashCommand({
