@@ -43,7 +43,7 @@ export class AttendanceService {
     }
   }
 
-  private recordAttendance(
+  public recordAttendance(
   id: number,
   userId: string,
   category: "meeting" | "outreach",
