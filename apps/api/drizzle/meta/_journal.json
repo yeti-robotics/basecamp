@@ -8,6 +8,13 @@
       "when": 1784608262324,
       "tag": "0000_stiff_supernaut",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1790122051728,
+      "tag": "0001_remarkable_gateway",
+      "breakpoints": true
     }
   ]
 }
