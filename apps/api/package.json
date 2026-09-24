@@ -35,9 +35,11 @@
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",
     "necord": "^7.0.0",
+    "neverthrow": "^8.2.0",
     "pg": "^8.22.0",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.1"
+    "rxjs": "^7.8.1",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@nestjs/cli": "^12.0.0",

@@ -1,9 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import type { SlashCommandContext } from 'necord';
 import { Context, SlashCommand } from 'necord';
+import { AttendanceService } from './attendance.service.js';
 
 @Injectable()
 export class AttendanceCommands {
+  constructor(private readonly attendanceService: AttendanceService) {}
+
   @SlashCommand({
     name: 'attendance',
     description: 'Get your current attendance',
@@ -24,8 +27,25 @@ export class AttendanceCommands {
     name: 'signin',
     description: 'Sign in to a YETI meeting at the zone',
   })
-  async SigninCommand(@Context() [interaction]: SlashCommandContext) {
-    await interaction.reply('Signin command');
+    async SigninCommand(@Context() [interaction]: SlashCommandContext) {
+      const result = await this.attendanceService.recordAttendance(
+    interaction.user.id,
+    "meeting",
+    null,
+    );
+
+  if (result.isErr()) {
+    await interaction.reply({
+      content: `Error signing in: ${result.error.message}. Please try again later or contact a web dev mentor if issue persists.`,
+      flags: ["Ephemeral"],
+    });
+
+  return;
+}
+
+await interaction.reply(
+  `<@${interaction.user.id}> has signed in.`,
+);
   }
 
   @SlashCommand({
