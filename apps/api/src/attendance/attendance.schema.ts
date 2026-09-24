@@ -6,7 +6,7 @@ export const AttendanceSchema = z.object({
   checkedInAt: z.iso.datetime(),
   checkedOutAt: z.iso.datetime().nullable(),
   category: z.enum(["meeting", "outreach"]),
-  eventId: z.int().min(1),
+  eventId: z.int().min(1).nullable(),
 });
 
 export type Attendance = z.infer<typeof AttendanceSchema>;

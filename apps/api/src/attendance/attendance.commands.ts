@@ -29,10 +29,9 @@ export class AttendanceCommands {
   })
     async SigninCommand(@Context() [interaction]: SlashCommandContext) {
       const result = await this.attendanceService.recordAttendance(
-    1,
     interaction.user.id,
     "meeting",
-    0,
+    null,
     );
 
   if (result.isErr()) {

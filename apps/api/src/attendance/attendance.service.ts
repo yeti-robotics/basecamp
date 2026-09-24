@@ -42,10 +42,9 @@ export class AttendanceService {
   }
 
   public recordAttendance(
-  id: number,
   userId: string,
   category: "meeting" | "outreach",
-  eventId: number,
+  eventId: number | null,
   checkedInAt: Date = new Date(),
 ): ResultAsync<void, Error> {
   return this.attendanceRepository.getLast(userId).andThen((attendance) => {

@@ -10,14 +10,14 @@ type AttendanceCreate = {
   userId: string;
   checkedInAt: Date;
   category: "meeting" | "outreach";
-  eventId: number;
+  eventId: number | null;
 };
 
 type AttendanceUpdate = {
   checkedInAt?: Date;
   checkedOutAt?: Date | null;
   category?: "meeting" | "outreach";
-  eventId?: number;
+  eventId?: number | null;
 };
 
 @Injectable()
