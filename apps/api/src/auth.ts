@@ -4,6 +4,8 @@ import { admin } from 'better-auth/plugins';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import * as schema from './database/schema/auth.js';
+import { config } from 'dotenv';
+config();
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,

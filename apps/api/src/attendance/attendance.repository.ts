@@ -7,7 +7,6 @@ import { db } from "../auth.js";
 import { type Attendance, AttendanceSchema } from "./attendance.schema.js";
 
 type AttendanceCreate = {
-  id: number;
   userId: string;
   checkedInAt: Date;
   category: "meeting" | "outreach";
@@ -31,8 +30,8 @@ export class AttendanceRepository {
         sql`
           SELECT *
           FROM attendance
-          WHERE userId = ${userId}
-          ORDER BY checkedInAt DESC
+          WHERE user_id = ${userId}
+          ORDER BY checked_in_at DESC
           LIMIT 1
         `,
       ),
@@ -47,15 +46,13 @@ export class AttendanceRepository {
     return ResultAsync.fromPromise<QueryResult<Attendance>, Error>(
       db.execute(sql`
         INSERT INTO attendance (
-          id,
-          userId,
-          checkedInAt,
-          checkedOutAt,
+          user_id,
+          checked_in_at,
+          checked_out_at,
           category,
-          eventId
+          event_id
         )
         VALUES (
-          ${record.id},
           ${record.userId},
           ${record.checkedInAt.toISOString()},
           NULL,
@@ -85,13 +82,13 @@ export class AttendanceRepository {
 
     if (updates.checkedInAt !== undefined) {
       setClauses.push(
-        sql`checkedInAt = ${updates.checkedInAt.toISOString()}`,
+        sql`checked_in_at = ${updates.checkedInAt.toISOString()}`,
       );
     }
 
     if (updates.checkedOutAt !== undefined) {
       setClauses.push(
-        sql`checkedOutAt = ${
+        sql`checked_out_at = ${
           updates.checkedOutAt?.toISOString() ?? null
         }`,
       );
@@ -102,7 +99,7 @@ export class AttendanceRepository {
     }
 
     if (updates.eventId !== undefined) {
-      setClauses.push(sql`eventId = ${updates.eventId}`);
+      setClauses.push(sql`event_id = ${updates.eventId}`);
     }
 
     if (setClauses.length === 0) {
@@ -121,8 +118,8 @@ export class AttendanceRepository {
           WHERE id = (
             SELECT id
             FROM attendance
-            WHERE userId = ${userId}
-            ORDER BY checkedInAt DESC
+            WHERE user_id = ${userId}
+            ORDER BY checked_in_at DESC
             LIMIT 1
           )
           RETURNING *

@@ -55,7 +55,6 @@ export class AttendanceService {
 
     return this.attendanceRepository
       .createRecord({
-        id,
         userId,
         checkedInAt,
         category,
