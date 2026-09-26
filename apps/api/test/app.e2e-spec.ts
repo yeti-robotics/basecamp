@@ -1,4 +1,5 @@
 import { INestApplication } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { App } from 'supertest/types';
@@ -10,7 +11,17 @@ describe('AppController (e2e)', () => {
   beforeEach(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(ConfigService)
+      .useValue(new ConfigService({
+        DATABASE_URL: 'postgresql://test:test@localhost:5432/basecamp-test',
+        BETTER_AUTH_SECRET: 'test-secret-at-least-thirty-two-characters',
+        BETTER_AUTH_URL: 'http://localhost:3000',
+        DASHBOARD_URL: 'http://localhost:3000',
+        DISCORD_CLIENT_ID: 'test-client-id',
+        DISCORD_CLIENT_SECRET: 'test-client-secret',
+      }))
+      .compile();
 
     app = moduleFixture.createNestApplication();
     await app.init();
@@ -21,6 +32,6 @@ describe('AppController (e2e)', () => {
   });
 
   afterEach(async () => {
-    await app.close();
+    await app?.close();
   });
 });

@@ -2,7 +2,9 @@ import { Test, type TestingModule } from "@nestjs/testing";
 import { ActivityType } from "discord.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LifecycleService } from "./lifecycle.service.js";
-import { db } from "../auth.js";
+import { DatabaseService } from "../database/database.service.js";
+
+const execute = vi.fn();
 
 // ─── Client helper ────────────────────────────────────────────────────────────
 
@@ -19,7 +21,10 @@ function makeClient(username = "TestBot") {
 
 async function makeModule(): Promise<TestingModule> {
   return Test.createTestingModule({
-    providers: [LifecycleService],
+    providers: [
+      LifecycleService,
+      { provide: DatabaseService, useValue: { db: { execute } } },
+    ],
   }).compile();
 }
 
@@ -27,13 +32,16 @@ async function makeModule(): Promise<TestingModule> {
 
 describe("LifecycleService", () => {
   let service: LifecycleService;
+  let module: TestingModule;
 
   beforeEach(async () => {
-    const module = await makeModule();
+    execute.mockReset();
+    module = await makeModule();
     service = module.get(LifecycleService);
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await module.close();
     vi.clearAllMocks();
   });
 
@@ -94,8 +102,7 @@ describe("LifecycleService", () => {
   // ─── checkConnection ──────────────────────────────────────────────────────────────
   describe("checkConnection", () => {
     it("returns true when the database connection is working", async () => {
-      const executeSpy = vi.spyOn(db, "execute");
-      executeSpy.mockResolvedValue({ rows: [{ connected: 1 }] } as never);
+      execute.mockResolvedValue({ rows: [{ connected: 1 }] });
 
       const result = await service.checkConnection();
 
@@ -103,8 +110,7 @@ describe("LifecycleService", () => {
     });
 
     it("returns false when the database connection is not working", async () => {
-      const executeSpy = vi.spyOn(db, "execute");
-      executeSpy.mockRejectedValue(new Error("Database connection error"));
+      execute.mockRejectedValue(new Error("Database connection error"));
 
       const result = await service.checkConnection();
 

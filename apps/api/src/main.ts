@@ -1,12 +1,14 @@
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { toNodeHandler } from 'better-auth/node';
+import type { Auth } from './auth.js';
+import { AUTH } from './auth/auth.module.js';
 import { AppModule } from './app.module.js';
-import { auth } from './auth.js';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { bodyParser: false });
   const server = app.getHttpAdapter().getInstance();
+  const auth = app.get<Auth>(AUTH);
 
   // Better Auth needs the untouched request stream, so its catch-all handler
   // must be registered before Nest's body parsers.
@@ -14,6 +16,7 @@ async function bootstrap() {
 
   app.useBodyParser('json');
   app.useBodyParser('urlencoded', { extended: true });
+  app.enableShutdownHooks();
   await app.listen(process.env.PORT ?? 8000);
 }
 bootstrap();

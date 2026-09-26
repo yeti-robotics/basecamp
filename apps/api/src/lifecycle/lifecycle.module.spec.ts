@@ -1,8 +1,9 @@
 import { Test, type TestingModule } from "@nestjs/testing";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { LifecycleCommands } from "./lifecycle.commands.js";
 import { LifecycleModule } from "./lifecycle.module.js";
 import { LifecycleService } from "./lifecycle.service.js";
+import { DatabaseService } from "../database/database.service.js";
 
 describe("LifecycleModule", () => {
   let module: TestingModule;
@@ -10,7 +11,10 @@ describe("LifecycleModule", () => {
   beforeEach(async () => {
     module = await Test.createTestingModule({
       imports: [LifecycleModule],
-    }).compile();
+    })
+      .overrideProvider(DatabaseService)
+      .useValue({ db: { execute: vi.fn() } })
+      .compile();
   });
 
   it("should compile successfully", () => {
