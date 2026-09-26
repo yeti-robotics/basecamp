@@ -5,6 +5,7 @@ import { NecordModule } from 'necord';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { AttendanceModule } from './attendance/attendance.module.js';
+import { AuthModule } from './auth/auth.module.js';
 import { apiEnvFiles } from './env.js';
 import { HandbookModule } from './handbook/handbook.module.js';
 import { HealthModule } from './health/health.module.js';
@@ -30,6 +31,7 @@ const discordDevelopmentGuildId = process.env.DISCORD_DEVELOPMENT_GUILD_ID;
       envFilePath: apiEnvFiles,
     }),
     AttendanceModule,
+    AuthModule,
     LifecycleModule,
     HandbookModule,
     OutreachModule,

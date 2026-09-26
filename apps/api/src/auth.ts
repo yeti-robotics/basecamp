@@ -1,33 +1,64 @@
 import { drizzleAdapter } from '@better-auth/drizzle-adapter';
-import { betterAuth } from 'better-auth';
+import { ConfigService } from '@nestjs/config';
+import { type Auth as BetterAuthInstance, type BetterAuthOptions, betterAuth } from 'better-auth';
 import { admin } from 'better-auth/plugins';
-import { drizzle } from 'drizzle-orm/node-postgres';
-import { Pool } from 'pg';
+import type { AppDatabase } from './database/database.service.js';
 import * as schema from './database/schema/auth.js';
-import './env.js';
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
+function requiredSetting(config: ConfigService, key: string): string {
+  const value = config.get<string>(key);
+  if (!value?.trim()) {
+    throw new Error(`${key} is required`);
+  }
+  return value;
+}
 
-export const db = drizzle(pool);
+function requiredHttpUrl(config: ConfigService, key: string): URL {
+  const setting = requiredSetting(config, key);
+  let url: URL;
+  try {
+    url = new URL(setting);
+  } catch {
+    throw new Error(`${key} must be an HTTP(S) URL`);
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    throw new Error(`${key} must be an HTTP(S) URL`);
+  }
+  return url;
+}
 
-// biome-ignore lint/suspicious/noExplicitAny: better-auth's inferred type is too complex to annotate here
-export const auth: any = betterAuth({
-  baseURL: process.env.BETTER_AUTH_URL ?? 'http://localhost:3000',
-  trustedOrigins: [process.env.DASHBOARD_URL ?? 'http://localhost:3000'],
-  database: drizzleAdapter(db, {
-    provider: 'pg',
-    schema,
-  }),
-  emailAndPassword: {
-    enabled: false,
-  },
-  socialProviders: {
-    discord: {
-      clientId: process.env.DISCORD_CLIENT_ID!,
-      clientSecret: process.env.DISCORD_CLIENT_SECRET!,
+export function createAuth(database: AppDatabase, config: ConfigService): BetterAuthInstance {
+  const secret = requiredSetting(config, 'BETTER_AUTH_SECRET');
+  if (secret.length < 32) {
+    throw new Error('BETTER_AUTH_SECRET must contain at least 32 characters');
+  }
+
+  const baseURL = requiredSetting(config, 'BETTER_AUTH_URL');
+  requiredHttpUrl(config, 'BETTER_AUTH_URL');
+  const dashboardOrigin = requiredHttpUrl(config, 'DASHBOARD_URL').origin;
+  const clientId = requiredSetting(config, 'DISCORD_CLIENT_ID');
+  const clientSecret = requiredSetting(config, 'DISCORD_CLIENT_SECRET');
+
+  const options: BetterAuthOptions = {
+    baseURL,
+    secret,
+    trustedOrigins: [dashboardOrigin],
+    database: drizzleAdapter(database, {
+      provider: 'pg',
+      schema,
+    }),
+    emailAndPassword: {
+      enabled: false,
     },
-  },
-  plugins: [admin()],
-});
+    socialProviders: {
+      discord: {
+        clientId,
+        clientSecret,
+      },
+    },
+    plugins: [admin()],
+  };
+  return betterAuth(options);
+}
+
+export type Auth = BetterAuthInstance;
