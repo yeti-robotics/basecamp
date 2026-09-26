@@ -110,4 +110,6 @@ pnpm --filter api db:generate --name=describe_the_change
 pnpm --filter api db:migrate
 ```
 
+To delete and recreate the local `basecamp` database, then apply all migrations, run `pnpm --filter api db:nuke`. This command only accepts a loopback PostgreSQL URL whose database name is `basecamp`. All data in that database is deleted.
+
 Commit the generated SQL, migration journal, and snapshot. Deployment applies pending migrations once, before rolling out API instances. The API does not migrate the database during application startup.
