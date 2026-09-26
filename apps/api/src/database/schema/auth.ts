@@ -26,6 +26,7 @@ export const session = pgTable(
     token: text('token').notNull().unique(),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at')
+      .defaultNow()
       .$onUpdate(() => /* @__PURE__ */ new Date())
       .notNull(),
     ipAddress: text('ip_address'),
@@ -42,7 +43,6 @@ export const account = pgTable(
   'account',
   {
     id: text('id').primaryKey(),
-    issuer: text('issuer').notNull(),
     accountId: text('account_id').notNull(),
     providerId: text('provider_id').notNull(),
     userId: text('user_id')
@@ -57,11 +57,12 @@ export const account = pgTable(
     password: text('password'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at')
+      .defaultNow()
       .$onUpdate(() => /* @__PURE__ */ new Date())
       .notNull(),
   },
   (table) => [
-    uniqueIndex('account_issuer_accountId_uidx').on(table.issuer, table.accountId),
+    uniqueIndex('account_providerId_accountId_uidx').on(table.providerId, table.accountId),
     index('account_userId_idx').on(table.userId),
   ],
 );

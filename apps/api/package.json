@@ -22,6 +22,7 @@
     "test:e2e": "vitest run --project e2e",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
+    "db:nuke": "node scripts/db-nuke.mjs",
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
