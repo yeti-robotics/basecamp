@@ -13,14 +13,16 @@ describe('AppController (e2e)', () => {
       imports: [AppModule],
     })
       .overrideProvider(ConfigService)
-      .useValue(new ConfigService({
-        DATABASE_URL: 'postgresql://test:test@localhost:5432/basecamp-test',
-        BETTER_AUTH_SECRET: 'test-secret-at-least-thirty-two-characters',
-        BETTER_AUTH_URL: 'http://localhost:3000',
-        DASHBOARD_URL: 'http://localhost:3000',
-        DISCORD_CLIENT_ID: 'test-client-id',
-        DISCORD_CLIENT_SECRET: 'test-client-secret',
-      }))
+      .useValue(
+        new ConfigService({
+          DATABASE_URL: 'postgresql://test:test@localhost:5432/basecamp-test',
+          BETTER_AUTH_SECRET: 'test-secret-at-least-thirty-two-characters',
+          BETTER_AUTH_URL: 'http://localhost:3000',
+          DASHBOARD_URL: 'http://localhost:3000',
+          DISCORD_CLIENT_ID: 'test-client-id',
+          DISCORD_CLIENT_SECRET: 'test-client-secret',
+        }),
+      )
       .compile();
 
     app = moduleFixture.createNestApplication();

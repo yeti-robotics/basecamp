@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { createAuth } from '../auth.js';
 import { DatabaseModule } from '../database/database.module.js';
 import { DatabaseService } from '../database/database.service.js';
-import { createAuth } from '../auth.js';
 
 export const AUTH = Symbol('AUTH');
 

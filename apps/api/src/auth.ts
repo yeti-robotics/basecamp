@@ -1,7 +1,7 @@
 import { drizzleAdapter } from '@better-auth/drizzle-adapter';
-import { betterAuth, type Auth as BetterAuthInstance, type BetterAuthOptions } from 'better-auth';
-import { admin } from 'better-auth/plugins';
 import { ConfigService } from '@nestjs/config';
+import { type Auth as BetterAuthInstance, type BetterAuthOptions, betterAuth } from 'better-auth';
+import { admin } from 'better-auth/plugins';
 import type { AppDatabase } from './database/database.service.js';
 import * as schema from './database/schema/auth.js';
 

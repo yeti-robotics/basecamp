@@ -43,19 +43,26 @@ describe('DatabaseService', () => {
 
   it('creates one pool for the module and awaits pool shutdown', async () => {
     let resolveEnd!: () => void;
-    mocks.end.mockImplementationOnce(() => new Promise<void>((resolve) => {
-      resolveEnd = resolve;
-    }));
+    mocks.end.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveEnd = resolve;
+        }),
+    );
 
     const { app, module } = await makeApplication('postgresql://test:test@localhost/test');
     expect(module.get(DatabaseService)).toBe(module.get(DatabaseService));
     expect(mocks.Pool).toHaveBeenCalledTimes(1);
-    expect(mocks.Pool).toHaveBeenCalledWith(expect.objectContaining({
-      connectionString: 'postgresql://test:test@localhost/test',
-    }));
+    expect(mocks.Pool).toHaveBeenCalledWith(
+      expect.objectContaining({
+        connectionString: 'postgresql://test:test@localhost/test',
+      }),
+    );
 
     let closed = false;
-    const closing = app.close().then(() => { closed = true; });
+    const closing = app.close().then(() => {
+      closed = true;
+    });
     await vi.waitFor(() => expect(mocks.end).toHaveBeenCalledTimes(1));
     expect(closed).toBe(false);
     resolveEnd();

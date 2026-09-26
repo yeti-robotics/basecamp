@@ -52,20 +52,22 @@ describe('AuthModule', () => {
       provider: 'pg',
       schema: authSchema,
     });
-    expect(mocks.betterAuth).toHaveBeenCalledWith(expect.objectContaining({
-      baseURL: validSettings.BETTER_AUTH_URL,
-      trustedOrigins: ['http://localhost:3000'],
-      secret: validSettings.BETTER_AUTH_SECRET,
-      database: { kind: 'drizzle-adapter' },
-      emailAndPassword: { enabled: false },
-      socialProviders: {
-        discord: {
-          clientId: validSettings.DISCORD_CLIENT_ID,
-          clientSecret: validSettings.DISCORD_CLIENT_SECRET,
+    expect(mocks.betterAuth).toHaveBeenCalledWith(
+      expect.objectContaining({
+        baseURL: validSettings.BETTER_AUTH_URL,
+        trustedOrigins: ['http://localhost:3000'],
+        secret: validSettings.BETTER_AUTH_SECRET,
+        database: { kind: 'drizzle-adapter' },
+        emailAndPassword: { enabled: false },
+        socialProviders: {
+          discord: {
+            clientId: validSettings.DISCORD_CLIENT_ID,
+            clientSecret: validSettings.DISCORD_CLIENT_SECRET,
+          },
         },
-      },
-      plugins: [{ kind: 'admin-plugin' }],
-    }));
+        plugins: [{ kind: 'admin-plugin' }],
+      }),
+    );
     await module.close();
   });
 
@@ -86,7 +88,10 @@ describe('AuthModule', () => {
     ['DASHBOARD_URL', 'not a url'],
   ])('rejects invalid %s without exposing its value', async (key, value) => {
     const settings = { ...validSettings, [key]: value };
-    const error = await makeModule(settings).then(() => undefined, (cause: Error) => cause);
+    const error = await makeModule(settings).then(
+      () => undefined,
+      (cause: Error) => cause,
+    );
     expect(error?.message).toBe(`${key} must be an HTTP(S) URL`);
     expect(error?.message).not.toContain(value);
     expect(mocks.betterAuth).not.toHaveBeenCalled();
@@ -94,8 +99,9 @@ describe('AuthModule', () => {
 
   it('rejects short auth secrets without passing them to Better Auth', async () => {
     const secret = 'too-short-secret';
-    await expect(makeModule({ ...validSettings, BETTER_AUTH_SECRET: secret }))
-      .rejects.toThrow('BETTER_AUTH_SECRET must contain at least 32 characters');
+    await expect(makeModule({ ...validSettings, BETTER_AUTH_SECRET: secret })).rejects.toThrow(
+      'BETTER_AUTH_SECRET must contain at least 32 characters',
+    );
     expect(mocks.betterAuth).not.toHaveBeenCalled();
   });
 });
