@@ -5,15 +5,22 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1790292090023,
-      "tag": "0001_basecamp_auth",
+      "when": 1784608262324,
+      "tag": "0000_stiff_supernaut",
       "breakpoints": true
     },
     {
       "idx": 1,
       "version": "7",
+      "when": 1790122051728,
+      "tag": "0001_remarkable_gateway",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
       "when": 1790390642090,
-      "tag": "0002_basecamp_domain_schema",
+      "tag": "0002_reconcile_auth",
       "breakpoints": true
     }
   ]
