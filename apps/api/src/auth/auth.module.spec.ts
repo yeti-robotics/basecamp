@@ -19,7 +19,6 @@ import { AUTH, AuthModule } from './auth.module.js';
 const validSettings = {
   BETTER_AUTH_SECRET: 'test-secret-at-least-thirty-two-characters',
   BETTER_AUTH_URL: 'http://localhost:3000',
-  DASHBOARD_URL: 'http://localhost:3000',
   DISCORD_CLIENT_ID: 'test-client-id',
   DISCORD_CLIENT_SECRET: 'test-client-secret',
 };
@@ -55,7 +54,6 @@ describe('AuthModule', () => {
     expect(mocks.betterAuth).toHaveBeenCalledWith(
       expect.objectContaining({
         baseURL: validSettings.BETTER_AUTH_URL,
-        trustedOrigins: ['http://localhost:3000'],
         secret: validSettings.BETTER_AUTH_SECRET,
         database: { kind: 'drizzle-adapter' },
         emailAndPassword: { enabled: false },
@@ -76,7 +74,6 @@ describe('AuthModule', () => {
     ['DISCORD_CLIENT_ID', ''],
     ['DISCORD_CLIENT_SECRET', ''],
     ['BETTER_AUTH_URL', ''],
-    ['DASHBOARD_URL', ''],
   ])('requires %s', async (key, value) => {
     const settings = { ...validSettings, [key]: value };
     await expect(makeModule(settings)).rejects.toThrow(`${key} is required`);
@@ -85,7 +82,6 @@ describe('AuthModule', () => {
 
   it.each([
     ['BETTER_AUTH_URL', 'ftp://auth.example.test'],
-    ['DASHBOARD_URL', 'not a url'],
   ])('rejects invalid %s without exposing its value', async (key, value) => {
     const settings = { ...validSettings, [key]: value };
     const error = await makeModule(settings).then(
