@@ -78,12 +78,21 @@ export class AttendanceRepository {
     ).andThen((result) => this.parseRow(result[0]));
   }
 
-  private parseRow(row: unknown): Result<Attendance | null, Error> {
+  private parseRow(row: typeof attendance.$inferSelect | undefined): Result<Attendance | null, Error> {
     if (!row) {
       return ok(null);
     }
 
-    const parsed = AttendanceSchema.safeParse(row);
+    const parseableRow = {
+      id: row.id,
+      userId: row.user_id,
+      checkedInAt: row.checked_in_at.toISOString(),
+      checkedOutAt: row.checked_out_at ? row.checked_out_at.toISOString() : null,
+      category: row.category,
+      eventId: row.event_id,
+    };
+
+    const parsed = AttendanceSchema.safeParse(parseableRow);
 
     if (!parsed.success) {
       this.logger.error(
