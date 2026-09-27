@@ -25,6 +25,19 @@ test('finds added lines only inside the configured source directories', () => {
   );
 });
 
+test('excludes unit test files from new source lines', () => {
+  const diff = [
+    'diff --git a/apps/api/src/example.spec.ts b/apps/api/src/example.spec.ts',
+    '--- a/apps/api/src/example.spec.ts',
+    '+++ b/apps/api/src/example.spec.ts',
+    '@@ -1,0 +1,2 @@',
+    '+test("example", () => {});',
+    '+expect(true).toBe(true);',
+  ].join('\n');
+
+  assert.deepEqual(parseAddedLines(diff, ['apps/api/src']), new Map());
+});
+
 test('counts executable added lines covered by Istanbul statements', () => {
   const coverage = {
     '/workspace/apps/api/src/example.ts': {

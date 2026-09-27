@@ -1,7 +1,9 @@
 import 'reflect-metadata';
 import { MODULE_METADATA } from '@nestjs/common/constants';
+import { ConfigModule } from '@nestjs/config';
+import { Test } from '@nestjs/testing';
 import { NecordModule } from 'necord';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 describe('AppModule', () => {
   const envKeys = [
@@ -50,5 +52,37 @@ describe('AppModule', () => {
     );
 
     expect(registersNecord).toBe(false);
+  });
+
+  it('registers the Discord bot when both settings are configured', async () => {
+    vi.resetModules();
+    process.env.DISCORD_TOKEN = 'bot-token';
+    process.env.DISCORD_DEVELOPMENT_GUILD_ID = 'guild-id';
+
+    const { AppModule } = await import('./app.module.js');
+    const imports = Reflect.getMetadata(MODULE_METADATA.IMPORTS, AppModule) as unknown[];
+    const registersNecord = imports.some(
+      (entry) =>
+        typeof entry === 'object' &&
+        entry !== null &&
+        'module' in entry &&
+        entry.module === NecordModule,
+    );
+
+    expect(registersNecord).toBe(true);
+  });
+
+  it('loads validated configuration from the extracted options', async () => {
+    vi.resetModules();
+    process.env.DISCORD_TOKEN = ' ';
+    process.env.DISCORD_DEVELOPMENT_GUILD_ID = ' ';
+
+    const { AppModule } = await import('./app.module.js');
+    const module = await Test.createTestingModule({ imports: [AppModule] }).compile();
+    await module.init();
+
+    expect(module.get(ConfigModule, { strict: false })).toBeDefined();
+
+    await module.close();
   });
 });
