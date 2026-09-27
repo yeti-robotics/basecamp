@@ -8,38 +8,11 @@ import {
 } from "./attendance.constants.js";
 import { AttendanceRepository } from "./attendance.repository.js";
 
-type AttendanceOperationResult =
-  | {
-      success: true;
-      message?: string;
-    }
-  | {
-      success: false;
-      message: string;
-    };
-
 @Injectable()
 export class AttendanceService {
   private readonly logger = new Logger(AttendanceService.name);
 
-  private readonly ServerId: string;
-  private readonly devGuildId: string;
-
-  constructor(private readonly attendanceRepository: AttendanceRepository,) {
-    this.ServerId = process.env.DISCORD_GUILD_ID || "";
-    this.devGuildId = process.env.DISCORD_DEVELOPMENT_GUILD_ID || "";
-  }
-
-  private getTeam(guildId: string) {
-    switch (guildId) {
-      case this.ServerId:
-        return TEAM_NAMES.OFFICIAL_NAME;
-      case this.devGuildId:
-        return TEAM_NAMES.DEV;
-      default:
-        return "";
-    }
-  }
+  constructor(private readonly attendanceRepository: AttendanceRepository,) {}  
 
   public recordAttendance(
   userId: string,
