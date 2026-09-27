@@ -101,7 +101,7 @@ Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
 
 The API owns the PostgreSQL connection pool, Better Auth, and database migrations. The API process creates one pool with a maximum of 10 connections, a 5-second connection timeout, and a 30-second idle timeout. The pool closes during Nest application shutdown, so the deployment's total possible connections are the per-process limit multiplied by the number of API instances.
 
-Copy `.env.example` to `.env` for local development. Set `DATABASE_URL` to PostgreSQL, `BETTER_AUTH_SECRET` to a random value of at least 32 characters (for example, `openssl rand -base64 32`), and provide the Discord client ID and secret. Set `BETTER_AUTH_URL` to the public dashboard URL, where Discord can reach the auth callback. Better Auth trusts that URL's origin for browser requests and redirects. The dashboard separately uses `API_INTERNAL_URL` to reach NestJS over the private network; set it in `apps/dashboard/.env.local`.
+Copy `.env.example` to `.env` for local development. The API validates its environment at startup. Set `DATABASE_URL` to a PostgreSQL URL, `BETTER_AUTH_SECRET` to a random value of at least 32 characters (for example, `openssl rand -base64 32`), `BETTER_AUTH_URL` to the public dashboard URL, and provide the Discord client ID and secret. `DISCORD_TOKEN` and `DISCORD_DEVELOPMENT_GUILD_ID` are optional, but must be set together to enable the bot. `PORT` defaults to `8000`. The dashboard separately uses `API_INTERNAL_URL` to reach NestJS over the private network; set it in `apps/dashboard/.env.local`.
 
 Generate and review migrations from the repository root:
 
