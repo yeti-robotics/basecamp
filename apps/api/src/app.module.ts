@@ -6,14 +6,14 @@ import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { AttendanceModule } from './attendance/attendance.module.js';
 import { AuthModule } from './auth/auth.module.js';
-import { apiEnvFiles } from './env.js';
+import { configOptions } from './config.options.js';
 import { HandbookModule } from './handbook/handbook.module.js';
 import { HealthModule } from './health/health.module.js';
 import { LifecycleModule } from './lifecycle/lifecycle.module.js';
 import { OutreachModule } from './outreach/outreach.module.js';
 
-const discordToken = process.env.DISCORD_TOKEN;
-const discordDevelopmentGuildId = process.env.DISCORD_DEVELOPMENT_GUILD_ID;
+const discordToken = process.env.DISCORD_TOKEN?.trim();
+const discordDevelopmentGuildId = process.env.DISCORD_DEVELOPMENT_GUILD_ID?.trim();
 
 @Module({
   imports: [
@@ -26,10 +26,7 @@ const discordDevelopmentGuildId = process.env.DISCORD_DEVELOPMENT_GUILD_ID;
           }),
         ]
       : []),
-    ConfigModule.forRoot({
-      isGlobal: true,
-      envFilePath: apiEnvFiles,
-    }),
+    ConfigModule.forRoot(configOptions),
     AttendanceModule,
     AuthModule,
     LifecycleModule,
