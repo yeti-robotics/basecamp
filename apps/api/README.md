@@ -96,3 +96,20 @@ Nest is an MIT-licensed open source project. It can grow thanks to the sponsors 
 ## License
 
 Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+
+## Database and authentication
+
+The API owns the PostgreSQL connection pool, Better Auth, and database migrations. The API process creates one pool with a maximum of 10 connections, a 5-second connection timeout, and a 30-second idle timeout. The pool closes during Nest application shutdown, so the deployment's total possible connections are the per-process limit multiplied by the number of API instances.
+
+Copy `.env.example` to `.env` for local development. The API validates its environment at startup. Set `DATABASE_URL` to a PostgreSQL URL, `BETTER_AUTH_SECRET` to a random value of at least 32 characters (for example, `openssl rand -base64 32`), `BETTER_AUTH_URL` to the public dashboard URL, and provide the Discord client ID and secret. `DISCORD_TOKEN` and `DISCORD_DEVELOPMENT_GUILD_ID` are optional, but must be set together to enable the bot. `PORT` defaults to `8000`. The dashboard separately uses `API_INTERNAL_URL` to reach NestJS over the private network; set it in `apps/dashboard/.env.local`.
+
+Generate and review migrations from the repository root:
+
+```bash
+pnpm --filter api db:generate --name=describe_the_change
+pnpm --filter api db:migrate
+```
+
+To delete and recreate the local `basecamp` database, then apply all migrations, run `pnpm --filter api db:nuke`. This command only accepts a loopback PostgreSQL URL whose database name is `basecamp`. All data in that database is deleted.
+
+Commit the generated SQL, migration journal, and snapshot. Deployment applies pending migrations once, before rolling out API instances. The API does not migrate the database during application startup.

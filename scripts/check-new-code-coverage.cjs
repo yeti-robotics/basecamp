@@ -6,7 +6,10 @@ const SOURCE_ROOTS = ['apps/api/src', 'apps/dashboard/src'];
 const DEFAULT_THRESHOLD = 60;
 
 function isUnderSourceRoot(file, sourceRoots) {
-  return sourceRoots.some((root) => file === root || file.startsWith(`${root}/`));
+  return (
+    !file.endsWith('.spec.ts') &&
+    sourceRoots.some((root) => file === root || file.startsWith(`${root}/`))
+  );
 }
 
 function parseAddedLines(diff, sourceRoots) {

@@ -1,29 +1,33 @@
-import { Test, type TestingModule } from "@nestjs/testing";
-import { beforeEach, describe, expect, it } from "vitest";
-import { LifecycleCommands } from "./lifecycle.commands.js";
-import { LifecycleModule } from "./lifecycle.module.js";
-import { LifecycleService } from "./lifecycle.service.js";
+import { Test, type TestingModule } from '@nestjs/testing';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { DatabaseService } from '../database/database.service.js';
+import { LifecycleCommands } from './lifecycle.commands.js';
+import { LifecycleModule } from './lifecycle.module.js';
+import { LifecycleService } from './lifecycle.service.js';
 
-describe("LifecycleModule", () => {
+describe('LifecycleModule', () => {
   let module: TestingModule;
 
   beforeEach(async () => {
     module = await Test.createTestingModule({
       imports: [LifecycleModule],
-    }).compile();
+    })
+      .overrideProvider(DatabaseService)
+      .useValue({ db: { execute: vi.fn() } })
+      .compile();
   });
 
-  it("should compile successfully", () => {
+  it('should compile successfully', () => {
     expect(module).toBeDefined();
   });
 
-  it("should provide LifecycleService", () => {
+  it('should provide LifecycleService', () => {
     const service = module.get(LifecycleService);
     expect(service).toBeDefined();
     expect(service).toBeInstanceOf(LifecycleService);
   });
 
-  it("should provide LifecycleCommands", () => {
+  it('should provide LifecycleCommands', () => {
     const commands = module.get(LifecycleCommands);
     expect(commands).toBeDefined();
     expect(commands).toBeInstanceOf(LifecycleCommands);
