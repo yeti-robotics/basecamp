@@ -12,8 +12,8 @@ import { HealthModule } from './health/health.module.js';
 import { LifecycleModule } from './lifecycle/lifecycle.module.js';
 import { OutreachModule } from './outreach/outreach.module.js';
 
-const discordToken = process.env.DISCORD_TOKEN;
-const discordDevelopmentGuildId = process.env.DISCORD_DEVELOPMENT_GUILD_ID;
+const discordToken = process.env.DISCORD_TOKEN?.trim();
+const discordDevelopmentGuildId = process.env.DISCORD_DEVELOPMENT_GUILD_ID?.trim();
 
 @Module({
   imports: [
