@@ -35,14 +35,12 @@ export function createAuth(database: AppDatabase, config: ConfigService): Better
 
   const baseURL = requiredSetting(config, 'BETTER_AUTH_URL');
   requiredHttpUrl(config, 'BETTER_AUTH_URL');
-  const dashboardOrigin = requiredHttpUrl(config, 'DASHBOARD_URL').origin;
   const clientId = requiredSetting(config, 'DISCORD_CLIENT_ID');
   const clientSecret = requiredSetting(config, 'DISCORD_CLIENT_SECRET');
 
   const options: BetterAuthOptions = {
     baseURL,
     secret,
-    trustedOrigins: [dashboardOrigin],
     database: drizzleAdapter(database, {
       provider: 'pg',
       schema,
