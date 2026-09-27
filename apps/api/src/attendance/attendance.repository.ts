@@ -63,16 +63,39 @@ export class AttendanceRepository {
     userId: string,
     updates: AttendanceUpdate,
   ): ResultAsync<Attendance | null, Error> {
+    const setObject: Partial<typeof attendance.$inferInsert> = {};
+    if (updates.checkedInAt !== undefined) {
+      setObject.checked_in_at = updates.checkedInAt;
+    }
+    if (updates.checkedOutAt !== undefined) {
+      setObject.checked_out_at = updates.checkedOutAt;
+    }
+    if (updates.category !== undefined) {
+      setObject.category = updates.category;
+    }
+    if (updates.eventId !== undefined) {
+      setObject.event_id = updates.eventId;
+    }
+
     return ResultAsync.fromPromise<(typeof attendance.$inferSelect)[], Error>(
-      this.database.db.update(attendance)
-        .set({
-          checked_in_at: updates.checkedInAt,
-          checked_out_at: updates.checkedOutAt,
-          category: updates.category,
-          event_id: updates.eventId,
-        })
+      this.database.db.transaction(async (tx) => {
+        // Get last record using transaction so update works on correct record
+        const [last] = await tx
+        .select({id: attendance.id})
+        .from(attendance)
         .where(eq(attendance.user_id, userId))
-        .returning(),
+        .orderBy(desc(attendance.checked_in_at))
+        .limit(1);
+
+        if (!last) {
+          throw new Error("No attendance record found to update");
+        }
+
+        return tx.update(attendance)
+        .set(setObject)
+        .where(eq(attendance.id, last.id))
+        .returning();
+      }),
       (error) =>
         error instanceof Error ? error : new Error(String(error)),
     ).andThen((result) => this.parseRow(result[0]));
