@@ -10,14 +10,5 @@ export const EXPIRED_SESSION_THRESHOLD_MS = 1000 * 60 * 60 * 18;
 /** Milliseconds per hour for calculations */
 export const MS_PER_HOUR = 1000 * 60 * 60;
 
-/** Team name mappings */
-export const TEAM_NAMES = {
-  OFFICIAL_NAME: "YETI Robotics",
-  DEV: "Dev",
-} as const;
-
 /** Default limit for leaderboard queries */
 export const DEFAULT_LEADERBOARD_LIMIT = 5;
-
-/** Cache TTL for attendance sheet reads (15 minutes) */
-export const ATTENDANCE_CACHE_TTL_MS = 900_000;

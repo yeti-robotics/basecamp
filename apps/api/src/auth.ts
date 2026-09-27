@@ -4,8 +4,6 @@ import { type Auth as BetterAuthInstance, type BetterAuthOptions, betterAuth } f
 import { admin } from 'better-auth/plugins';
 import type { AppDatabase } from './database/database.service.js';
 import * as schema from './database/schema/auth.js';
-import { config } from 'dotenv';
-config();
 
 function requiredSetting(config: ConfigService, key: string): string {
   const value = config.get<string>(key);
