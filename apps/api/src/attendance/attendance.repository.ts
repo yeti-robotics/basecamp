@@ -3,7 +3,7 @@ import { err, errAsync, ok, Result, ResultAsync } from "neverthrow";
 import { sql, type SQL } from "drizzle-orm";
 import type { QueryResult } from "pg";
 
-import { db } from "../auth.js";
+import { DatabaseService } from "../database/database.service.js";
 import { type Attendance, AttendanceSchema } from "./attendance.schema.js";
 
 type AttendanceCreate = {
@@ -23,10 +23,12 @@ type AttendanceUpdate = {
 @Injectable()
 export class AttendanceRepository {
   private readonly logger = new Logger(AttendanceRepository.name);
+  
+  constructor(private readonly database: DatabaseService) {}
 
   getLast(userId: string): ResultAsync<Attendance | null, Error> {
     return ResultAsync.fromPromise<QueryResult<Attendance>, Error>(
-      db.execute(
+      this.database.db.execute(
         sql`
           SELECT *
           FROM attendance
@@ -44,7 +46,7 @@ export class AttendanceRepository {
     record: AttendanceCreate,
   ): ResultAsync<Attendance, Error> {
     return ResultAsync.fromPromise<QueryResult<Attendance>, Error>(
-      db.execute(sql`
+      this.database.db.execute(sql`
         INSERT INTO attendance (
           user_id,
           checked_in_at,
@@ -111,7 +113,7 @@ export class AttendanceRepository {
     const setClause = sql.join(setClauses, sql`, `);
 
     return ResultAsync.fromPromise<QueryResult<Attendance>, Error>(
-      db.execute(
+      this.database.db.execute(
         sql`
           UPDATE attendance
           SET ${setClause}
