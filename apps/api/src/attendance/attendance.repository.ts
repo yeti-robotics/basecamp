@@ -1,10 +1,10 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { err, ok, Result, ResultAsync } from "neverthrow";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 
 import { DatabaseService } from "../database/database.service.js";
 import { type Attendance, AttendanceSchema } from "./attendance.schema.js";
-import { attendance } from "../database/schema/index.js";
+import { account, attendance } from "../database/schema/index.js";
 
 type AttendanceCreate = {
   userId: string;
@@ -125,5 +125,22 @@ export class AttendanceRepository {
     }
 
     return ok(parsed.data);
+  }
+
+  getUserIdByDiscordId(discordId: string): ResultAsync<string, Error> {
+    return ResultAsync.fromPromise<{ userId: string }[], Error>(
+      this.database.db
+        .select({ userId: account.userId })
+        .from(account)
+        .where(and(eq(account.accountId, discordId), eq(account.providerId, "discord")))
+        .limit(1),
+      (error) =>
+        error instanceof Error ? error : new Error(String(error)),
+    ).andThen((result) => {
+      if (!result.length) {
+        return err(new Error("User not found"));
+      }
+      return ok(result[0].userId);
+    });
   }
 }

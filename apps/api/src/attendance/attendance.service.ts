@@ -12,24 +12,26 @@ export class AttendanceService {
   constructor(private readonly attendanceRepository: AttendanceRepository,) {}  
 
   public recordAttendance(
-  userId: string,
+  discordId: string,
   category: "meeting" | "outreach",
   eventId: number | null,
   checkedInAt: Date = new Date(),
 ): ResultAsync<void, Error> {
-  return this.attendanceRepository.getLast(userId).andThen((attendance) => {
-    if (attendance && attendance.checkedOutAt === null) {
-      return errAsync(new Error("User is already checked in"));
-    }
+  return this.attendanceRepository.getUserIdByDiscordId(discordId).andThen((userId) => {
+    return this.attendanceRepository.getLast(userId).andThen((attendance) => {
+      if (attendance && attendance.checkedOutAt === null) {
+        return errAsync(new Error("User is already checked in"));
+      }
 
-    return this.attendanceRepository
-      .createRecord({
-        userId,
-        checkedInAt,
-        category,
-        eventId,
-      })
-      .map(() => undefined);
+      return this.attendanceRepository
+        .createRecord({
+          userId,
+          checkedInAt,
+          category,
+          eventId,
+        })
+        .map(() => undefined);
+    });
   });
 }
 }
