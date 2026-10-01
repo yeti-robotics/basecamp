@@ -53,7 +53,25 @@ await interaction.reply(
     description: 'Sign out of a YETI meeting at the zone',
   })
   async SignoutCommand(@Context() [interaction]: SlashCommandContext) {
-    await interaction.reply('Signout command');
+    const result = await this.attendanceService.updateAttendance(
+    interaction.user.id,
+    {
+      checkedOutAt: new Date(),
+    },
+    );
+
+  if (result.isErr()) {
+    await interaction.reply({
+      content: `Error signing out: ${result.error.message}. Please try again later or contact a web dev mentor if issue persists.`,
+      flags: ["Ephemeral"],
+    });
+
+  return;
+}
+
+await interaction.reply(
+  `<@${interaction.user.id}> has signed out.`,
+);
   }
 
   @SlashCommand({

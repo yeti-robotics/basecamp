@@ -13,7 +13,7 @@ type AttendanceCreate = {
   eventId: number | null;
 };
 
-type AttendanceUpdate = {
+export type AttendanceUpdate = {
   checkedInAt?: Date;
   checkedOutAt?: Date | null;
   category?: "meeting" | "outreach";
