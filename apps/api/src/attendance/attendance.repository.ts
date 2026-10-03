@@ -6,7 +6,7 @@ import { DatabaseService } from "../database/database.service.js";
 import { type Attendance, AttendanceSchema } from "./attendance.schema.js";
 import { account, attendance } from "../database/schema/index.js";
 
-type AttendanceCreate = {
+export type AttendanceCreate = {
   userId: string;
   checkedInAt: Date;
   category: "meeting" | "outreach";
