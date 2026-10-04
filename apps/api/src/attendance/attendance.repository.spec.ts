@@ -67,7 +67,7 @@ describe("AttendanceRepository", () => {
         event_id: null,
       };
 
-      mockDb.limit.mockReturnValueOnce([mockAttendance]);
+      mockDb.limit.mockResolvedValueOnce([mockAttendance]);
 
       const result = await repository.getLast("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
 
@@ -84,7 +84,7 @@ describe("AttendanceRepository", () => {
     });
 
 it("should return null when there are no rows for the user", async () => {
-      mockDb.limit.mockReturnValueOnce([]);
+      mockDb.limit.mockResolvedValueOnce([]);
 
       const result = await repository.getLast("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
 
@@ -102,7 +102,7 @@ it("should return error when the row fails schema validation", async () => {
     category: "invalid-category", //should fail
     event_id: null,
   };
-  mockDb.limit.mockReturnValueOnce([invalidRow]);
+  mockDb.limit.mockResolvedValueOnce([invalidRow]);
 
   const result = await repository.getLast("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
 
@@ -128,7 +128,7 @@ it("should create and return a new attendance record", async () => {
         category: "meeting",
         event_id: null,
     };
-    mockDb.returning.mockReturnValueOnce([insertedRow]);
+    mockDb.returning.mockResolvedValueOnce([insertedRow]);
 
       const result = await repository.createRecord(mockRecord);
 
@@ -150,7 +150,7 @@ it("should error when a row is not returned", async () => {
     category: "meeting",
     eventId: null,
       };
-    mockDb.returning.mockReturnValueOnce([]);
+    mockDb.returning.mockResolvedValueOnce([]);
 
       const result = await repository.createRecord(mockRecord);
 
@@ -166,7 +166,7 @@ it("should insert using snake_case column names", async () => {
     category: "meeting",
     eventId: null,
   };
-  mockDb.returning.mockReturnValueOnce([{
+  mockDb.returning.mockResolvedValueOnce([{
     id: 1,
     user_id: mockRecord.userId,
     checked_in_at: mockRecord.checkedInAt,
@@ -196,7 +196,7 @@ describe("updateLast", () => {
         eventId: 123,
     };
 
-    mockTx.limit.mockReturnValueOnce([{ id: 1 }]);
+    mockTx.limit.mockResolvedValueOnce([{ id: 1 }]);
 
     const updatedRow = {
         id: 1,
@@ -280,7 +280,7 @@ it("should error when no row id is found", async () => {
 describe("getUserIdByDiscordId", () => {
   it("should return the userId for a given discordId", async () => {
     const mockUserId = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
-    mockDb.limit.mockReturnValueOnce([{ userId: mockUserId }]);
+    mockDb.limit.mockResolvedValueOnce([{ userId: mockUserId }]);
     const result = await repository.getUserIdByDiscordId("123456789012345678");
 
     expect(result.isOk()).toBe(true);
@@ -289,7 +289,7 @@ describe("getUserIdByDiscordId", () => {
 
   });
   it("should error when no linked account is found", async () => {
-  mockDb.limit.mockReturnValueOnce([]);
+  mockDb.limit.mockResolvedValueOnce([]);
 
   const result = await repository.getUserIdByDiscordId("123456789012345678");
 
