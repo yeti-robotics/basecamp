@@ -1,9 +1,7 @@
 import { Test, type TestingModule } from "@nestjs/testing";
-import { ResultAsync } from "neverthrow";
 import { DatabaseService } from "../database/database.service.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AttendanceCreate, AttendanceUpdate, AttendanceRepository } from "./attendance.repository.js";
-import type { Attendance } from "./attendance.schema.ts";
 
 describe("AttendanceRepository", () => {
   let repository: AttendanceRepository;
