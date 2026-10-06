@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
+import { SignOutButton } from './SignOutButton';
 
 export default async function HomePage() {
   const session = await getSession();
@@ -18,6 +19,7 @@ export default async function HomePage() {
         <p className="mt-3 text-sm text-muted-foreground">
           Signed in as {session.user.name || session.user.email}
         </p>
+        <SignOutButton />
       </section>
     </main>
   );
