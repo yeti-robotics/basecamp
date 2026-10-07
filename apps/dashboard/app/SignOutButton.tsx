@@ -4,9 +4,8 @@ import { LogOut } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { authClient } from '@/lib/auth-client';
-import { cn } from '@/lib/utils';
 
-export function SignOutButton({ className }: { className?: string }) {
+export function SignOutButton() {
   const [error, setError] = useState<string>();
   const [isPending, setIsPending] = useState(false);
 
@@ -29,7 +28,7 @@ export function SignOutButton({ className }: { className?: string }) {
   }
 
   return (
-    <div className={cn('mt-6', className)}>
+    <div className="mt-6">
       <Button
         className="w-full"
         disabled={isPending}
