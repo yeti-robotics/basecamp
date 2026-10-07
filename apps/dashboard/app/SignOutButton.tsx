@@ -3,6 +3,7 @@
 import { LogOut } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { authClient } from '@/lib/auth-client';
 
 export function SignOutButton() {
   const [error, setError] = useState<string>();
@@ -13,13 +14,10 @@ export function SignOutButton() {
     setIsPending(true);
 
     try {
-      const response = await fetch('/api/auth/sign-out', {
-        method: 'POST',
-        credentials: 'include',
-      });
+      const { error: signOutError } = await authClient.signOut();
 
-      if (!response.ok) {
-        throw new Error('Sign out failed. Please try again.');
+      if (signOutError) {
+        throw new Error(signOutError.message ?? 'Sign out failed. Please try again.');
       }
 
       window.location.assign('/auth');
