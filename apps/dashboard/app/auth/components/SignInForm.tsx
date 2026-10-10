@@ -4,6 +4,7 @@ import { KeyRound } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import { authClient } from '@/lib/auth-client';
 import { DiscordIcon } from './AuthIcons';
 
 function safeRedirectUrl(redirectUrl?: string) {
@@ -19,35 +20,15 @@ export function SignInForm({ redirectUrl }: { redirectUrl?: string }) {
     setIsPending(true);
 
     try {
-      const response = await fetch('/api/auth/sign-in/social', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          provider: 'discord',
-          callbackURL: safeRedirectUrl(redirectUrl),
-          errorCallbackURL: '/auth?error=oauth',
-        }),
+      const { error: signInError } = await authClient.signIn.social({
+        provider: 'discord',
+        callbackURL: safeRedirectUrl(redirectUrl),
+        errorCallbackURL: '/auth?error=oauth',
       });
-      const responseText = await response.text();
-      let result: { message?: string; url?: string } = {};
 
-      if (responseText) {
-        try {
-          result = JSON.parse(responseText) as typeof result;
-        } catch {
-          result = {};
-        }
+      if (signInError) {
+        throw new Error(signInError.message ?? 'Discord sign-in could not be started.');
       }
-
-      if (!response.ok || !result.url) {
-        throw new Error(
-          result.message ??
-            `Discord sign-in could not be started${response.status ? ` (${response.status})` : ''}.`,
-        );
-      }
-
-      window.location.assign(result.url);
     } catch (signInError) {
       setError(signInError instanceof Error ? signInError.message : 'Discord sign-in failed.');
       setIsPending(false);
