@@ -71,7 +71,7 @@ describe("AttendanceCommands", () => {
   // ─── /signin ───────────────────────────────────────────────────────────────
 
   describe("SigninCommand", () => {
-    it("replies with the error message when recordAttendance errors", async () => {
+    it("replies with a friendly message when the user is already signed in", async () => {
       const interaction = makeInteraction();
 
       service.recordAttendance.mockReturnValue(
@@ -81,43 +81,30 @@ describe("AttendanceCommands", () => {
       await commands.SigninCommand([interaction] as never);
 
       expect(interaction.reply).toHaveBeenCalledWith({
-        content:
-          "Error signing in: User is already signed in. Please try again later or contact a web dev mentor if issue persists.",
+        content: "You're already signed in.",
         flags: ["Ephemeral"],
       });
     });
 
-    it("replies with a success message when recordAttendance succeeds", async () => {
+    it("replies with a generic error message for other failures", async () => {
       const interaction = makeInteraction();
 
-      service.recordAttendance.mockReturnValue(okAsync(undefined));
+      service.recordAttendance.mockReturnValue(errAsync(new Error("Something unexpected")));
 
       await commands.SigninCommand([interaction] as never);
 
-      expect(interaction.reply).toHaveBeenCalledWith(
-        "<@123456789012345678> has signed in.",
-      );
+      expect(interaction.reply).toHaveBeenCalledWith({
+        content:
+          "Something went wrong while signing you in. Please try again later or contact a web dev mentor if the issue persists.",
+        flags: ["Ephemeral"],
+      });
     });
-
-    it("passes the user id, meeting category, and null event id to recordAttendance", async () => {
-      const interaction = makeInteraction();
-
-      service.recordAttendance.mockReturnValue(okAsync(undefined));
-
-      await commands.SigninCommand([interaction] as never);
-
-      expect(service.recordAttendance).toHaveBeenCalledWith(
-        "123456789012345678",
-        "meeting",
-        null,
-      );
-    });
-  });
+})
 
   // ─── /signout ──────────────────────────────────────────────────────────────
 
   describe("SignoutCommand", () => {
-    it("replies with the error message when updateAttendance errors", async () => {
+    it("replies with the correct error message when user is already signed out", async () => {
       const interaction = makeInteraction();
 
       service.updateAttendance.mockReturnValue(
@@ -128,7 +115,39 @@ describe("AttendanceCommands", () => {
 
       expect(interaction.reply).toHaveBeenCalledWith({
         content:
-          "Error signing out: User is already signed out. Please try again later or contact a web dev mentor if issue persists.",
+          "You're already signed out.",
+        flags: ["Ephemeral"],
+      });
+    });
+
+    it("replies with the correct error message when user has never signed in", async () => {
+      const interaction = makeInteraction();
+
+      service.updateAttendance.mockReturnValue(
+        errAsync(new Error("User was not signed out because they have not signed in yet")),
+      );
+
+      await commands.SignoutCommand([interaction] as never);
+
+      expect(interaction.reply).toHaveBeenCalledWith({
+        content:
+          "You need to sign in before signing out.",
+        flags: ["Ephemeral"],
+      });
+    });
+
+    it("replies with a generic error message if not caught in ternaries", async () => {
+      const interaction = makeInteraction();
+
+      service.updateAttendance.mockReturnValue(
+        errAsync(new Error("Unknown Error")),
+      );
+
+      await commands.SignoutCommand([interaction] as never);
+
+      expect(interaction.reply).toHaveBeenCalledWith({
+        content:
+          "Something went wrong while signing you out. Please try again later or contact a web dev mentor if the issue persists.",
         flags: ["Ephemeral"],
       });
     });

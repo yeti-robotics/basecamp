@@ -99,7 +99,7 @@ describe("AttendanceService", () => {
     it("errors when the user has never signed in", async () => {
       mockRepository.getLast.mockReturnValue(okAsync(null));
 
-      const result = await service.updateAttendance(DISCORD_ID, {});
+      const result = await service.updateAttendance(DISCORD_ID, { checkedOutAt: new Date() });
 
       expect(result.isErr()).toBe(true);
     });
@@ -109,7 +109,7 @@ describe("AttendanceService", () => {
         okAsync(makeAttendance({ checkedOutAt: "2026-10-31T17:00:00.000Z" })),
       );
 
-      const result = await service.updateAttendance(DISCORD_ID, {});
+      const result = await service.updateAttendance(DISCORD_ID, { checkedOutAt: new Date() });
 
       expect(result.isErr()).toBe(true);
     });
@@ -120,13 +120,23 @@ describe("AttendanceService", () => {
         okAsync(makeAttendance({ checkedOutAt: "2026-10-31T17:00:00.000Z" })),
       );
 
-      const result = await service.updateAttendance(DISCORD_ID, {});
+      const result = await service.updateAttendance(DISCORD_ID, { checkedOutAt: new Date() });
 
       expect(result.isOk()).toBe(true);
       expect(mockRepository.updateLast).toHaveBeenCalledWith(
         USER_ID,
         expect.objectContaining({ checkedOutAt: expect.any(Date) }),
       );
+    });
+
+    it("updates fields directly without the signed-out check when checkedOutAt is omitted", async () => {
+      mockRepository.updateLast.mockReturnValue(okAsync(makeAttendance({ category: "outreach" })));
+
+      const result = await service.updateAttendance(DISCORD_ID, { category: "outreach" });
+
+      expect(result.isOk()).toBe(true);
+      expect(mockRepository.getLast).not.toHaveBeenCalled();
+      expect(mockRepository.updateLast).toHaveBeenCalledWith(USER_ID, { category: "outreach" });
     });
   });
 

@@ -56,9 +56,17 @@ export class AttendanceService {
     updates: AttendanceUpdate,
   ): ResultAsync<void, Error> {
     return this.attendanceRepository.getUserIdByDiscordId(discordId).andThen((userId) => {
+      if (updates.checkedOutAt === undefined || updates.checkedOutAt === null) {
+        return this.attendanceRepository
+          .updateLast(userId, updates)
+          .map(() => undefined);
+      }
+
       return this.attendanceRepository.getLast(userId).andThen((attendance) => {
         if (!attendance) {
-          return errAsync(new Error("User was not signed out because they have not signed in yet"));
+          return errAsync(
+            new Error("User was not signed out because they have not signed in yet"),
+          );
         }
 
         if (attendance.checkedOutAt !== null) {
@@ -66,9 +74,7 @@ export class AttendanceService {
         }
 
         return this.attendanceRepository
-          .updateLast(userId, {
-            checkedOutAt: updates.checkedOutAt || new Date(),
-          })
+          .updateLast(userId, updates)
           .map(() => undefined);
       });
     });
@@ -116,6 +122,10 @@ export class AttendanceService {
       return this.attendanceRepository.getLast(userId).andThen((attendance) => {
         if (!attendance) {
           return errAsync(new Error("No attendance record found for user"));
+        }
+
+        if (attendance.checkedOutAt !== null) {
+          return okAsync(attendance);
         }
 
         const staleResult = this.isStaleSession(new Date(attendance.checkedInAt));
