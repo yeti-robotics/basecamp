@@ -1,4 +1,3 @@
-
 import { Injectable, Logger } from "@nestjs/common";
 import { err, ok, Result, ResultAsync } from "neverthrow";
 import { eq, desc, and, isNull, sql } from "drizzle-orm";
@@ -21,6 +20,11 @@ export type AttendanceUpdate = {
   eventId?: number | null;
 };
 
+export type AttendanceSumFilter = {
+  category?: "meeting" | "outreach";
+  eventId?: number | null;
+};
+
 @Injectable()
 export class AttendanceRepository {
   private readonly logger = new Logger(AttendanceRepository.name);
@@ -38,6 +42,49 @@ export class AttendanceRepository {
       (error) =>
         error instanceof Error ? error : new Error(String(error)),
     ).andThen((result) => this.parseRow(result[0]));
+  }
+
+  getSum(
+    userId: string,
+    filter?: AttendanceSumFilter,
+  ): ResultAsync<number, Error> {
+    return ResultAsync.fromPromise(
+      this.database.db
+        .select({
+          totalSeconds: sql<number>`COALESCE(
+            SUM(
+              EXTRACT(
+                EPOCH FROM (
+                  ${attendance.checked_out_at} -
+                  ${attendance.checked_in_at}
+                )
+              )
+            ),
+            0
+          )`,
+        })
+        .from(attendance)
+        .where(
+          and(
+            eq(attendance.user_id, userId),
+            filter?.category !== undefined
+              ? eq(attendance.category, filter.category)
+              : undefined,
+            filter?.eventId !== undefined
+              ? filter.eventId === null
+                ? isNull(attendance.event_id)
+                : eq(attendance.event_id, filter.eventId)
+              : undefined,
+          ),
+        ),
+      (error) =>
+        error instanceof Error ? error : new Error(String(error)),
+    ).andThen((result) => {
+      const totalSeconds = Number(result[0]?.totalSeconds ?? 0);
+      const hours = Math.round((totalSeconds / 3600) * 100) / 100;
+
+      return ok(hours);
+    });
   }
 
   createRecord(
@@ -177,6 +224,7 @@ export class AttendanceRepository {
       if (!result.length) {
         return err(new Error("User not found"));
       }
+
       return ok(result[0].userId);
     });
   }
