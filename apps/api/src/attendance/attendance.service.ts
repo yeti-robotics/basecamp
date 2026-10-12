@@ -9,7 +9,7 @@ import {
   okAsync,
 } from "neverthrow";
 import { AttendanceRepository } from "./attendance.repository.js";
-import { type AttendanceUpdate } from "./attendance.repository.js";
+import { type AttendanceUpdate, type AttendanceSumFilter } from "./attendance.repository.js";
 import { Attendance } from "./attendance.schema.js";
 import { FORGOT_SIGNOUT_CREDIT_MS, STALE_SIGNIN_MIN_HOURS_MS } from "./attendance.constants.js";
 
@@ -149,6 +149,15 @@ export class AttendanceService {
             return okAsync(updated);
           });
       });
+    });
+  }
+
+  public getAttendanceSum(
+    discordId: string,
+    filter?: AttendanceSumFilter,
+  ): ResultAsync<number, Error> {
+    return this.attendanceRepository.getUserIdByDiscordId(discordId).andThen((userId) => {
+      return this.attendanceRepository.getSum(userId, filter);
     });
   }
 }
