@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AttendanceService } from "./attendance.service.js";
 import { AttendanceRepository } from "./attendance.repository.js";
 import type { Attendance } from "./attendance.schema.js";
+import { getTotalPossibleHoursToDate as calculateTotalPossibleHoursToDate } from "./schedule.util.js";
 
 const mockRepository = {
   getUserIdByDiscordId: vi.fn(),
@@ -171,6 +172,41 @@ describe("AttendanceService", () => {
 
       expect(result.isOk()).toBe(true);
       expect(mockRepository.updateLast).not.toHaveBeenCalled();
+    });
+  });
+  
+  describe("getTotalPossibleHoursToDate", () => {
+    it("returns the schedule utility's result for an explicit date", () => {
+      const asOfDate = new Date("2026-01-15T12:00:00Z");
+
+      const expected = calculateTotalPossibleHoursToDate(asOfDate);
+      const actual = service.getTotalPossibleHoursToDate(asOfDate);
+
+      expect(actual).toBe(expected);
+      expect(typeof actual).toBe("number");
+    });
+
+    it("uses the provided date rather than the current system date", () => {
+      const earlyDate = new Date("2025-08-04T12:00:00Z");
+      const meetingDate = new Date("2025-08-05T12:00:00Z");
+
+      const earlyTotal = service.getTotalPossibleHoursToDate(earlyDate);
+      const meetingTotal = service.getTotalPossibleHoursToDate(meetingDate);
+
+      expect(meetingTotal - earlyTotal).toBe(3);
+    });
+
+    it("supports calling the method without an argument", () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2025-09-01T12:00:00Z"));
+
+      expect(() => service.getTotalPossibleHoursToDate()).not.toThrow();
+
+      expect(service.getTotalPossibleHoursToDate()).toBe(
+        calculateTotalPossibleHoursToDate(
+          new Date("2025-09-01T12:00:00Z"),
+        ),
+      );
     });
   });
 });

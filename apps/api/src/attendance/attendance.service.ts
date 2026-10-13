@@ -12,6 +12,9 @@ import { AttendanceRepository } from "./attendance.repository.js";
 import { type AttendanceUpdate, type AttendanceSumFilter } from "./attendance.repository.js";
 import { Attendance } from "./attendance.schema.js";
 import { FORGOT_SIGNOUT_CREDIT_MS, STALE_SIGNIN_MIN_HOURS_MS } from "./attendance.constants.js";
+import {
+  getTotalPossibleHoursToDate as calculateTotalPossibleHoursToDate,
+} from "./schedule.util.js";
 
 @Injectable()
 export class AttendanceService {
@@ -159,5 +162,9 @@ export class AttendanceService {
     return this.attendanceRepository.getUserIdByDiscordId(discordId).andThen((userId) => {
       return this.attendanceRepository.getSum(userId, filter);
     });
+  }
+
+  public getTotalPossibleHoursToDate(asOfDate: Date = new Date()): number {
+  return calculateTotalPossibleHoursToDate(asOfDate);
   }
 }
