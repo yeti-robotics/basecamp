@@ -21,6 +21,7 @@ export default function DisplayPage() {
     'checking',
   );
   const [error, setError] = useState('');
+  const [logoutFailed, setLogoutFailed] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -82,9 +83,15 @@ export default function DisplayPage() {
     setStatus('locked');
     setError('');
     try {
-      await fetch(`${basePath}/logout`, { method: 'POST', credentials: 'include' });
+      const response = await fetch(`${basePath}/logout`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error('Logout failed');
+      setLogoutFailed(false);
     } catch {
-      setError('Could not contact Basecamp. Reload before using this display again.');
+      setLogoutFailed(true);
+      setError('Basecamp could not end this session. Retry log out before leaving this device.');
     }
   }
 
@@ -163,6 +170,15 @@ export default function DisplayPage() {
                   {status === 'unlocking' ? 'Unlocking…' : 'Unlock display'}
                 </button>
               </form>
+              {logoutFailed && (
+                <button
+                  type="button"
+                  onClick={logout}
+                  className="mt-5 w-full rounded-xl border border-white/25 px-4 py-3 font-medium text-white hover:border-white/60"
+                >
+                  Retry log out
+                </button>
+              )}
             </div>
           )}
         </div>

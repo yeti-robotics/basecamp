@@ -51,4 +51,28 @@ describe('facility display page', () => {
       }),
     );
   });
+
+  it('keeps logout retryable when the API does not clear the session', async () => {
+    jest.spyOn(Date, 'now').mockReturnValue(270_000);
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ secret: seed, expiresAt: 43_470_000 }),
+      })
+      .mockResolvedValueOnce({ ok: false, status: 503 })
+      .mockResolvedValueOnce({ ok: true, status: 204 });
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    render(<DisplayPage />);
+    expect(await screen.findByText('0489')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Log out' }));
+
+    expect(await screen.findByRole('button', { name: 'Retry log out' })).toBeInTheDocument();
+    expect(screen.queryByText('0489')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry log out' }));
+    expect(await screen.findByRole('button', { name: 'Unlock display' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Retry log out' })).not.toBeInTheDocument();
+  });
 });

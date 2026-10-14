@@ -1,6 +1,12 @@
+import { ConfigService } from '@nestjs/config';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { toNodeHandler } from 'better-auth/node';
 import type { Auth } from './auth.js';
+
+export function configureTrustedProxy(app: NestExpressApplication, config: ConfigService): void {
+  const trustedProxy = config.get<string>('ATTENDANCE_TRUSTED_PROXY');
+  if (trustedProxy) app.getHttpAdapter().getInstance().set('trust proxy', trustedProxy);
+}
 
 export function configureHttp(app: NestExpressApplication, auth: Auth): void {
   app.getHttpAdapter().getInstance().all('/api/auth/*splat', toNodeHandler(auth));

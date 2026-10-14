@@ -1,8 +1,9 @@
-import { type INestApplication } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { configureTrustedProxy } from '../configure-http.js';
 import { DatabaseService } from '../database/database.service.js';
 import { AttendanceModule } from './attendance.module.js';
 
@@ -12,7 +13,7 @@ const sessionSecret = 'a-display-session-secret-longer-than-32-chars';
 const sessionLifetimeMs = 43_200_000;
 
 describe('attendance display HTTP API', () => {
-  let app: INestApplication;
+  let app: NestExpressApplication;
   const originalNodeEnv = process.env.NODE_ENV;
 
   beforeEach(async () => {
@@ -30,7 +31,8 @@ describe('attendance display HTTP API', () => {
       .overrideProvider(DatabaseService)
       .useValue({ db: {} })
       .compile();
-    app = module.createNestApplication();
+    app = module.createNestApplication<NestExpressApplication>();
+    configureTrustedProxy(app, new ConfigService({ ATTENDANCE_TRUSTED_PROXY: 'loopback' }));
     await app.init();
   });
 
@@ -110,6 +112,42 @@ describe('attendance display HTTP API', () => {
     }
     await request(app.getHttpServer())
       .post('/api/attendance-display/login')
+      .send({ password })
+      .expect(429);
+  });
+
+  it('limits each client address independently when the dashboard proxy is trusted', async () => {
+    for (let attempt = 0; attempt < 5; attempt++) {
+      await request(app.getHttpServer())
+        .post('/api/attendance-display/login')
+        .set('X-Forwarded-For', '192.0.2.10')
+        .send({ password: 'wrong' })
+        .expect(401);
+    }
+    await request(app.getHttpServer())
+      .post('/api/attendance-display/login')
+      .set('X-Forwarded-For', '192.0.2.11')
+      .send({ password })
+      .expect(204);
+    await request(app.getHttpServer())
+      .post('/api/attendance-display/login')
+      .set('X-Forwarded-For', '192.0.2.10')
+      .send({ password })
+      .expect(429);
+  });
+
+  it('ignores forged forwarding headers from an untrusted direct client', async () => {
+    configureTrustedProxy(app, new ConfigService({ ATTENDANCE_TRUSTED_PROXY: '10.0.0.0/8' }));
+    for (let attempt = 0; attempt < 5; attempt++) {
+      await request(app.getHttpServer())
+        .post('/api/attendance-display/login')
+        .set('X-Forwarded-For', `192.0.2.${attempt + 1}`)
+        .send({ password: 'wrong' })
+        .expect(401);
+    }
+    await request(app.getHttpServer())
+      .post('/api/attendance-display/login')
+      .set('X-Forwarded-For', '192.0.2.99')
       .send({ password })
       .expect(429);
   });
