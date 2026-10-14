@@ -35,6 +35,9 @@ importers:
       '@nestjs/platform-express':
         specifier: ^12.0.1
         version: 12.0.1(@nestjs/common@12.0.1(class-transformer@0.5.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.0.1)
+      '@repo/attendance-code':
+        specifier: workspace:*
+        version: link:../../packages/attendance-code
       better-auth:
         specifier: ^1.7.2
         version: 1.7.4(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0))(next@16.2.0(react-dom@19.2.0(react@19.2.0))(react@19.2.0))(pg@8.23.0)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(vitest@3.2.7(@types/node@24.13.3)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(terser@5.49.0)(tsx@4.23.13))
@@ -126,6 +129,9 @@ importers:
 
   apps/dashboard:
     dependencies:
+      '@repo/attendance-code':
+        specifier: workspace:*
+        version: link:../../packages/attendance-code
       '@repo/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -193,6 +199,18 @@ importers:
       typescript:
         specifier: 5.9.2
         version: 5.9.2
+
+  packages/attendance-code:
+    devDependencies:
+      '@repo/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.2
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.7(@types/node@24.13.3)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(terser@5.49.0)(tsx@4.23.13)
 
   packages/typescript-config: {}
 
