@@ -80,18 +80,19 @@ describe('AuthModule', () => {
     expect(mocks.betterAuth).not.toHaveBeenCalled();
   });
 
-  it.each([
-    ['BETTER_AUTH_URL', 'ftp://auth.example.test'],
-  ])('rejects invalid %s without exposing its value', async (key, value) => {
-    const settings = { ...validSettings, [key]: value };
-    const error = await makeModule(settings).then(
-      () => undefined,
-      (cause: Error) => cause,
-    );
-    expect(error?.message).toBe(`${key} must be an HTTP(S) URL`);
-    expect(error?.message).not.toContain(value);
-    expect(mocks.betterAuth).not.toHaveBeenCalled();
-  });
+  it.each([['BETTER_AUTH_URL', 'ftp://auth.example.test']])(
+    'rejects invalid %s without exposing its value',
+    async (key, value) => {
+      const settings = { ...validSettings, [key]: value };
+      const error = await makeModule(settings).then(
+        () => undefined,
+        (cause: Error) => cause,
+      );
+      expect(error?.message).toBe(`${key} must be an HTTP(S) URL`);
+      expect(error?.message).not.toContain(value);
+      expect(mocks.betterAuth).not.toHaveBeenCalled();
+    },
+  );
 
   it('rejects short auth secrets without passing them to Better Auth', async () => {
     const secret = 'too-short-secret';

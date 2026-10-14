@@ -1,4 +1,5 @@
 import { Separator } from '@/components/ui/separator';
+import { typographyVariants } from '@/components/ui/typography';
 import { SignInForm } from './SignInForm';
 
 type AuthScreenProps = {
@@ -17,25 +18,32 @@ export function AuthScreen({ authError, redirectUrl }: AuthScreenProps) {
         aria-labelledby="sign-in-heading"
       >
         <header className="text-center">
-          <h1 className="font-mono text-3xl font-bold uppercase leading-none tracking-tight">
-            Basecamp
-          </h1>
-          <p className="mt-2 font-mono text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+          <h1 className={typographyVariants({ variant: 'h1' })}>Basecamp</h1>
+          <p className={typographyVariants({ variant: 'muted', className: 'mt-3' })}>
             Yeti Robotics <span aria-hidden="true">·</span> 3506
           </p>
         </header>
 
         <div className="w-full space-y-5">
           <div className="text-center">
-            <h2 id="sign-in-heading" className="text-lg font-medium">
+            <h2
+              id="sign-in-heading"
+              className={typographyVariants({ variant: 'h3', className: 'text-balance' })}
+            >
               Sign in to your account
             </h2>
-            <p className="mt-1 text-sm text-muted-foreground">Continue to Basecamp</p>
+            <p className={typographyVariants({ variant: 'muted', className: 'mt-2 leading-6' })}>
+              Continue to Basecamp
+            </p>
           </div>
 
           {authError && (
             <p
-              className="rounded-lg border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+              className={typographyVariants({
+                variant: 'p',
+                className:
+                  'rounded-lg border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive',
+              })}
               role="alert"
             >
               Discord sign-in was not completed. Please try again.
@@ -45,7 +53,12 @@ export function AuthScreen({ authError, redirectUrl }: AuthScreenProps) {
           <SignInForm redirectUrl={redirectUrl} />
         </div>
 
-        <footer className="flex items-center gap-2 whitespace-nowrap text-sm text-muted-foreground/50">
+        <footer
+          className={typographyVariants({
+            variant: 'muted',
+            className: 'flex items-center gap-2 whitespace-nowrap',
+          })}
+        >
           <Separator className="w-8" />
           <p>YETI Robotics Platform</p>
           <Separator className="w-8" />

@@ -1,14 +1,16 @@
 'use client';
 
-import { KeyRound } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import { typographyVariants } from '@/components/ui/typography';
 import { authClient } from '@/lib/auth-client';
-import { DiscordIcon } from './AuthIcons';
+import { navigateAfterAuth } from '@/lib/auth-navigation';
 
 function safeRedirectUrl(redirectUrl?: string) {
-  return redirectUrl?.startsWith('/') && !redirectUrl.startsWith('//') ? redirectUrl : '/';
+  if (!redirectUrl?.startsWith('/') || redirectUrl.startsWith('//') || redirectUrl.includes('\\'))
+    return '/';
+  return redirectUrl;
 }
 
 export function SignInForm({ redirectUrl }: { redirectUrl?: string }) {
@@ -20,15 +22,19 @@ export function SignInForm({ redirectUrl }: { redirectUrl?: string }) {
     setIsPending(true);
 
     try {
-      const { error: signInError } = await authClient.signIn.social({
+      const { data, error: signInError } = await authClient.signIn.social({
         provider: 'discord',
         callbackURL: safeRedirectUrl(redirectUrl),
         errorCallbackURL: '/auth?error=oauth',
+        disableRedirect: true,
       });
 
       if (signInError) {
         throw new Error(signInError.message ?? 'Discord sign-in could not be started.');
       }
+
+      if (!data?.url) throw new Error('Discord sign-in could not be started. Please try again.');
+      navigateAfterAuth(data.url);
     } catch (signInError) {
       setError(signInError instanceof Error ? signInError.message : 'Discord sign-in failed.');
       setIsPending(false);
@@ -43,12 +49,17 @@ export function SignInForm({ redirectUrl }: { redirectUrl?: string }) {
         onClick={signInDiscord}
         type="button"
       >
-        <DiscordIcon className="size-5" />
         {isPending ? 'Connecting to Discord…' : 'Sign in with Discord'}
       </Button>
 
       {error && (
-        <p className="mt-3 text-center text-sm text-destructive" role="alert">
+        <p
+          className={typographyVariants({
+            variant: 'p',
+            className: 'mt-3 text-center text-sm text-destructive',
+          })}
+          role="alert"
+        >
           {error}
         </p>
       )}
@@ -63,7 +74,6 @@ export function SignInForm({ redirectUrl }: { redirectUrl?: string }) {
       </div>
 
       <Button className="h-12 w-full bg-card/50 text-base" disabled type="button" variant="outline">
-        <KeyRound className="size-5" />
         Sign in with Passkey — coming soon
       </Button>
     </div>

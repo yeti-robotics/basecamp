@@ -1,23 +1,22 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { and, desc, eq, isNull, sql } from 'drizzle-orm';
+import { err, ok, Result, ResultAsync } from 'neverthrow';
 
-import { Injectable, Logger } from "@nestjs/common";
-import { err, ok, Result, ResultAsync } from "neverthrow";
-import { eq, desc, and, isNull, sql } from "drizzle-orm";
-
-import { DatabaseService } from "../database/database.service.js";
-import { type Attendance, AttendanceSchema } from "./attendance.schema.js";
-import { account, attendance } from "../database/schema/index.js";
+import { DatabaseService } from '../database/database.service.js';
+import { account, attendance } from '../database/schema/index.js';
+import { type Attendance, AttendanceSchema } from './attendance.schema.js';
 
 export type AttendanceCreate = {
   userId: string;
   checkedInAt: Date;
-  category: "meeting" | "outreach";
+  category: 'meeting' | 'outreach';
   eventId: number | null;
 };
 
 export type AttendanceUpdate = {
   checkedInAt?: Date;
   checkedOutAt?: Date | null;
-  category?: "meeting" | "outreach";
+  category?: 'meeting' | 'outreach';
   eventId?: number | null;
 };
 
@@ -35,19 +34,14 @@ export class AttendanceRepository {
         .where(eq(attendance.user_id, userId))
         .orderBy(desc(attendance.checked_in_at))
         .limit(1),
-      (error) =>
-        error instanceof Error ? error : new Error(String(error)),
+      (error) => (error instanceof Error ? error : new Error(String(error))),
     ).andThen((result) => this.parseRow(result[0]));
   }
 
-  createRecord(
-    record: AttendanceCreate,
-  ): ResultAsync<Attendance, Error> {
+  createRecord(record: AttendanceCreate): ResultAsync<Attendance, Error> {
     return ResultAsync.fromPromise<(typeof attendance.$inferSelect)[], Error>(
       this.database.db.transaction(async (tx) => {
-        await tx.execute(
-          sql`SELECT pg_advisory_xact_lock(hashtextextended(${record.userId}, 0))`,
-        );
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${record.userId}, 0))`);
 
         const [last] = await tx
           .select({ checked_out_at: attendance.checked_out_at })
@@ -57,7 +51,7 @@ export class AttendanceRepository {
           .limit(1);
 
         if (last && last.checked_out_at === null) {
-          throw new Error("User is already signed in");
+          throw new Error('User is already signed in');
         }
 
         return tx
@@ -71,19 +65,15 @@ export class AttendanceRepository {
           })
           .returning();
       }),
-      (error) =>
-        error instanceof Error ? error : new Error(String(error)),
+      (error) => (error instanceof Error ? error : new Error(String(error))),
     ).andThen((rows) =>
       this.parseRow(rows[0]).andThen((row) =>
-        row ? ok(row) : err(new Error("Attendance record was not created")),
+        row ? ok(row) : err(new Error('Attendance record was not created')),
       ),
     );
   }
 
-  updateLast(
-    userId: string,
-    updates: AttendanceUpdate,
-  ): ResultAsync<Attendance | null, Error> {
+  updateLast(userId: string, updates: AttendanceUpdate): ResultAsync<Attendance | null, Error> {
     const setObject: Partial<typeof attendance.$inferInsert> = {};
 
     if (updates.checkedInAt !== undefined) {
@@ -101,9 +91,7 @@ export class AttendanceRepository {
 
     return ResultAsync.fromPromise<(typeof attendance.$inferSelect)[], Error>(
       this.database.db.transaction(async (tx) => {
-        await tx.execute(
-          sql`SELECT pg_advisory_xact_lock(hashtextextended(${userId}, 0))`,
-        );
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${userId}, 0))`);
 
         const [last] = await tx
           .select({ id: attendance.id })
@@ -113,7 +101,7 @@ export class AttendanceRepository {
           .limit(1);
 
         if (!last) {
-          throw new Error("No attendance record found to update");
+          throw new Error('No attendance record found to update');
         }
 
         const condition =
@@ -121,17 +109,12 @@ export class AttendanceRepository {
             ? and(eq(attendance.id, last.id), isNull(attendance.checked_out_at))
             : eq(attendance.id, last.id);
 
-        return tx
-          .update(attendance)
-          .set(setObject)
-          .where(condition)
-          .returning();
+        return tx.update(attendance).set(setObject).where(condition).returning();
       }),
-      (error) =>
-        error instanceof Error ? error : new Error(String(error)),
+      (error) => (error instanceof Error ? error : new Error(String(error))),
     ).andThen((result) =>
       this.parseRow(result[0]).andThen((row) =>
-        row ? ok(row) : err(new Error("Attendance record was not updated")),
+        row ? ok(row) : err(new Error('Attendance record was not updated')),
       ),
     );
   }
@@ -155,9 +138,7 @@ export class AttendanceRepository {
     const parsed = AttendanceSchema.safeParse(parseableRow);
 
     if (!parsed.success) {
-      this.logger.error(
-        `Invalid attendance row: ${parsed.error.message}`,
-      );
+      this.logger.error(`Invalid attendance row: ${parsed.error.message}`);
       return err(parsed.error);
     }
 
@@ -169,13 +150,12 @@ export class AttendanceRepository {
       this.database.db
         .select({ userId: account.userId })
         .from(account)
-        .where(and(eq(account.accountId, discordId), eq(account.providerId, "discord")))
+        .where(and(eq(account.accountId, discordId), eq(account.providerId, 'discord')))
         .limit(1),
-      (error) =>
-        error instanceof Error ? error : new Error(String(error)),
+      (error) => (error instanceof Error ? error : new Error(String(error))),
     ).andThen((result) => {
       if (!result.length) {
-        return err(new Error("User not found"));
+        return err(new Error('User not found'));
       }
       return ok(result[0].userId);
     });

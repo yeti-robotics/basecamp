@@ -1,4 +1,3 @@
-
 import { Injectable } from '@nestjs/common';
 import type { SlashCommandContext } from 'necord';
 import { Context, SlashCommand } from 'necord';
@@ -31,17 +30,17 @@ export class AttendanceCommands {
   async SigninCommand(@Context() [interaction]: SlashCommandContext) {
     const result = await this.attendanceService.recordAttendance(
       interaction.user.id,
-      "meeting",
+      'meeting',
       null,
     );
 
     if (result.isErr()) {
       await interaction.reply({
         content:
-          result.error.message === "User is already signed in"
+          result.error.message === 'User is already signed in'
             ? "You're already signed in."
-            : "Something went wrong while signing you in. Please try again later or contact a web dev mentor if the issue persists.",
-        flags: ["Ephemeral"],
+            : 'Something went wrong while signing you in. Please try again later or contact a web dev mentor if the issue persists.',
+        flags: ['Ephemeral'],
       });
 
       return;
@@ -55,22 +54,19 @@ export class AttendanceCommands {
     description: 'Sign out of a YETI meeting at the zone',
   })
   async SignoutCommand(@Context() [interaction]: SlashCommandContext) {
-    const result = await this.attendanceService.updateAttendance(
-      interaction.user.id,
-      {
-        checkedOutAt: new Date(),
-      },
-    );
+    const result = await this.attendanceService.updateAttendance(interaction.user.id, {
+      checkedOutAt: new Date(),
+    });
 
     if (result.isErr()) {
       await interaction.reply({
         content:
-          result.error.message === "User is already signed out"
+          result.error.message === 'User is already signed out'
             ? "You're already signed out."
-            : result.error.message === "User was not signed out because they have not signed in yet"
-              ? "You need to sign in before signing out."
-              : "Something went wrong while signing you out. Please try again later or contact a web dev mentor if the issue persists.",
-        flags: ["Ephemeral"],
+            : result.error.message === 'User was not signed out because they have not signed in yet'
+              ? 'You need to sign in before signing out.'
+              : 'Something went wrong while signing you out. Please try again later or contact a web dev mentor if the issue persists.',
+        flags: ['Ephemeral'],
       });
 
       return;

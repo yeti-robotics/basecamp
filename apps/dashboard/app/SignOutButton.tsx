@@ -1,9 +1,10 @@
 'use client';
 
-import { LogOut } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { typographyVariants } from '@/components/ui/typography';
 import { authClient } from '@/lib/auth-client';
+import { navigateAfterAuth } from '@/lib/auth-navigation';
 import { cn } from '@/lib/utils';
 
 export function SignOutButton({ className }: { className?: string }) {
@@ -15,13 +16,15 @@ export function SignOutButton({ className }: { className?: string }) {
     setIsPending(true);
 
     try {
-      const { error: signOutError } = await authClient.signOut();
+      const { data, error: signOutError } = await authClient.signOut();
 
       if (signOutError) {
         throw new Error(signOutError.message ?? 'Sign out failed. Please try again.');
       }
 
-      window.location.assign('/auth');
+      if (!data?.success) throw new Error('Sign out failed. Please try again.');
+
+      navigateAfterAuth('/auth');
     } catch (signOutError) {
       setError(signOutError instanceof Error ? signOutError.message : 'Sign out failed.');
       setIsPending(false);
@@ -37,11 +40,16 @@ export function SignOutButton({ className }: { className?: string }) {
         type="button"
         variant="outline"
       >
-        <LogOut className="size-4" />
         {isPending ? 'Signing out…' : 'Sign out'}
       </Button>
       {error ? (
-        <p className="mt-3 text-sm text-destructive" role="alert">
+        <p
+          className={typographyVariants({
+            variant: 'p',
+            className: 'mt-3 text-sm text-destructive',
+          })}
+          role="alert"
+        >
           {error}
         </p>
       ) : null}
