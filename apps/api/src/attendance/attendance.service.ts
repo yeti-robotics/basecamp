@@ -24,14 +24,20 @@ export class AttendanceService {
   ) {}
 
   public signInWithCode(discordId: string, code: string): ResultAsync<void, Error> {
-    return ResultAsync.fromPromise(this.codeService.verify(code), (error) => new Error(String(error)))
+    return ResultAsync.fromPromise(
+      this.codeService.verify(code, Date.now(), 'signin'),
+      (error) => new Error(String(error)),
+    )
       .andThen((valid) => valid
         ? this.recordAttendance(discordId, "meeting", null)
         : errAsync(new Error("Invalid attendance code")));
   }
 
   public signOutWithCode(discordId: string, code: string): ResultAsync<void, Error> {
-    return ResultAsync.fromPromise(this.codeService.verify(code), (error) => new Error(String(error)))
+    return ResultAsync.fromPromise(
+      this.codeService.verify(code, Date.now(), 'signout'),
+      (error) => new Error(String(error)),
+    )
       .andThen((valid) => valid
         ? this.updateAttendance(discordId, { checkedOutAt: new Date() })
         : errAsync(new Error("Invalid attendance code")));
