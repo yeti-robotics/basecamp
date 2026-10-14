@@ -8,7 +8,7 @@
     "format": "biome format --write .",
     "check-types": "turbo run check-types",
     "test": "turbo run test",
-    "coverage:new": "pnpm test:coverage-helper && pnpm --filter api test:cov && pnpm --filter web test:cov && node scripts/check-new-code-coverage.cjs",
+    "coverage:new": "pnpm test:coverage-helper && pnpm --filter @repo/attendance-code build && pnpm --filter api test:cov && pnpm --filter web test:cov && node scripts/check-new-code-coverage.cjs",
     "test:coverage-helper": "node --test scripts/check-new-code-coverage.test.cjs"
   },
   "devDependencies": {
