@@ -1,7 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common";
 import {
   errAsync,
-  type ResultAsync,
+  ResultAsync,
   err,
   ok,
   fromThrowable,
@@ -9,6 +9,7 @@ import {
   okAsync,
 } from "neverthrow";
 import { AttendanceRepository } from "./attendance.repository.js";
+import { AttendanceCodeService } from "./attendance-code.service.js";
 import { type AttendanceUpdate } from "./attendance.repository.js";
 import { Attendance } from "./attendance.schema.js";
 import { FORGOT_SIGNOUT_CREDIT_MS, STALE_SIGNIN_MIN_HOURS_MS } from "./attendance.constants.js";
@@ -17,7 +18,24 @@ import { FORGOT_SIGNOUT_CREDIT_MS, STALE_SIGNIN_MIN_HOURS_MS } from "./attendanc
 export class AttendanceService {
   private readonly logger = new Logger(AttendanceService.name);
 
-  constructor(private readonly attendanceRepository: AttendanceRepository) {}
+  constructor(
+    private readonly attendanceRepository: AttendanceRepository,
+    private readonly codeService: AttendanceCodeService,
+  ) {}
+
+  public signInWithCode(discordId: string, code: string): ResultAsync<void, Error> {
+    return ResultAsync.fromPromise(this.codeService.verify(code), (error) => new Error(String(error)))
+      .andThen((valid) => valid
+        ? this.recordAttendance(discordId, "meeting", null)
+        : errAsync(new Error("Invalid attendance code")));
+  }
+
+  public signOutWithCode(discordId: string, code: string): ResultAsync<void, Error> {
+    return ResultAsync.fromPromise(this.codeService.verify(code), (error) => new Error(String(error)))
+      .andThen((valid) => valid
+        ? this.updateAttendance(discordId, { checkedOutAt: new Date() })
+        : errAsync(new Error("Invalid attendance code")));
+  }
 
   public recordAttendance(
     discordId: string,

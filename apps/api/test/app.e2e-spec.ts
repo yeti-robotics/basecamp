@@ -10,6 +10,7 @@ describe('AppController (e2e)', () => {
     'DATABASE_URL',
     'BETTER_AUTH_SECRET',
     'BETTER_AUTH_URL',
+    'ATTENDANCE_TOTP_SECRET',
     'DISCORD_CLIENT_ID',
     'DISCORD_CLIENT_SECRET',
     'DISCORD_TOKEN',
@@ -27,6 +28,7 @@ describe('AppController (e2e)', () => {
       DATABASE_URL: 'postgresql://test:test@localhost:5432/basecamp-test',
       BETTER_AUTH_SECRET: 'test-secret-at-least-thirty-two-characters',
       BETTER_AUTH_URL: 'http://localhost:3000',
+      ATTENDANCE_TOTP_SECRET: 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ',
       DISCORD_CLIENT_ID: 'test-client-id',
       DISCORD_CLIENT_SECRET: 'test-client-secret',
     });
@@ -40,6 +42,7 @@ describe('AppController (e2e)', () => {
           DATABASE_URL: 'postgresql://test:test@localhost:5432/basecamp-test',
           BETTER_AUTH_SECRET: 'test-secret-at-least-thirty-two-characters',
           BETTER_AUTH_URL: 'http://localhost:3000',
+          ATTENDANCE_TOTP_SECRET: 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ',
           DISCORD_CLIENT_ID: 'test-client-id',
           DISCORD_CLIENT_SECRET: 'test-client-secret',
         }),

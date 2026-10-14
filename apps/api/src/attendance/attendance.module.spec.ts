@@ -2,6 +2,7 @@ import { Test, type TestingModule } from '@nestjs/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { DatabaseService } from '../database/database.service.js';
 import { AttendanceCommands } from './attendance.commands.js';
+import { AttendanceCodeService } from './attendance-code.service.js';
 import { AttendanceModule } from './attendance.module.js';
 import { AttendanceRepository } from './attendance.repository.js';
 import { AttendanceService } from './attendance.service.js';
@@ -13,6 +14,8 @@ describe('AttendanceModule', () => {
     module = await Test.createTestingModule({
       imports: [AttendanceModule],
     })
+      .overrideProvider(AttendanceCodeService)
+      .useValue({ verify: async () => true })
       .overrideProvider(DatabaseService)
       .useValue({ db: {} })
       .compile();

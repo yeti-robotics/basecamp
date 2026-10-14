@@ -11,6 +11,7 @@ const valid = {
   DATABASE_URL: 'postgresql://user:password@localhost/basecamp',
   BETTER_AUTH_SECRET: 'test-secret-at-least-thirty-two-characters',
   BETTER_AUTH_URL: 'http://localhost:3000',
+  ATTENDANCE_TOTP_SECRET: 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ',
   DISCORD_CLIENT_ID: 'client-id',
   DISCORD_CLIENT_SECRET: 'client-secret',
 };
@@ -74,6 +75,7 @@ describe('ConfigModule environment validation', () => {
     'DATABASE_URL',
     'BETTER_AUTH_SECRET',
     'BETTER_AUTH_URL',
+    'ATTENDANCE_TOTP_SECRET',
     'DISCORD_CLIENT_ID',
     'DISCORD_CLIENT_SECRET',
     'DISCORD_TOKEN',
@@ -89,6 +91,7 @@ describe('ConfigModule environment validation', () => {
       DATABASE_URL: 'postgresql://user:password@localhost/basecamp',
       BETTER_AUTH_SECRET: 'test-secret-at-least-thirty-two-characters',
       BETTER_AUTH_URL: 'http://localhost:3000',
+      ATTENDANCE_TOTP_SECRET: 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ',
       DISCORD_CLIENT_ID: 'client-id',
       DISCORD_CLIENT_SECRET: 'client-secret',
     });
