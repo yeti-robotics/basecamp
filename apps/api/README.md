@@ -103,6 +103,23 @@ The API owns the PostgreSQL connection pool, Better Auth, and database migration
 
 Copy `.env.example` to `.env` for local development. The API validates its environment at startup. Set `DATABASE_URL` to a PostgreSQL URL, `BETTER_AUTH_SECRET` to a random value of at least 32 characters (for example, `openssl rand -base64 32`), `BETTER_AUTH_URL` to the public dashboard URL, and provide the Discord client ID and secret. `DISCORD_TOKEN` and `DISCORD_DEVELOPMENT_GUILD_ID` are optional, but must be set together to enable the bot. `PORT` defaults to `8000`. The dashboard separately uses `API_INTERNAL_URL` to reach NestJS over the private network; set it in `apps/dashboard/.env.local`.
 
+## Facility attendance display
+
+Set these API environment variables before starting the API:
+
+- `ATTENDANCE_TOTP_SECRET`: one shared Base32 seed of at least 20 bytes. The API verifies attendance codes and gives this seed only to an unlocked facility display.
+- `ATTENDANCE_DISPLAY_PASSWORD`: a mentor-chosen password for `/attendance/display`.
+- `ATTENDANCE_DISPLAY_SESSION_SECRET`: a separate random signing secret of at least 32 characters for 12-hour display sessions. Changing it signs out every display.
+
+Generate a seed and signing secret with:
+
+```bash
+python3 -c 'import base64,secrets; print(base64.b32encode(secrets.token_bytes(20)).decode().rstrip("="))'
+openssl rand -base64 32
+```
+
+Members enter the four-digit code currently shown at the facility with `/signin` or `/signout` in Discord. It changes every 30 seconds and is padded with zeros when needed. The API accepts the previous and next 30-second windows to allow for small clock differences. The display obtains the seed after password login and computes later codes in the browser; keep that page on a trusted facility device. The login uses Nest Throttler's in-memory storage, limited to five attempts per 15 minutes per API-observed IP. Discord code submissions share a separate five-attempt-per-minute limit per member across both commands. These limits assume a single API instance.
+
 Generate and review migrations from the repository root:
 
 ```bash

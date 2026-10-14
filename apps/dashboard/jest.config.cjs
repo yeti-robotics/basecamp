@@ -9,5 +9,9 @@ module.exports = createJestConfig({
   collectCoverageFrom: ['src/**/*.{js,jsx,ts,tsx}'],
   passWithNoTests: true,
   testEnvironment: 'jsdom',
-  testMatch: ['<rootDir>/src/**/*.(test|spec).{js,jsx,ts,tsx}'],
+  testMatch: [
+    '<rootDir>/src/**/*.(test|spec).{js,jsx,ts,tsx}',
+    '<rootDir>/app/**/*.(test|spec).{ts,tsx}',
+  ],
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
 });
