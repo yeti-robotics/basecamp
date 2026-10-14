@@ -1,3 +1,11 @@
 packages:
   - "apps/*"
   - "packages/*"
+
+# Allow required native tooling; skip necord's donation message script.
+allowBuilds:
+  "@swc/core": true
+  esbuild: true
+  necord: false
+  sharp: true
+  unrs-resolver: true
