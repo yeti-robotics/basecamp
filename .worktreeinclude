@@ -1,0 +1,4 @@
+# Only copy the local environment files used by these applications.
+apps/api/.env.local
+apps/api/.env
+apps/dashboard/.env.local
