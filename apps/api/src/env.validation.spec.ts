@@ -12,6 +12,8 @@ const valid = {
   BETTER_AUTH_SECRET: 'test-secret-at-least-thirty-two-characters',
   BETTER_AUTH_URL: 'http://localhost:3000',
   ATTENDANCE_TOTP_SECRET: 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ',
+  ATTENDANCE_DISPLAY_PASSWORD: 'mentor-configured-password',
+  ATTENDANCE_DISPLAY_SESSION_SECRET: 'a-display-session-secret-longer-than-32-chars',
   DISCORD_CLIENT_ID: 'client-id',
   DISCORD_CLIENT_SECRET: 'client-secret',
 };
@@ -76,6 +78,8 @@ describe('ConfigModule environment validation', () => {
     'BETTER_AUTH_SECRET',
     'BETTER_AUTH_URL',
     'ATTENDANCE_TOTP_SECRET',
+    'ATTENDANCE_DISPLAY_PASSWORD',
+    'ATTENDANCE_DISPLAY_SESSION_SECRET',
     'DISCORD_CLIENT_ID',
     'DISCORD_CLIENT_SECRET',
     'DISCORD_TOKEN',
@@ -92,6 +96,8 @@ describe('ConfigModule environment validation', () => {
       BETTER_AUTH_SECRET: 'test-secret-at-least-thirty-two-characters',
       BETTER_AUTH_URL: 'http://localhost:3000',
       ATTENDANCE_TOTP_SECRET: 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ',
+      ATTENDANCE_DISPLAY_PASSWORD: 'mentor-configured-password',
+      ATTENDANCE_DISPLAY_SESSION_SECRET: 'a-display-session-secret-longer-than-32-chars',
       DISCORD_CLIENT_ID: 'client-id',
       DISCORD_CLIENT_SECRET: 'client-secret',
     });

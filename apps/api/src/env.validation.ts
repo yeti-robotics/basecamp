@@ -16,6 +16,8 @@ export const envSchema = z
     DATABASE_URL: postgresUrl,
     BETTER_AUTH_SECRET: z.string().trim().min(32),
     BETTER_AUTH_URL: httpUrl,
+    ATTENDANCE_DISPLAY_PASSWORD: z.string().trim().min(1),
+    ATTENDANCE_DISPLAY_SESSION_SECRET: z.string().min(32),
     ATTENDANCE_TOTP_SECRET: z.string().refine((value) => {
       try {
         decodeSeed(value);
