@@ -1,3 +1,4 @@
+
 import { Injectable, Logger } from "@nestjs/common";
 import {
   errAsync,
@@ -9,7 +10,11 @@ import {
   okAsync,
 } from "neverthrow";
 import { AttendanceRepository } from "./attendance.repository.js";
-import { type AttendanceUpdate, type AttendanceSumFilter } from "./attendance.repository.js";
+import {
+  type AttendanceUpdate,
+  type AttendanceSumFilter,
+  type AttendanceRequirementSummary,
+} from "./attendance.repository.js";
 import { Attendance } from "./attendance.schema.js";
 import { FORGOT_SIGNOUT_CREDIT_MS, STALE_SIGNIN_MIN_HOURS_MS } from "./attendance.constants.js";
 import {
@@ -164,7 +169,14 @@ export class AttendanceService {
     });
   }
 
+  public getCurrentHourRequirements(
+    discordId: string,
+    asOfDate: Date = new Date(),
+  ): ResultAsync<AttendanceRequirementSummary, Error> {
+    return this.attendanceRepository.getCurrentHourRequirements(discordId, asOfDate);
+  }
+
   public getTotalPossibleHoursToDate(asOfDate: Date = new Date()): number {
-  return calculateTotalPossibleHoursToDate(asOfDate);
+    return calculateTotalPossibleHoursToDate(asOfDate);
   }
 }

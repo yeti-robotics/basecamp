@@ -1,10 +1,16 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { err, ok, Result, ResultAsync } from "neverthrow";
-import { eq, desc, and, isNull, sql } from "drizzle-orm";
+import { eq, desc, and, isNull, sql, lte, gte, or } from "drizzle-orm";
 
 import { DatabaseService } from "../database/database.service.js";
 import { type Attendance, AttendanceSchema } from "./attendance.schema.js";
-import { account, attendance } from "../database/schema/index.js";
+import {
+  account,
+  attendance,
+  hour_requirements,
+  season_memberships,
+  seasons,
+} from "../database/schema/index.js";
 
 export type AttendanceCreate = {
   userId: string;
@@ -23,6 +29,14 @@ export type AttendanceUpdate = {
 export type AttendanceSumFilter = {
   category?: "meeting" | "outreach";
   eventId?: number | null;
+  checkedInFrom?: Date;
+  checkedInThrough?: Date;
+};
+
+export type AttendanceRequirementSummary = {
+  status: typeof season_memberships.$inferSelect.status;
+  member: number;
+  leadership: number;
 };
 
 @Injectable()
@@ -75,6 +89,12 @@ export class AttendanceRepository {
                 ? isNull(attendance.event_id)
                 : eq(attendance.event_id, filter.eventId)
               : undefined,
+            filter?.checkedInFrom !== undefined
+              ? gte(attendance.checked_in_at, filter.checkedInFrom)
+              : undefined,
+            filter?.checkedInThrough !== undefined
+              ? lte(attendance.checked_in_at, filter.checkedInThrough)
+              : undefined,
           ),
         ),
       (error) =>
@@ -85,6 +105,83 @@ export class AttendanceRepository {
 
       return ok(hours);
     });
+  }
+
+  /**
+   * Retrieves the active season's meeting requirements for the user's status.
+   */
+  getCurrentHourRequirements(
+    discordId: string,
+    asOfDate: Date = new Date(),
+  ): ResultAsync<AttendanceRequirementSummary, Error> {
+    return this.getUserIdByDiscordId(discordId).andThen((userId) =>
+      ResultAsync.fromPromise(
+        this.database.db
+          .select({
+            seasonId: seasons.id,
+            status: season_memberships.status,
+          })
+          .from(season_memberships)
+          .innerJoin(seasons, eq(season_memberships.season_id, seasons.id))
+          .where(
+            and(
+              eq(season_memberships.user_id, userId),
+              lte(seasons.started_at, asOfDate),
+              gte(seasons.ended_at, asOfDate),
+              lte(season_memberships.started_at, asOfDate),
+              or(
+                isNull(season_memberships.ended_at),
+                gte(season_memberships.ended_at, asOfDate),
+              ),
+            ),
+          )
+          .orderBy(desc(seasons.started_at))
+          .limit(1),
+        (error) =>
+          error instanceof Error ? error : new Error(String(error)),
+      ).andThen((memberships) => {
+        const membership = memberships[0];
+
+        if (!membership) {
+          return err(new Error("No active season membership found"));
+        }
+
+        return ResultAsync.fromPromise(
+          this.database.db
+            .select({
+              isLeader: hour_requirements.is_leader,
+              requiredHours: hour_requirements.required_hours,
+            })
+            .from(hour_requirements)
+            .where(
+              and(
+                eq(hour_requirements.status, membership.status),
+                eq(hour_requirements.season_id, membership.seasonId),
+                eq(hour_requirements.category, "meeting"),
+              ),
+            ),
+          (error) =>
+            error instanceof Error ? error : new Error(String(error)),
+        ).andThen((rows) => {
+          const memberRequirement = rows.find((row) => !row.isLeader);
+          const leadershipRequirement = rows.find((row) => row.isLeader);
+
+          if (!memberRequirement || !leadershipRequirement) {
+            return err(
+              new Error(
+                `Meeting requirements are not configured for status "${membership.status}" in season ${membership.seasonId}`,
+              ),
+            );
+          }
+
+          return ok({
+            status: membership.status,
+            member: memberRequirement.requiredHours,
+            leadership: leadershipRequirement.requiredHours,
+          });
+        });
+      }),
+    );
   }
 
   createRecord(

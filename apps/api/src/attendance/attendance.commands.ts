@@ -1,11 +1,13 @@
-
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import type { SlashCommandContext } from 'necord';
 import { Context, SlashCommand } from 'necord';
 import { AttendanceService } from './attendance.service.js';
+import { getSeasonDataStartForDate } from './schedule.util.js';
 
 @Injectable()
 export class AttendanceCommands {
+  private readonly logger = new Logger(AttendanceCommands.name);
+
   constructor(private readonly attendanceService: AttendanceService) {}
 
   @SlashCommand({
@@ -13,7 +15,68 @@ export class AttendanceCommands {
     description: 'Get your current attendance',
   })
   async AttendanceCommand(@Context() [interaction]: SlashCommandContext) {
-    await interaction.reply('Attendance command');
+    const asOfDate = new Date();
+    const [hoursResult, requirementsResult] = await Promise.all([
+      this.attendanceService.getAttendanceSum(interaction.user.id, {
+        category: 'meeting',
+        checkedInFrom: getSeasonDataStartForDate(asOfDate),
+        checkedInThrough: asOfDate,
+      }),
+      this.attendanceService.getCurrentHourRequirements(
+        interaction.user.id,
+        asOfDate,
+      ),
+    ]);
+
+    if (hoursResult.isErr() || requirementsResult.isErr()) {
+      const error = hoursResult.isErr()
+        ? hoursResult.error
+        : requirementsResult.isErr()
+          ? requirementsResult.error
+          : new Error('Unknown attendance lookup error');
+
+      this.logger.error(
+        `Error getting attendance for user ${interaction.user.id}: ${error.message}`,
+      );
+
+      await interaction.reply({
+        content:
+          'There was an error getting your attendance or hour requirements. Please let a mentor know.',
+        flags: ['Ephemeral'],
+      });
+      return;
+    }
+
+    const meetingHours = hoursResult.value;
+    const requirements = requirementsResult.value;
+    const memberRequirementMet = meetingHours >= requirements.member;
+    const leadershipRequirementMet = meetingHours >= requirements.leadership;
+
+    const totalPossibleHours =
+      this.attendanceService.getTotalPossibleHoursToDate(asOfDate);
+    const hoursPercentage =
+      totalPossibleHours > 0
+        ? `${((meetingHours / totalPossibleHours) * 100).toFixed(1)}`
+        : '∞';
+    const totalPossibleHoursDisplay = Math.floor(totalPossibleHours);
+
+    const statusMessage = leadershipRequirementMet
+      ? `You're currently above the minimum hours for leadership (${meetingHours.toFixed(2)} hours, ${hoursPercentage}% of ${totalPossibleHoursDisplay} possible hours to date)! :tada:`
+      : memberRequirementMet
+        ? `You're currently above the minimum hours for members (${meetingHours.toFixed(2)} hours, ${hoursPercentage}% of ${totalPossibleHoursDisplay} possible hours to date)! If you're on leadership, you are currently ${Math.ceil(requirements.leadership - meetingHours)} hour(s) behind the leadership requirement.`
+        : `You've got ${meetingHours.toFixed(2)} hours (${hoursPercentage}% of ${totalPossibleHoursDisplay} possible hours to date). You are currently ${Math.ceil(requirements.member - meetingHours)} hour(s) behind the minimum hours goal. :rocket:`;
+
+    await interaction.reply(
+      [
+        `**Attendance for ${requirements.status}**`,
+        '',
+        `- Meeting hours: ${meetingHours.toFixed(2)}`,
+        `- Member minimum: ${meetingHours.toFixed(2)} / ${requirements.member} hours`,
+        `- Leadership minimum: ${meetingHours.toFixed(2)} / ${requirements.leadership} hours`,
+        '',
+        statusMessage,
+      ].join('\n'),
+    );
   }
 
   @SlashCommand({
