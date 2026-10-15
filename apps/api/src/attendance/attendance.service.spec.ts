@@ -2,8 +2,11 @@ import { Test, type TestingModule } from "@nestjs/testing";
 import { okAsync } from "neverthrow";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AttendanceService } from "./attendance.service.js";
+import { AttendanceCodeService } from "./attendance-code.service.js";
 import { AttendanceRepository } from "./attendance.repository.js";
 import type { Attendance } from "./attendance.schema.js";
+
+const mockCodeService = { verify: vi.fn() };
 
 const mockRepository = {
   getUserIdByDiscordId: vi.fn(),
@@ -36,6 +39,7 @@ describe("AttendanceService", () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AttendanceService,
+        { provide: AttendanceCodeService, useValue: mockCodeService },
         { provide: AttendanceRepository, useValue: mockRepository },
       ],
     }).compile();
@@ -43,6 +47,7 @@ describe("AttendanceService", () => {
     service = module.get<AttendanceService>(AttendanceService);
 
     mockRepository.getUserIdByDiscordId.mockReturnValue(okAsync(USER_ID));
+    mockCodeService.verify.mockResolvedValue(true);
   });
 
   afterEach(() => {
@@ -172,5 +177,46 @@ describe("AttendanceService", () => {
       expect(result.isOk()).toBe(true);
       expect(mockRepository.updateLast).not.toHaveBeenCalled();
     });
+  });
+
+  it("requires a display code before self-service writes and lets two members share one code", async () => {
+    const secondDiscordId = "234567890123456789";
+    const records = new Map<string, Attendance>();
+    mockCodeService.verify.mockImplementation(async (code: string) => code === "0042");
+    mockRepository.getUserIdByDiscordId.mockImplementation((discordId: string) => okAsync(discordId));
+    mockRepository.getLast.mockImplementation((userId: string) => okAsync(records.get(userId) ?? null));
+    mockRepository.createRecord.mockImplementation((input) => {
+      const row = makeAttendance({
+        id: records.size + 1,
+        userId: input.userId,
+        checkedInAt: input.checkedInAt.toISOString(),
+        checkedOutAt: null,
+      });
+      records.set(input.userId, row);
+      return okAsync(row);
+    });
+    mockRepository.updateLast.mockImplementation((userId: string, updates) => {
+      const row = records.get(userId);
+      if (!row) throw new Error("Missing fake attendance record");
+      const updated = {
+        ...row,
+        checkedOutAt: updates.checkedOutAt?.toISOString() ?? row.checkedOutAt,
+      };
+      records.set(userId, updated);
+      return okAsync(updated);
+    });
+
+    expect((await service.signInWithCode(DISCORD_ID, "9999")).isErr()).toBe(true);
+    expect((await service.signOutWithCode(DISCORD_ID, "42")).isErr()).toBe(true);
+    expect(records.size).toBe(0);
+    expect(mockRepository.createRecord).not.toHaveBeenCalled();
+    expect(mockRepository.updateLast).not.toHaveBeenCalled();
+
+    expect((await service.signInWithCode(DISCORD_ID, "0042")).isOk()).toBe(true);
+    expect((await service.signInWithCode(secondDiscordId, "0042")).isOk()).toBe(true);
+    expect(records.size).toBe(2);
+    expect((await service.signInWithCode(DISCORD_ID, "0042")).isErr()).toBe(true);
+    expect((await service.signOutWithCode(DISCORD_ID, "0042")).isOk()).toBe(true);
+    expect(records.get(DISCORD_ID)?.checkedOutAt).toEqual(expect.any(String));
   });
 });

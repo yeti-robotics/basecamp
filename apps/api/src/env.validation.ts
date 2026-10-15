@@ -1,3 +1,4 @@
+import { decodeSeed } from '@repo/attendance-code';
 import { z } from 'zod';
 
 const nonblank = z.string().trim().min(1);
@@ -15,6 +16,17 @@ export const envSchema = z
     DATABASE_URL: postgresUrl,
     BETTER_AUTH_SECRET: z.string().trim().min(32),
     BETTER_AUTH_URL: httpUrl,
+    ATTENDANCE_DISPLAY_PASSWORD: z.string().trim().min(1),
+    ATTENDANCE_DISPLAY_SESSION_SECRET: z.string().min(32),
+    ATTENDANCE_TRUSTED_PROXY: optionalNonblank,
+    ATTENDANCE_TOTP_SECRET: z.string().refine((value) => {
+      try {
+        decodeSeed(value);
+        return true;
+      } catch {
+        return false;
+      }
+    }, 'ATTENDANCE_TOTP_SECRET must be a Base32 seed of at least 20 bytes'),
     DISCORD_CLIENT_ID: nonblank,
     DISCORD_CLIENT_SECRET: nonblank,
     DISCORD_TOKEN: optionalNonblank,

@@ -1,3 +1,4 @@
+import { ConfigService } from '@nestjs/config';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { DatabaseService } from '../database/database.service.js';
@@ -13,6 +14,14 @@ describe('AttendanceModule', () => {
     module = await Test.createTestingModule({
       imports: [AttendanceModule],
     })
+      .overrideProvider(ConfigService)
+      .useValue(
+        new ConfigService({
+          ATTENDANCE_TOTP_SECRET: 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ',
+          ATTENDANCE_DISPLAY_PASSWORD: 'mentor-configured-password',
+          ATTENDANCE_DISPLAY_SESSION_SECRET: 'a-display-session-secret-longer-than-32-chars',
+        }),
+      )
       .overrideProvider(DatabaseService)
       .useValue({ db: {} })
       .compile();
