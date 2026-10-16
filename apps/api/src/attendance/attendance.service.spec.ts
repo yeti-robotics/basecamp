@@ -329,7 +329,7 @@ describe('AttendanceService', () => {
     const { service, queries } = setup([
       [season],
       records,
-      [{ status: 'rookie' }],
+      [{ legacy_status: 'rookie' }],
       [
         { category: 'meeting', required_hours: 40 },
         { category: 'outreach', required_hours: 10 },
