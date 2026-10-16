@@ -3,6 +3,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { AUTH } from '../auth/auth.module.js';
 import { configureTrustedProxy } from '../configure-http.js';
 import { DatabaseService } from '../database/database.service.js';
 import { AttendanceModule } from './attendance.module.js';
@@ -28,6 +29,8 @@ describe('attendance display HTTP API', () => {
           ATTENDANCE_DISPLAY_SESSION_SECRET: sessionSecret,
         }),
       )
+      .overrideProvider(AUTH)
+      .useValue({ api: {} })
       .overrideProvider(DatabaseService)
       .useValue({ db: {} })
       .compile();

@@ -1,8 +1,8 @@
-import { Test, type TestingModule } from "@nestjs/testing";
-import { beforeEach, describe, expect, it } from "vitest";
-import { HealthController } from "./health.controller.js";
+import { Test, type TestingModule } from '@nestjs/testing';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { HealthController } from './health.controller.js';
 
-describe("HealthController", () => {
+describe('HealthController', () => {
   let controller: HealthController;
 
   beforeEach(async () => {
@@ -13,13 +13,13 @@ describe("HealthController", () => {
     controller = module.get(HealthController);
   });
 
-  it("should be defined", () => {
+  it('should be defined', () => {
     expect(controller).toBeDefined();
   });
 
-  describe("health (GET /health)", () => {
-    it("returns status ok", () => {
-      expect(controller.health()).toEqual({ status: "ok" });
+  describe('health (GET /health)', () => {
+    it('returns status ok', () => {
+      expect(controller.health()).toEqual({ status: 'ok' });
     });
   });
 });

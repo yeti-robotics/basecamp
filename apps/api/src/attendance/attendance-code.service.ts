@@ -1,7 +1,7 @@
 import { timingSafeEqual } from 'node:crypto';
-import { decodeSeed, generateAttendanceCode } from '@repo/attendance-code';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { decodeSeed, generateAttendanceCode } from '@repo/attendance-code';
 
 @Injectable()
 export class AttendanceCodeService {

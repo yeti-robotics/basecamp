@@ -1,8 +1,10 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { AuthModule } from '../auth/auth.module.js';
 import { DatabaseModule } from '../database/database.module.js';
 import { AttendanceCommands } from './attendance.commands.js';
+import { AttendanceController } from './attendance.controller.js';
 import { AttendanceRepository } from './attendance.repository.js';
 import { AttendanceService } from './attendance.service.js';
 import { AttendanceCodeService } from './attendance-code.service.js';
@@ -13,11 +15,12 @@ import { DisplaySessionService } from './display-session.service.js';
 
 @Module({
   imports: [
+    AuthModule,
     DatabaseModule,
     ConfigModule,
     ThrottlerModule.forRoot([{ name: 'attendance', ttl: 60_000, limit: 5 }]),
   ],
-  controllers: [DisplayController],
+  controllers: [AttendanceController, DisplayController],
   providers: [
     AttendanceCommands,
     AttendanceService,

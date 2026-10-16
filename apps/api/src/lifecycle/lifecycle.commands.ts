@@ -1,18 +1,15 @@
-import { Injectable } from "@nestjs/common";
-import { MessageFlags } from "discord.js";
-import { Context, SlashCommand, type SlashCommandContext } from "necord";
-import { LifecycleService } from "./lifecycle.service.js";
+import { Injectable } from '@nestjs/common';
+import { MessageFlags } from 'discord.js';
+import { Context, SlashCommand, type SlashCommandContext } from 'necord';
+import { LifecycleService } from './lifecycle.service.js';
 
 @Injectable()
 export class LifecycleCommands {
-
-  constructor(
-  private readonly service: LifecycleService,
-) {}
+  constructor(private readonly service: LifecycleService) {}
 
   @SlashCommand({
-    name: "ping",
-    description: "Ping the bot",
+    name: 'ping',
+    description: 'Ping the bot',
     dmPermission: true,
   })
   public async onPing(@Context() [interaction]: SlashCommandContext) {
@@ -23,8 +20,8 @@ export class LifecycleCommands {
   }
 
   @SlashCommand({
-    name: "greet",
-    description: "Talk to the database",
+    name: 'greet',
+    description: 'Talk to the database',
     dmPermission: true,
   })
   public async onGreet(@Context() [interaction]: SlashCommandContext) {

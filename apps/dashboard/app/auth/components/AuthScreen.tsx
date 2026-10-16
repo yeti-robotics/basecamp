@@ -1,3 +1,5 @@
+import { ErrorToast } from '@/components/ErrorToast';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import { SignInForm } from './SignInForm';
 
@@ -34,12 +36,16 @@ export function AuthScreen({ authError, redirectUrl }: AuthScreenProps) {
           </div>
 
           {authError && (
-            <p
-              className="rounded-lg border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive"
-              role="alert"
-            >
-              Discord sign-in was not completed. Please try again.
-            </p>
+            <Alert>
+              <AlertDescription>
+                Discord sign-in was not completed. Please try again.
+              </AlertDescription>
+              <ErrorToast
+                id="oauth-error"
+                message="Discord sign-in was not completed"
+                description="Please try again."
+              />
+            </Alert>
           )}
 
           <SignInForm redirectUrl={redirectUrl} />

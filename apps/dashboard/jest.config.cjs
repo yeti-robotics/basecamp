@@ -6,7 +6,10 @@ const createJestConfig = nextJest({
 
 module.exports = createJestConfig({
   coverageDirectory: 'coverage',
-  collectCoverageFrom: ['src/**/*.{js,jsx,ts,tsx}'],
+  collectCoverageFrom: [
+    '{app,components,lib,src}/**/*.{js,jsx,ts,tsx}',
+    '!**/*.{test,spec}.{js,jsx,ts,tsx}',
+  ],
   passWithNoTests: true,
   testEnvironment: 'jsdom',
   testMatch: [
