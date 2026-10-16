@@ -29,6 +29,10 @@ const nextConfig = {
         source: '/api/roster/:path*',
         destination: `${apiInternalUrl}/api/roster/:path*`,
       },
+      {
+        source: '/api/access/:path*',
+        destination: `${apiInternalUrl}/api/access/:path*`,
+      },
     ];
   },
 };

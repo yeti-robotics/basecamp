@@ -30,6 +30,15 @@ To establish the first Team Admin, set `BASECAMP_BOOTSTRAP_ADMIN_DISCORD_IDS` to
 
 Set `BASECAMP_TIME_ZONE` to the team's IANA timezone (for example, `America/New_York`). Season dates are local calendar dates, and API authorization selects the current season using this timezone.
 
+Signed-in admitted members join the current season roster on their first dashboard API visit during that season. A new season starts empty. Team Admins can correct a season role, remove or restore a person for the current season, and read past rosters. Mentors can read current rosters. Students and Student Leaders can read only their own assignment. Role corrections and season membership actions are recorded in the roster audit log.
+
+Account suspension is separate from season removal. Suspending an account revokes its sessions and prevents future sign-in while preserving all season memberships and attendance. Team Admins can restore account access. If all Team Admin access is lost, an operator with database access can restore a known local account with the one-off recovery command below. It requires an explicit account ID and season ID, reads `apps/api/.env`, clears any account suspension, grants Team Admin for the selected season, and records an operator recovery audit entry:
+
+```bash
+cd apps/api
+node scripts/recover-admin.mjs <userId> <seasonId>
+```
+
 ## Facility attendance display
 
 Set these API environment variables before starting the API:

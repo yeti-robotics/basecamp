@@ -1,3 +1,7 @@
+'use client';
+
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 import type { RosterMember, RosterSeason } from '@/lib/roster';
 
 type RosterTableProps = {
@@ -35,6 +39,190 @@ function MembershipSummary({ member }: { member: RosterMember }) {
   );
 }
 
+function MemberRow({
+  member,
+  canManage,
+  readOnly,
+  seasonId,
+}: {
+  member: RosterMember;
+  canManage: boolean;
+  readOnly: boolean;
+  seasonId: number;
+}) {
+  const router = useRouter();
+  const [role, setRole] = useState<RosterMember['role']>(member.role);
+  const [experience, setExperience] = useState<RosterMember['studentExperience']>(
+    member.studentExperience,
+  );
+  const [reason, setReason] = useState('');
+  const [error, setError] = useState('');
+
+  function updateRole(value: RosterMember['role']) {
+    setRole(value);
+    if (value === 'student' || value === 'student_leader') {
+      setExperience(member.studentExperience ?? 'rookie');
+    } else {
+      setExperience(null);
+    }
+  }
+
+  async function mutate(path: string, method: 'PATCH' | 'POST', body?: unknown) {
+    setError('');
+    const response = await fetch(path, {
+      method,
+      ...(body === undefined
+        ? {}
+        : { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
+    });
+    if (!response.ok) {
+      const result = await response.json().catch(() => ({}));
+      setError(
+        typeof result.message === 'string' ? result.message : 'The change could not be saved.',
+      );
+      return;
+    }
+    router.refresh();
+  }
+
+  const assignmentPath = readOnly
+    ? `/api/roster/seasons/${seasonId}/members/${member.id}`
+    : `/api/roster/members/${member.id}`;
+  const canEditAssignment = canManage && member.state === 'active';
+
+  return (
+    <tr>
+      <td className="px-4 py-3 font-medium">{member.name}</td>
+      <td className="px-4 py-3">{roleLabels[member.role]}</td>
+      <td className="px-4 py-3 text-zinc-400">
+        {experienceLabel(member.studentExperience) ?? '—'}
+      </td>
+      <td className="px-4 py-3 text-zinc-400">
+        {member.state === 'active' ? 'Active' : 'Removed'}
+        {member.suspended && <span className="ml-2 text-amber-300">Account suspended</span>}
+      </td>
+      {canManage && (
+        <td className="min-w-64 px-4 py-3 align-top">
+          <div className="space-y-3">
+            {canEditAssignment && (
+              <form
+                className="grid gap-2"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void mutate(assignmentPath, 'PATCH', { role, studentExperience: experience });
+                }}
+              >
+                <label className="grid gap-1 text-xs text-zinc-400">
+                  Role
+                  <select
+                    aria-label={`Role for ${member.name}`}
+                    value={role}
+                    onChange={(event) => updateRole(event.target.value as RosterMember['role'])}
+                    className="rounded border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-sm text-white"
+                  >
+                    <option value="team_admin">Team Admin</option>
+                    <option value="mentor">Mentor</option>
+                    <option value="student_leader">Student Leader</option>
+                    <option value="student">Student</option>
+                  </select>
+                </label>
+                {(role === 'student' || role === 'student_leader') && (
+                  <label className="grid gap-1 text-xs text-zinc-400">
+                    Experience
+                    <select
+                      aria-label={`Experience for ${member.name}`}
+                      value={experience ?? 'rookie'}
+                      onChange={(event) =>
+                        setExperience(event.target.value as 'rookie' | 'veteran')
+                      }
+                      className="rounded border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-sm text-white"
+                    >
+                      <option value="rookie">Rookie</option>
+                      <option value="veteran">Veteran</option>
+                    </select>
+                  </label>
+                )}
+                <button
+                  type="submit"
+                  className="rounded border border-zinc-700 px-2 py-1.5 text-xs hover:bg-zinc-800"
+                >
+                  Save assignment
+                </button>
+              </form>
+            )}
+            {!readOnly && member.state === 'removed' && (
+              <button
+                type="button"
+                className="rounded border border-cyan-800 px-2 py-1.5 text-xs text-cyan-200 hover:bg-cyan-950"
+                onClick={() => void mutate(`/api/roster/members/${member.id}/restore`, 'POST')}
+              >
+                Restore to season
+              </button>
+            )}
+            {!readOnly && (
+              <details className="rounded border border-zinc-800 p-2">
+                <summary className="cursor-pointer text-xs text-zinc-300">Access actions</summary>
+                <p className="mt-2 text-xs leading-5 text-zinc-500">
+                  Season removal affects this season only. Account suspension blocks sign-in across
+                  Basecamp.
+                </p>
+                <label className="mt-2 grid gap-1 text-xs text-zinc-400">
+                  Optional reason
+                  <input
+                    aria-label={`Reason for ${member.name}`}
+                    value={reason}
+                    onChange={(event) => setReason(event.target.value)}
+                    className="rounded border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-sm text-white"
+                  />
+                </label>
+                {member.state === 'active' && (
+                  <button
+                    type="button"
+                    className="mt-2 block rounded border border-amber-900 px-2 py-1.5 text-xs text-amber-200 hover:bg-amber-950"
+                    onClick={() =>
+                      void mutate(`/api/roster/members/${member.id}/remove`, 'POST', { reason })
+                    }
+                  >
+                    Remove from season
+                  </button>
+                )}
+                {member.suspended ? (
+                  <button
+                    type="button"
+                    className="mt-2 block rounded border border-cyan-800 px-2 py-1.5 text-xs text-cyan-200 hover:bg-cyan-950"
+                    onClick={() =>
+                      void mutate(`/api/access/users/${member.userId}/restore`, 'POST')
+                    }
+                  >
+                    Restore account access
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="mt-2 block rounded border border-rose-900 px-2 py-1.5 text-xs text-rose-200 hover:bg-rose-950"
+                    onClick={() =>
+                      void mutate(`/api/access/users/${member.userId}/suspend`, 'POST', {
+                        reason,
+                      })
+                    }
+                  >
+                    Suspend account access
+                  </button>
+                )}
+              </details>
+            )}
+            {error && (
+              <p role="alert" className="text-xs text-rose-300">
+                {error}
+              </p>
+            )}
+          </div>
+        </td>
+      )}
+    </tr>
+  );
+}
+
 export function RosterTable({
   season,
   members,
@@ -63,7 +251,11 @@ export function RosterTable({
         )}
       </header>
 
-      {season?.readOnly && <p className="mt-6 text-sm text-amber-300">Past season · read only</p>}
+      {season?.readOnly && (
+        <p className="mt-6 text-sm text-amber-300">
+          Past season · admins can correct historical assignments
+        </p>
+      )}
       {!season && (
         <p className="mt-6 rounded-lg border border-zinc-800 p-4 text-zinc-300">
           No active season is configured yet.
@@ -93,20 +285,22 @@ export function RosterTable({
                 <th scope="col" className="px-4 py-3 font-medium">
                   Status
                 </th>
+                {canManage && (
+                  <th scope="col" className="px-4 py-3 font-medium">
+                    Admin actions
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-800">
               {members.map((member) => (
-                <tr key={member.id}>
-                  <td className="px-4 py-3 font-medium">{member.name}</td>
-                  <td className="px-4 py-3">{roleLabels[member.role]}</td>
-                  <td className="px-4 py-3 text-zinc-400">
-                    {experienceLabel(member.studentExperience) ?? '—'}
-                  </td>
-                  <td className="px-4 py-3 text-zinc-400">
-                    {member.state === 'active' ? 'Active' : 'Removed'}
-                  </td>
-                </tr>
+                <MemberRow
+                  key={member.id}
+                  member={member}
+                  canManage={canManage}
+                  readOnly={Boolean(season.readOnly)}
+                  seasonId={season.id}
+                />
               ))}
             </tbody>
           </table>
