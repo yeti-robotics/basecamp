@@ -2,23 +2,37 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
   Check,
-  ChevronRight,
   Clock3,
   HandHeart,
   Layers3,
   Radio,
-  TriangleAlert,
 } from 'lucide-react';
 import { Brand } from '@/components/Brand';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@/components/ui/empty';
+import { Progress } from '@/components/ui/progress';
 import type { AttendanceOverview } from '@/lib/attendance';
 import type { SessionUser } from '@/lib/auth';
+import { AttendanceError } from './AttendanceError';
 import { SignOutButton } from './SignOutButton';
 
-type DashboardOverviewProps = {
-  user: SessionUser;
-  attendance: AttendanceOverview | null;
-};
-
+type DashboardOverviewProps = { user: SessionUser; attendance: AttendanceOverview | null };
 const activityDate = new Intl.DateTimeFormat('en-US', {
   month: 'short',
   day: 'numeric',
@@ -54,30 +68,22 @@ function ProgressRow({
           </p>
         </div>
         {complete ? (
-          <span className="flex items-center gap-1 text-xs text-emerald-400">
-            <Check aria-hidden="true" className="size-3.5" />
+          <Badge variant="secondary">
+            <Check aria-hidden="true" />
             Met
-          </span>
+          </Badge>
         ) : percentage !== null ? (
           <span className="font-mono text-xs text-muted-foreground">{Math.floor(percentage)}%</span>
         ) : null}
       </div>
       {percentage !== null ? (
         <>
-          <div
-            className="mt-4 h-1.5 overflow-hidden rounded-full bg-muted"
-            role="progressbar"
+          <Progress
+            className="mt-4 h-1.5"
+            value={percentage}
             aria-label={`${label} progress`}
-            aria-valuemax={100}
-            aria-valuemin={0}
-            aria-valuenow={percentage}
-            aria-valuetext={`${hours.toFixed(1)} of ${required} hours`}
-          >
-            <div
-              className={`h-full rounded-full ${outreach ? 'bg-violet-400' : 'bg-blue-400'}`}
-              style={{ width: `${percentage}%` }}
-            />
-          </div>
+            getValueLabel={() => `${hours.toFixed(1)} of ${required} hours`}
+          />
           <p className="mt-2.5 text-xs text-muted-foreground">
             {complete
               ? 'Season requirement completed'
@@ -100,21 +106,18 @@ export function DashboardOverview({ user, attendance }: DashboardOverviewProps) 
       value: attendance?.hours.meeting,
       icon: Clock3,
       detail: 'Time spent building together',
-      color: 'text-blue-400',
     },
     {
       label: 'Outreach hours',
       value: attendance?.hours.outreach,
       icon: HandHeart,
       detail: 'Making an impact beyond the shop',
-      color: 'text-violet-400',
     },
     {
       label: 'Total hours',
       value: attendance?.hours.total,
       icon: Layers3,
       detail: 'Your contribution this season',
-      color: 'text-emerald-400',
     },
   ];
   const firstName = user.name.trim().split(/\s+/)[0] || 'there';
@@ -126,7 +129,6 @@ export function DashboardOverview({ user, attendance }: DashboardOverviewProps) 
       .slice(0, 2)
       .map((name) => name[0])
       .join('') || 'TM';
-
   return (
     <div className="min-h-svh bg-background">
       <a
@@ -145,12 +147,9 @@ export function DashboardOverview({ user, attendance }: DashboardOverviewProps) 
             <span className="hidden text-sm text-muted-foreground sm:block">YETI Robotics</span>
           </div>
           <div className="flex min-w-0 items-center gap-3">
-            <span
-              className="hidden size-8 items-center justify-center rounded-full border bg-muted font-mono text-xs sm:flex"
-              aria-hidden="true"
-            >
-              {initials}
-            </span>
+            <Avatar className="hidden border sm:flex">
+              <AvatarFallback className="font-mono text-xs">{initials}</AvatarFallback>
+            </Avatar>
             <div className="hidden min-w-0 sm:block">
               <p className="max-w-40 truncate text-xs font-medium">{user.name || 'Team member'}</p>
               <p className="mt-0.5 max-w-48 truncate text-[11px] text-muted-foreground">
@@ -182,15 +181,13 @@ export function DashboardOverview({ user, attendance }: DashboardOverviewProps) 
           </a>
         </nav>
       </header>
-
       <main id="main-content" className="mx-auto max-w-7xl scroll-mt-6 px-5 py-9 sm:px-8 sm:py-12">
         <section
           aria-labelledby="dashboard-heading"
           className="mb-8 flex flex-wrap items-end justify-between gap-5"
         >
           <div>
-            <p className="mb-3 flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-              <span className="size-1.5 rounded-full bg-blue-400" aria-hidden="true" />
+            <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
               Member dashboard
             </p>
             <h1
@@ -204,72 +201,60 @@ export function DashboardOverview({ user, attendance }: DashboardOverviewProps) 
               Every hour moves the team forward. Here’s your season at a glance.
             </p>
           </div>
-          <span className="inline-flex items-center gap-2 rounded-md border bg-card px-3 py-2 text-xs text-muted-foreground">
-            <span
-              className={`size-1.5 rounded-full ${attendance?.season ? 'bg-emerald-400' : 'bg-muted-foreground'}`}
-              aria-hidden="true"
-            />
-            {attendance?.season?.name ?? (attendance ? 'No active season' : 'Season unavailable')}
-          </span>
-        </section>
-
-        {!attendance ? (
-          <div
-            role="status"
-            className="mb-6 flex flex-wrap items-center gap-3 rounded-lg border border-amber-400/25 bg-amber-400/5 p-4 text-sm"
+          <Badge
+            variant="outline"
+            className="h-auto rounded-md px-3 py-2 font-normal text-muted-foreground"
           >
-            <TriangleAlert aria-hidden="true" className="size-4 shrink-0 text-amber-400" />
-            <p className="flex-1 text-muted-foreground">Attendance could not be loaded.</p>
-            <a href="/" className="font-medium underline underline-offset-4">
-              Try again
-            </a>
-          </div>
+            {attendance?.season?.name ?? (attendance ? 'No active season' : 'Season unavailable')}
+          </Badge>
+        </section>
+        {!attendance ? (
+          <AttendanceError />
         ) : !attendance.season ? (
-          <p className="mb-6 rounded-lg border bg-card p-4 text-sm text-muted-foreground">
-            No active season is configured yet.
-          </p>
+          <Alert className="mb-6">
+            <AlertDescription>No active season is configured yet.</AlertDescription>
+          </Alert>
         ) : null}
-
         <section className="grid gap-4 md:grid-cols-3" aria-label="Hours overview">
-          {metrics.map(({ label, value, icon: Icon, detail, color }) => (
-            <article
-              key={label}
-              className="min-w-0 rounded-xl border bg-card p-5 transition-colors hover:border-white/20 sm:p-6"
-            >
-              <div className="flex items-center justify-between">
-                <h2 className="text-sm text-muted-foreground">{label}</h2>
-                <Icon aria-hidden="true" className={`size-4 ${color}`} />
-              </div>
-              <p className="mt-6 text-4xl font-medium tracking-tight tabular-nums">
-                {value?.toFixed(1) ?? '—'}
-                <span className="ml-2 text-sm font-normal tracking-normal text-muted-foreground">
-                  hrs
-                </span>
-              </p>
-              <p className="mt-4 text-xs text-muted-foreground">{detail}</p>
-            </article>
+          {metrics.map(({ label, value, icon: Icon, detail }) => (
+            <Card key={label} className="min-w-0 gap-0 transition-colors hover:ring-foreground/20">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="text-sm font-normal text-muted-foreground">
+                  <h2>{label}</h2>
+                </CardTitle>
+                <Icon aria-hidden="true" className="size-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <p className="mt-6 text-4xl font-medium tracking-tight tabular-nums">
+                  {value?.toFixed(1) ?? '—'}
+                  <span className="ml-2 text-sm font-normal tracking-normal text-muted-foreground">
+                    hrs
+                  </span>
+                </p>
+                <p className="mt-4 text-xs text-muted-foreground">{detail}</p>
+              </CardContent>
+            </Card>
           ))}
         </section>
-
         <div className="mt-6 grid items-start gap-6 lg:grid-cols-3">
-          <section
+          <Card
             id="progress"
             aria-labelledby="progress-heading"
-            className="scroll-mt-6 overflow-hidden rounded-xl border bg-card"
+            className="scroll-mt-6 gap-0 overflow-hidden py-0"
           >
-            <div className="border-b px-5 py-5 sm:px-6">
-              <h2 id="progress-heading" className="text-sm font-medium">
-                Season progress
-              </h2>
-              <p className="mt-1.5 text-xs leading-5 text-muted-foreground">
+            <CardHeader className="gap-1.5 border-b py-5">
+              <CardTitle id="progress-heading" className="text-sm">
+                <h2>Season progress</h2>
+              </CardTitle>
+              <CardDescription className="text-xs leading-5">
                 {attendance
                   ? attendance.requirements
                     ? 'Small steps. A stronger season.'
                     : 'Requirements appear once your season membership is configured.'
                   : 'Season progress is currently unavailable.'}
-              </p>
-            </div>
-            <div className="divide-y p-5 sm:p-6">
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="divide-y py-6">
               {attendance ? (
                 <>
                   <ProgressRow
@@ -289,93 +274,96 @@ export function DashboardOverview({ user, attendance }: DashboardOverviewProps) 
                   Try reloading to see your progress.
                 </p>
               )}
-            </div>
-            <div className="flex items-center gap-2 border-t bg-muted/20 px-5 py-3.5 text-[11px] text-muted-foreground sm:px-6">
+            </CardContent>
+            <CardFooter className="gap-2 border-t bg-muted/20 py-3.5 text-[11px] text-muted-foreground">
               <Layers3 aria-hidden="true" className="size-3.5 shrink-0" />
               Hours count toward your current season.
-            </div>
-          </section>
-
-          <section
+            </CardFooter>
+          </Card>
+          <Card
             id="activity"
             aria-labelledby="activity-heading"
-            className="scroll-mt-6 overflow-hidden rounded-xl border bg-card lg:col-span-2"
+            className="scroll-mt-6 gap-0 overflow-hidden py-0 lg:col-span-2"
           >
-            <div className="flex items-center justify-between gap-4 border-b px-5 py-5 sm:px-6">
+            <CardHeader className="flex flex-row items-center justify-between gap-4 border-b py-5">
               <div>
-                <h2 id="activity-heading" className="text-sm font-medium">
-                  Recent activity
-                </h2>
-                <p className="mt-1.5 text-xs leading-5 text-muted-foreground">
+                <CardTitle id="activity-heading" className="text-sm">
+                  <h2>Recent activity</h2>
+                </CardTitle>
+                <CardDescription className="mt-1.5 text-xs leading-5">
                   Your latest meetings and outreach events.
-                </p>
+                </CardDescription>
               </div>
-              <span className="rounded-md border bg-muted/40 px-2 py-1 font-mono text-[10px] text-muted-foreground">
+              <Badge
+                variant="outline"
+                className="shrink-0 font-mono text-[10px] font-normal text-muted-foreground"
+              >
                 {attendance ? `${attendance.recentActivity.length} records` : 'Unavailable'}
-              </span>
-            </div>
-            {attendance && attendance.recentActivity.length > 0 ? (
-              <ul className="divide-y">
-                {attendance.recentActivity.map((activity) => {
-                  const open = !activity.checkedOutAt;
-                  return (
-                    <li
-                      key={activity.id}
-                      className="flex items-center gap-3 px-5 py-5 sm:gap-4 sm:px-6"
-                    >
-                      <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border bg-muted/40 text-muted-foreground">
-                        {activity.category === 'meeting' ? (
-                          <ArrowDownLeft aria-hidden="true" className="size-4" />
-                        ) : (
-                          <ArrowUpRight aria-hidden="true" className="size-4" />
-                        )}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p className="break-words text-sm font-medium">{activity.name}</p>
-                        <p className="mt-1.5 text-xs text-muted-foreground">
-                          <time dateTime={activity.checkedInAt}>
-                            {activityDate.format(new Date(activity.checkedInAt))}
-                          </time>
-                          <span aria-hidden="true"> · </span>
-                          {activity.category === 'meeting' ? 'Meeting' : 'Outreach'}
-                        </p>
-                      </div>
-                      <span
-                        className={`flex shrink-0 items-center gap-1.5 text-xs tabular-nums ${open ? 'text-emerald-400' : 'text-foreground'}`}
+              </Badge>
+            </CardHeader>
+            <CardContent className="px-0">
+              {attendance && attendance.recentActivity.length > 0 ? (
+                <ul className="divide-y">
+                  {attendance.recentActivity.map((activity) => {
+                    const open = !activity.checkedOutAt;
+                    return (
+                      <li
+                        key={activity.id}
+                        className="flex items-center gap-3 px-5 py-5 sm:gap-4 sm:px-6"
                       >
+                        <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border bg-muted/40 text-muted-foreground">
+                          {activity.category === 'meeting' ? (
+                            <ArrowDownLeft aria-hidden="true" className="size-4" />
+                          ) : (
+                            <ArrowUpRight aria-hidden="true" className="size-4" />
+                          )}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="break-words text-sm font-medium">{activity.name}</p>
+                          <p className="mt-1.5 text-xs text-muted-foreground">
+                            <time dateTime={activity.checkedInAt}>
+                              {activityDate.format(new Date(activity.checkedInAt))}
+                            </time>
+                            <span aria-hidden="true"> · </span>
+                            {activity.category === 'meeting' ? 'Meeting' : 'Outreach'}
+                          </p>
+                        </div>
                         {open ? (
-                          <>
-                            <Radio aria-hidden="true" className="size-3.5" />
+                          <Badge variant="secondary" className="shrink-0">
+                            <Radio aria-hidden="true" />
                             In progress
-                          </>
+                          </Badge>
                         ) : (
-                          `${activity.hours.toFixed(1)} hrs`
+                          <span className="shrink-0 text-xs tabular-nums">
+                            {activity.hours.toFixed(1)} hrs
+                          </span>
                         )}
-                      </span>
-                    </li>
-                  );
-                })}
-              </ul>
-            ) : (
-              <div className="flex min-h-64 flex-col items-center justify-center px-6 py-10 text-center">
-                <span className="mb-4 flex size-11 items-center justify-center rounded-xl border bg-muted/30 text-muted-foreground">
-                  <Clock3 aria-hidden="true" className="size-5" />
-                </span>
-                <p className="text-sm font-medium">
-                  {attendance ? 'No attendance recorded this season' : 'Activity unavailable'}
-                </p>
-                <p className="mt-2 max-w-xs text-xs leading-6 text-muted-foreground">
-                  {attendance
-                    ? 'Your latest meetings and outreach events will show up here after you attend.'
-                    : 'Try reloading to see your latest meetings and outreach events.'}
-                </p>
-              </div>
-            )}
-            <div className="flex items-center gap-1 border-t bg-muted/20 px-5 py-3.5 text-[11px] text-muted-foreground sm:px-6">
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : (
+                <Empty className="min-h-64 rounded-none">
+                  <EmptyHeader>
+                    <EmptyMedia variant="icon">
+                      <Clock3 aria-hidden="true" />
+                    </EmptyMedia>
+                    <EmptyTitle className="text-sm">
+                      {attendance ? 'No attendance recorded this season' : 'Activity unavailable'}
+                    </EmptyTitle>
+                    <EmptyDescription className="max-w-xs text-xs leading-6">
+                      {attendance
+                        ? 'Your latest meetings and outreach events will show up here after you attend.'
+                        : 'Try reloading to see your latest meetings and outreach events.'}
+                    </EmptyDescription>
+                  </EmptyHeader>
+                </Empty>
+              )}
+            </CardContent>
+            <CardFooter className="border-t bg-muted/20 py-3.5 text-[11px] text-muted-foreground">
               Your attendance, all in one place
-              <ChevronRight aria-hidden="true" className="size-3" />
-            </div>
-          </section>
+            </CardFooter>
+          </Card>
         </div>
         <footer className="mt-10 flex flex-wrap items-center justify-between gap-3 border-t pt-5 text-[11px] text-muted-foreground">
           <p>

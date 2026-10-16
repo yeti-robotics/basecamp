@@ -1,7 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { Spinner } from '@/components/ui/spinner';
 import { typographyVariants } from '@/components/ui/typography';
 import { authClient } from '@/lib/auth-client';
 import { navigateAfterAuth } from '@/lib/auth-navigation';
@@ -26,7 +28,9 @@ export function SignOutButton({ className }: { className?: string }) {
 
       navigateAfterAuth('/auth');
     } catch (signOutError) {
-      setError(signOutError instanceof Error ? signOutError.message : 'Sign out failed.');
+      const message = signOutError instanceof Error ? signOutError.message : 'Sign out failed.';
+      setError(message);
+      toast.error('Could not sign out', { description: message });
       setIsPending(false);
     }
   }
@@ -40,7 +44,14 @@ export function SignOutButton({ className }: { className?: string }) {
         type="button"
         variant="outline"
       >
-        {isPending ? 'Signing out…' : 'Sign out'}
+        {isPending ? (
+          <>
+            <Spinner aria-hidden="true" />
+            Signing out…
+          </>
+        ) : (
+          'Sign out'
+        )}
       </Button>
       {error ? (
         <p

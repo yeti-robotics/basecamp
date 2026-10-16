@@ -1,10 +1,12 @@
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { toast } from 'sonner';
 import { SignInForm } from '../app/auth/components/SignInForm';
 import { SignOutButton } from '../app/SignOutButton';
 import { authClient } from '../lib/auth-client';
 import { navigateAfterAuth } from '../lib/auth-navigation';
 
+jest.mock('sonner', () => ({ toast: { error: jest.fn() } }));
 jest.mock('../lib/auth-client', () => ({
   authClient: { signIn: { social: jest.fn() }, signOut: jest.fn() },
 }));
@@ -40,6 +42,9 @@ it('shows sign-in errors and enables retry instead of leaving the button stuck',
   render(<SignInForm />);
   fireEvent.click(screen.getByRole('button', { name: 'Sign in with Discord' }));
   expect(await screen.findByRole('alert')).toHaveTextContent('Discord unavailable');
+  expect(toast.error).toHaveBeenCalledWith('Could not sign in', {
+    description: 'Discord unavailable',
+  });
   expect(screen.getByRole('button', { name: 'Sign in with Discord' })).toBeEnabled();
   expect(navigate).not.toHaveBeenCalled();
 });
@@ -96,6 +101,9 @@ it('shows sign-out errors and enables retry', async () => {
   render(<SignOutButton />);
   fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
   expect(await screen.findByRole('alert')).toHaveTextContent('Sign out unavailable');
+  expect(toast.error).toHaveBeenCalledWith('Could not sign out', {
+    description: 'Sign out unavailable',
+  });
   expect(screen.getByRole('button', { name: 'Sign out' })).toBeEnabled();
   expect(navigate).not.toHaveBeenCalled();
 });

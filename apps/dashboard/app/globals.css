@@ -26,12 +26,16 @@ html {
 }
 
 ::selection {
-  background: oklch(0.65 0.15 250 / 35%);
+  background: oklch(0.65 0 0 / 35%);
 }
 
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
+  }
+  [data-slot="skeleton"],
+  [data-slot="spinner"] {
+    animation: none;
   }
 }
 

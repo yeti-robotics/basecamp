@@ -1,11 +1,15 @@
 'use client';
 
+import { KeyRound } from 'lucide-react';
 import { useState } from 'react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import { Spinner } from '@/components/ui/spinner';
 import { typographyVariants } from '@/components/ui/typography';
 import { authClient } from '@/lib/auth-client';
 import { navigateAfterAuth } from '@/lib/auth-navigation';
+import { DiscordIcon } from './AuthIcons';
 
 function safeRedirectUrl(redirectUrl?: string) {
   if (!redirectUrl?.startsWith('/') || redirectUrl.startsWith('//') || redirectUrl.includes('\\'))
@@ -36,7 +40,10 @@ export function SignInForm({ redirectUrl }: { redirectUrl?: string }) {
       if (!data?.url) throw new Error('Discord sign-in could not be started. Please try again.');
       navigateAfterAuth(data.url);
     } catch (signInError) {
-      setError(signInError instanceof Error ? signInError.message : 'Discord sign-in failed.');
+      const message =
+        signInError instanceof Error ? signInError.message : 'Discord sign-in failed.';
+      setError(message);
+      toast.error('Could not sign in', { description: message });
       setIsPending(false);
     }
   }
@@ -49,7 +56,17 @@ export function SignInForm({ redirectUrl }: { redirectUrl?: string }) {
         onClick={signInDiscord}
         type="button"
       >
-        {isPending ? 'Connecting to Discord…' : 'Sign in with Discord'}
+        {isPending ? (
+          <>
+            <Spinner aria-hidden="true" />
+            Connecting to Discord…
+          </>
+        ) : (
+          <>
+            <DiscordIcon className="size-5" />
+            Sign in with Discord
+          </>
+        )}
       </Button>
 
       {error && (
@@ -79,6 +96,7 @@ export function SignInForm({ redirectUrl }: { redirectUrl?: string }) {
         type="button"
         variant="outline"
       >
+        <KeyRound aria-hidden="true" className="size-5" />
         Sign in with Passkey — coming soon
       </Button>
     </div>

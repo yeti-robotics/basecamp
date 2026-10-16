@@ -1,5 +1,6 @@
-import { ArrowUpRight, Clock3, HandHeart, Layers3 } from 'lucide-react';
-import { Brand } from '@/components/Brand';
+import { ErrorToast } from '@/components/ErrorToast';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Separator } from '@/components/ui/separator';
 import { SignInForm } from './SignInForm';
 
 type AuthScreenProps = {
@@ -9,76 +10,53 @@ type AuthScreenProps = {
 
 export function AuthScreen({ authError, redirectUrl }: AuthScreenProps) {
   return (
-    <main className="flex min-h-svh flex-col bg-background">
-      <header className="border-b px-6 py-5 sm:px-10">
-        <Brand />
-      </header>
-      <div className="mx-auto grid w-full max-w-6xl flex-1 items-center gap-14 px-6 py-14 md:grid-cols-2 md:gap-20 md:py-24">
-        <section aria-labelledby="welcome-heading" className="hidden md:block">
-          <p className="mb-6 font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">
-            YETI Robotics / Team 3506
-          </p>
-          <h1
-            id="welcome-heading"
-            className="max-w-md text-5xl font-semibold leading-[1.15] tracking-tight"
-          >
-            Big ideas.
-            <br />
-            Real teamwork.
-            <br />
-            <span className="text-muted-foreground">Every hour counts.</span>
+    <main className="relative grid min-h-svh place-items-center overflow-hidden bg-background px-4 py-10">
+      <div className="pointer-events-none absolute -right-44 -top-64 size-[540px] rounded-full bg-primary/[0.035] blur-[110px]" />
+      <div className="pointer-events-none absolute -bottom-60 -left-40 size-[440px] rounded-full bg-primary/[0.025] blur-[110px]" />
+
+      <section
+        className="relative z-10 flex w-full max-w-sm flex-col items-center gap-8"
+        aria-labelledby="sign-in-heading"
+      >
+        <header className="text-center">
+          <h1 className="font-mono text-3xl font-bold uppercase leading-none tracking-tight">
+            Basecamp
           </h1>
-          <p className="mt-6 max-w-sm text-sm leading-7 text-muted-foreground">
-            Your home base for the season. Keep track of the time you put in and the impact you
-            make.
+          <p className="mt-2 font-mono text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+            Yeti Robotics <span aria-hidden="true">·</span> 3506
           </p>
-          <div className="mt-10 flex flex-wrap gap-3">
-            {[
-              { icon: Clock3, label: 'Attendance' },
-              { icon: HandHeart, label: 'Outreach' },
-              { icon: Layers3, label: 'Season progress' },
-            ].map(({ icon: Icon, label }) => (
-              <span
-                key={label}
-                className="inline-flex items-center gap-2 rounded-md border bg-card px-3 py-2 text-xs text-muted-foreground"
-              >
-                <Icon aria-hidden="true" className="size-3.5" />
-                {label}
-              </span>
-            ))}
+        </header>
+
+        <div className="w-full space-y-5">
+          <div className="text-center">
+            <h2 id="sign-in-heading" className="text-lg font-medium">
+              Sign in to your account
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">Continue to Basecamp</p>
           </div>
-        </section>
-        <section
-          className="mx-auto min-w-0 w-full max-w-sm rounded-xl border bg-card p-6 shadow-sm sm:p-8"
-          aria-labelledby="sign-in-heading"
-        >
-          <span className="mb-6 inline-flex size-10 items-center justify-center rounded-lg border bg-muted/40">
-            <ArrowUpRight aria-hidden="true" className="size-5" />
-          </span>
-          <h2 id="sign-in-heading" className="text-2xl font-semibold tracking-tight">
-            Welcome to Basecamp
-          </h2>
-          <p className="mb-7 mt-2 text-sm leading-6 text-muted-foreground">
-            Sign in with your Discord account to see your team dashboard.
-          </p>
-          {authError ? (
-            <p
-              className="mb-5 rounded-lg border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive"
-              role="alert"
-            >
-              Discord sign-in was not completed. Please try again.
-            </p>
-          ) : null}
+
+          {authError && (
+            <Alert>
+              <AlertDescription>
+                Discord sign-in was not completed. Please try again.
+              </AlertDescription>
+              <ErrorToast
+                id="oauth-error"
+                message="Discord sign-in was not completed"
+                description="Please try again."
+              />
+            </Alert>
+          )}
+
           <SignInForm redirectUrl={redirectUrl} />
-          <p className="mt-6 border-t pt-5 text-center text-xs leading-6 text-muted-foreground">
-            One team. One home base.
-          </p>
-        </section>
-      </div>
-      <footer className="flex flex-wrap justify-between gap-3 border-t px-6 py-5 text-[11px] text-muted-foreground sm:px-10">
-        <p>YETI Robotics Platform</p>
-        <p>Basecamp / 3506</p>
-      </footer>
+        </div>
+
+        <footer className="flex items-center gap-2 whitespace-nowrap text-sm text-muted-foreground/50">
+          <Separator className="w-8" />
+          <p>YETI Robotics Platform</p>
+          <Separator className="w-8" />
+        </footer>
+      </section>
     </main>
   );
 }

@@ -1,8 +1,10 @@
 import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/react';
+import { toast } from 'sonner';
 import { DashboardOverview } from '../app/DashboardOverview';
 import type { AttendanceOverview } from '../lib/attendance';
 
+jest.mock('sonner', () => ({ toast: { error: jest.fn(), dismiss: jest.fn() } }));
 jest.mock('../app/SignOutButton', () => ({
   SignOutButton: () => <button type="button">Sign out</button>,
 }));
@@ -40,6 +42,10 @@ it('renders fetched hours, caps progress, and identifies open attendance', () =>
 it('distinguishes API failure from empty history', () => {
   render(<DashboardOverview user={user} attendance={null} />);
   expect(screen.getByRole('status')).toHaveTextContent('Attendance could not be loaded');
+  expect(toast.error).toHaveBeenCalledWith(
+    'Attendance could not be loaded',
+    expect.objectContaining({ id: 'attendance-unavailable' }),
+  );
   expect(screen.getByRole('link', { name: 'Try again' })).toHaveAttribute('href', '/');
   expect(screen.queryByText('No attendance recorded this season')).not.toBeInTheDocument();
   expect(screen.queryByText('0.0')).not.toBeInTheDocument();
