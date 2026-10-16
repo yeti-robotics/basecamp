@@ -29,6 +29,10 @@ export const envSchema = z
     }, 'ATTENDANCE_TOTP_SECRET must be a Base32 seed of at least 20 bytes'),
     DISCORD_CLIENT_ID: nonblank,
     DISCORD_CLIENT_SECRET: nonblank,
+    DISCORD_GUILD_ID: z
+      .string()
+      .regex(/^\d{17,20}$/, 'DISCORD_GUILD_ID must be a Discord snowflake'),
+    DISCORD_ADMISSION_BOT_TOKEN: nonblank,
     DISCORD_TOKEN: optionalNonblank,
     DISCORD_DEVELOPMENT_GUILD_ID: optionalNonblank,
     PORT: z.coerce.number().int().min(1).max(65535).default(8000),

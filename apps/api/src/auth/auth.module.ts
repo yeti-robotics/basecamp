@@ -3,17 +3,27 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { createAuth } from '../auth.js';
 import { DatabaseModule } from '../database/database.module.js';
 import { DatabaseService } from '../database/database.service.js';
+import { DiscordAdmissionService } from './discord-admission.service.js';
 
 export const AUTH = Symbol('AUTH');
+export const DISCORD_ADMISSION = Symbol('DISCORD_ADMISSION');
 
 @Module({
   imports: [ConfigModule, DatabaseModule],
   providers: [
     {
+      provide: DISCORD_ADMISSION,
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => new DiscordAdmissionService(config),
+    },
+    {
       provide: AUTH,
-      inject: [DatabaseService, ConfigService],
-      useFactory: (database: DatabaseService, config: ConfigService) =>
-        createAuth(database.db, config),
+      inject: [DatabaseService, ConfigService, DISCORD_ADMISSION],
+      useFactory: (
+        database: DatabaseService,
+        config: ConfigService,
+        admission: DiscordAdmissionService,
+      ) => createAuth(database.db, config, admission),
     },
   ],
   exports: [AUTH],

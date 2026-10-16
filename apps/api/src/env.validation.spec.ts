@@ -16,6 +16,8 @@ const valid = {
   ATTENDANCE_DISPLAY_SESSION_SECRET: 'a-display-session-secret-longer-than-32-chars',
   DISCORD_CLIENT_ID: 'client-id',
   DISCORD_CLIENT_SECRET: 'client-secret',
+  DISCORD_GUILD_ID: '408711970305474560',
+  DISCORD_ADMISSION_BOT_TOKEN: 'admission-bot-token',
 };
 
 describe('API environment schema', () => {
@@ -56,6 +58,9 @@ describe('API environment schema', () => {
     ['BETTER_AUTH_URL', 'ftp://auth.example.test'],
     ['DISCORD_CLIENT_ID', ' '],
     ['DISCORD_CLIENT_SECRET', ''],
+    ['DISCORD_GUILD_ID', 'guild-id'],
+    ['DISCORD_GUILD_ID', '12345678901234567x'],
+    ['DISCORD_ADMISSION_BOT_TOKEN', ' '],
     ['PORT', '0'],
     ['PORT', '65536'],
     ['PORT', '3.5'],
@@ -82,6 +87,8 @@ describe('ConfigModule environment validation', () => {
     'ATTENDANCE_DISPLAY_SESSION_SECRET',
     'DISCORD_CLIENT_ID',
     'DISCORD_CLIENT_SECRET',
+    'DISCORD_GUILD_ID',
+    'DISCORD_ADMISSION_BOT_TOKEN',
     'DISCORD_TOKEN',
     'DISCORD_DEVELOPMENT_GUILD_ID',
     'PORT',
@@ -100,6 +107,8 @@ describe('ConfigModule environment validation', () => {
       ATTENDANCE_DISPLAY_SESSION_SECRET: 'a-display-session-secret-longer-than-32-chars',
       DISCORD_CLIENT_ID: 'client-id',
       DISCORD_CLIENT_SECRET: 'client-secret',
+      DISCORD_GUILD_ID: '408711970305474560',
+      DISCORD_ADMISSION_BOT_TOKEN: 'admission-bot-token',
     });
   });
 
