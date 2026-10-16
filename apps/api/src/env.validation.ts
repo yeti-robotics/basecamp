@@ -19,6 +19,18 @@ const bootstrapDiscordIds = z
     (value) => value === undefined || value.split(',').every((id) => /^\d{17,20}$/.test(id.trim())),
     'BASECAMP_BOOTSTRAP_ADMIN_DISCORD_IDS must be a comma-separated list of Discord snowflakes',
   );
+const ianaTimeZone = z
+  .string()
+  .trim()
+  .min(1)
+  .refine((value) => {
+    try {
+      new Intl.DateTimeFormat('en-US', { timeZone: value }).format(new Date());
+      return true;
+    } catch {
+      return false;
+    }
+  }, 'BASECAMP_TIME_ZONE must be a valid IANA timezone');
 
 export const envSchema = z
   .object({
@@ -43,6 +55,7 @@ export const envSchema = z
       .regex(/^\d{17,20}$/, 'DISCORD_GUILD_ID must be a Discord snowflake'),
     DISCORD_ADMISSION_BOT_TOKEN: nonblank,
     BASECAMP_BOOTSTRAP_ADMIN_DISCORD_IDS: bootstrapDiscordIds,
+    BASECAMP_TIME_ZONE: ianaTimeZone,
     DISCORD_TOKEN: optionalNonblank,
     DISCORD_DEVELOPMENT_GUILD_ID: optionalNonblank,
     PORT: z.coerce.number().int().min(1).max(65535).default(8000),
