@@ -1,8 +1,10 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Inject,
   Injectable,
+  NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -10,10 +12,30 @@ import { and, desc, eq, gte, lt, lte, sql } from 'drizzle-orm';
 import { DISCORD_ADMISSION } from '../auth/auth.module.js';
 import type { DiscordAdmissionService } from '../auth/discord-admission.service.js';
 import { DatabaseService } from '../database/database.service.js';
-import { account } from '../database/schema/auth.js';
+import { account, user } from '../database/schema/auth.js';
 import { rosterAudit, season_memberships, seasons } from '../database/schema/index.js';
 import { deriveAssignment } from '../seasons/assignment.js';
 import { localDateInTimeZone } from '../seasons/season-timezone.js';
+
+export interface RosterSeason {
+  id: number;
+  name: string;
+  startsOn: string;
+  endsOn: string;
+  readOnly?: boolean;
+}
+
+export interface RosterMember {
+  id: number;
+  userId: string;
+  name: string;
+  image: string | null;
+  role: string;
+  studentExperience: string | null;
+  state: string;
+  joinedAt: Date;
+  removedAt: Date | null;
+}
 
 @Injectable()
 export class RosterService {
@@ -177,6 +199,81 @@ export class RosterService {
       )
       .limit(1);
     return memberships[0] ?? null;
+  }
+
+  async currentRoster(includeRemoved = false, now = new Date()) {
+    const localToday = localDateInTimeZone(now, this.timeZone());
+    const currentSeasons = await this.database.db
+      .select({
+        id: seasons.id,
+        name: seasons.name,
+        startsOn: seasons.starts_on,
+        endsOn: seasons.ends_on,
+      })
+      .from(seasons)
+      .where(and(lte(seasons.starts_on, localToday), gte(seasons.ends_on, localToday)))
+      .limit(1);
+    const season = currentSeasons[0] ?? null;
+    if (!season) return { season: null, members: [] as RosterMember[] };
+    const members = await this.membersForSeason(season.id, includeRemoved);
+    return { season, members };
+  }
+
+  async seasonRoster(seasonId: number, includeRemoved = false, now = new Date()) {
+    const [season] = await this.database.db
+      .select({
+        id: seasons.id,
+        name: seasons.name,
+        startsOn: seasons.starts_on,
+        endsOn: seasons.ends_on,
+      })
+      .from(seasons)
+      .where(eq(seasons.id, seasonId))
+      .limit(1);
+    if (!season) throw new NotFoundException('Season not found');
+    const localToday = localDateInTimeZone(now, this.timeZone());
+    if (season.endsOn >= localToday)
+      throw new BadRequestException('Only past seasons are available here');
+    const members = await this.membersForSeason(seasonId, includeRemoved);
+    return { season: { ...season, readOnly: true }, members };
+  }
+
+  async listSeasons(now = new Date()): Promise<RosterSeason[]> {
+    const rows = await this.database.db
+      .select({
+        id: seasons.id,
+        name: seasons.name,
+        startsOn: seasons.starts_on,
+        endsOn: seasons.ends_on,
+      })
+      .from(seasons)
+      .orderBy(desc(seasons.starts_on));
+    const localToday = localDateInTimeZone(now, this.timeZone());
+    return rows.map((season) => ({ ...season, readOnly: season.endsOn < localToday }));
+  }
+
+  private async membersForSeason(
+    seasonId: number,
+    includeRemoved: boolean,
+  ): Promise<RosterMember[]> {
+    const conditions = [eq(season_memberships.season_id, seasonId)];
+    if (!includeRemoved) conditions.push(eq(season_memberships.state, 'active'));
+    return this.database.db
+      .select({
+        id: season_memberships.id,
+        userId: season_memberships.user_id,
+        name: user.name,
+        image: user.image,
+        role: season_memberships.role,
+        studentExperience: season_memberships.student_experience,
+        state: season_memberships.state,
+        joinedAt: season_memberships.joined_at,
+        removedAt: season_memberships.removed_at,
+      })
+      .from(season_memberships)
+      .innerJoin(user, eq(season_memberships.user_id, user.id))
+      .where(and(...conditions))
+      .orderBy(user.name);
   }
 
   private timeZone(): string {
