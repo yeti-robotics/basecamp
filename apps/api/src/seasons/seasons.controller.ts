@@ -3,41 +3,35 @@ import {
   Controller,
   Get,
   Header,
-  Inject,
   Param,
   ParseIntPipe,
   Patch,
   Post,
   Req,
-  UnauthorizedException,
 } from '@nestjs/common';
-import { fromNodeHeaders } from 'better-auth/node';
 import type { Request } from 'express';
-import { AUTH } from '../auth/auth.module.js';
-import type { Auth } from '../auth.js';
+import { MemberContextService } from '../roster/member-context.service.js';
 import { type SeasonInput, SeasonsService } from './seasons.service.js';
 
 @Controller('api/seasons')
 export class SeasonsController {
   constructor(
-    @Inject(AUTH) private readonly auth: Auth,
+    private readonly memberContext: MemberContextService,
     private readonly seasons: SeasonsService,
   ) {}
 
   @Get()
   @Header('Cache-Control', 'private, no-store')
   async list(@Req() request: Request) {
-    const session = await this.auth.api.getSession({ headers: fromNodeHeaders(request.headers) });
-    if (!session) throw new UnauthorizedException();
-    return this.seasons.viewFor(session.user.id);
+    const userId = await this.memberContext.authenticate(request.headers);
+    return this.seasons.viewFor(userId);
   }
 
   @Post()
   @Header('Cache-Control', 'private, no-store')
   async create(@Req() request: Request, @Body() input: SeasonInput) {
-    const session = await this.auth.api.getSession({ headers: fromNodeHeaders(request.headers) });
-    if (!session) throw new UnauthorizedException();
-    return this.seasons.create(input, session.user.id);
+    const userId = await this.memberContext.authenticate(request.headers);
+    return this.seasons.create(input, userId);
   }
 
   @Patch(':id')
@@ -47,8 +41,7 @@ export class SeasonsController {
     @Param('id', ParseIntPipe) id: number,
     @Body() input: SeasonInput,
   ) {
-    const session = await this.auth.api.getSession({ headers: fromNodeHeaders(request.headers) });
-    if (!session) throw new UnauthorizedException();
-    return this.seasons.update(id, input, session.user.id);
+    const userId = await this.memberContext.authenticate(request.headers);
+    return this.seasons.update(id, input, userId);
   }
 }
