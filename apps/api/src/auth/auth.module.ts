@@ -26,6 +26,6 @@ export const DISCORD_ADMISSION = Symbol('DISCORD_ADMISSION');
       ) => createAuth(database.db, config, admission),
     },
   ],
-  exports: [AUTH],
+  exports: [AUTH, DISCORD_ADMISSION],
 })
 export class AuthModule {}

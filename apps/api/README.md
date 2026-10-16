@@ -26,6 +26,8 @@ The API owns the PostgreSQL connection pool, Better Auth, and database migration
 
 Copy `.env.example` to `.env` for local development. The API validates its environment at startup. Set `DATABASE_URL` to a PostgreSQL URL, `BETTER_AUTH_SECRET` to a random value of at least 32 characters (for example, `openssl rand -base64 32`), `BETTER_AUTH_URL` to the public dashboard URL, and provide the Discord client ID and secret. `DISCORD_GUILD_ID` and `DISCORD_ADMISSION_BOT_TOKEN` are required for OAuth admission. The bot must be a member of that server; set the admission token to the same value as `DISCORD_TOKEN` if you use one bot for both jobs. The direct membership check does not depend on Necord or `DISCORD_DEVELOPMENT_GUILD_ID`. Discord OAuth sign-in and account linking are rejected when membership is absent or Discord cannot be reached. Members without a Discord email can still sign in; Basecamp stores a non-deliverable placeholder email derived from their stable Discord ID, and never uses email for admission. `DISCORD_TOKEN` and `DISCORD_DEVELOPMENT_GUILD_ID` remain optional, but must be set together to enable the Discord attendance bot. `PORT` defaults to `8000`. The dashboard separately uses `API_INTERNAL_URL` to reach NestJS over the private network; set it in `apps/dashboard/.env.local`.
 
+To establish the first Team Admin, set `BASECAMP_BOOTSTRAP_ADMIN_DISCORD_IDS` to a comma-separated list of Discord user IDs for admitted mentors. The setting only grants first-admin setup authority while no Team Admin membership exists. After the first Team Admin membership is recorded, remove the setting; roster assignments then control all permissions.
+
 ## Facility attendance display
 
 Set these API environment variables before starting the API:
