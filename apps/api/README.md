@@ -28,6 +28,8 @@ Copy `.env.example` to `.env` for local development. The API validates its envir
 
 To establish the first Team Admin, set `BASECAMP_BOOTSTRAP_ADMIN_DISCORD_IDS` to a comma-separated list of Discord user IDs for admitted mentors. The setting only grants first-admin setup authority while no Team Admin membership exists. After the first Team Admin membership is recorded, remove the setting; roster assignments then control all permissions.
 
+Set `BASECAMP_TIME_ZONE` to the team's IANA timezone (for example, `America/New_York`). Season dates are local calendar dates, and API authorization selects the current season using this timezone.
+
 ## Facility attendance display
 
 Set these API environment variables before starting the API:

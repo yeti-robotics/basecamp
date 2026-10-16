@@ -179,6 +179,12 @@ export function DashboardOverview({ user, attendance }: DashboardOverviewProps) 
           >
             Activity
           </a>
+          <a
+            href="/seasons"
+            className="py-3 text-muted-foreground transition-colors hover:text-foreground"
+          >
+            Seasons
+          </a>
         </nav>
       </header>
       <main id="main-content" className="mx-auto max-w-7xl scroll-mt-6 px-5 py-9 sm:px-8 sm:py-12">

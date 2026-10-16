@@ -11,6 +11,7 @@ import { HandbookModule } from './handbook/handbook.module.js';
 import { HealthModule } from './health/health.module.js';
 import { LifecycleModule } from './lifecycle/lifecycle.module.js';
 import { OutreachModule } from './outreach/outreach.module.js';
+import { SeasonsModule } from './seasons/seasons.module.js';
 
 const discordToken = process.env.DISCORD_TOKEN?.trim();
 const discordDevelopmentGuildId = process.env.DISCORD_DEVELOPMENT_GUILD_ID?.trim();
@@ -32,6 +33,7 @@ const discordDevelopmentGuildId = process.env.DISCORD_DEVELOPMENT_GUILD_ID?.trim
     LifecycleModule,
     HandbookModule,
     OutreachModule,
+    SeasonsModule,
     HealthModule,
   ],
   controllers: [AppController],
