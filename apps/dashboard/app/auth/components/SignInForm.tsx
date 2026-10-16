@@ -73,7 +73,12 @@ export function SignInForm({ redirectUrl }: { redirectUrl?: string }) {
         <Separator className="flex-1" />
       </div>
 
-      <Button className="h-12 w-full bg-card/50 text-base" disabled type="button" variant="outline">
+      <Button
+        className="h-auto min-h-12 w-full whitespace-normal bg-card/50 py-3 text-sm sm:text-base"
+        disabled
+        type="button"
+        variant="outline"
+      >
         Sign in with Passkey — coming soon
       </Button>
     </div>

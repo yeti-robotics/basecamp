@@ -59,3 +59,45 @@ it('shows the empty state only after successfully fetching no records', () => {
   expect(screen.getByText('No attendance recorded this season')).toBeInTheDocument();
   expect(screen.queryByRole('status')).not.toBeInTheDocument();
 });
+
+it('keeps progress within the accessible range for negative hours', () => {
+  render(
+    <DashboardOverview
+      user={user}
+      attendance={{ ...attendance, hours: { ...attendance.hours, meeting: -1 } }}
+    />,
+  );
+  expect(screen.getByRole('progressbar', { name: 'Meeting attendance progress' })).toHaveAttribute(
+    'aria-valuenow',
+    '0',
+  );
+});
+
+it('handles zero requirements without rendering an invalid progress bar', () => {
+  render(
+    <DashboardOverview
+      user={user}
+      attendance={{ ...attendance, requirements: { meeting: 0, outreach: 0 } }}
+    />,
+  );
+  expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+  expect(screen.getAllByText('No hours required')).toHaveLength(2);
+});
+
+it('shows completed attendance hours and a missing-season notice', () => {
+  render(
+    <DashboardOverview
+      user={user}
+      attendance={{
+        ...attendance,
+        season: null,
+        recentActivity: [
+          { ...attendance.recentActivity[0]!, checkedOutAt: '2026-10-12T19:00:00Z', hours: 2 },
+        ],
+      }}
+    />,
+  );
+  expect(screen.getByText('No active season is configured yet.')).toBeInTheDocument();
+  expect(screen.getByText('2.0 hrs')).toBeInTheDocument();
+  expect(screen.queryByText('In progress')).not.toBeInTheDocument();
+});
