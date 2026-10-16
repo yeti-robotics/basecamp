@@ -1,107 +1,49 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Basecamp API
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+NestJS API for Basecamp authentication, attendance, and Discord commands.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Run locally
 
-## Description
-
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
-
-## Project setup
+From the repository root, install dependencies and configure `apps/api/.env` as described below. Run the API through Turbo so its workspace packages build first:
 
 ```bash
-$ pnpm install
+pnpm install
+pnpm dev --filter=api
 ```
 
-## Compile and run the project
+For the Node debugger, run `pnpm exec turbo run dev:debug --filter=api`. To build and run the compiled API:
 
 ```bash
-# development
-$ pnpm run start
-
-# watch mode
-$ pnpm run start:dev
-
-# production mode
-$ pnpm run start:prod
+pnpm build --filter=api
+pnpm --filter api start:prod
 ```
 
-## Run tests
-
-```bash
-# unit tests
-$ pnpm run test
-
-# e2e tests
-$ pnpm run test:e2e
-
-# test coverage
-$ pnpm run test:cov
-```
-
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
-
-```bash
-$ pnpm install -g @nestjs/mau
-$ mau deploy
-```
-
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
-
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+Run the API tests with `pnpm --filter api test` or `pnpm --filter api test:e2e`. Use `pnpm --filter api test:cov` for coverage.
 
 ## Database and authentication
 
 The API owns the PostgreSQL connection pool, Better Auth, and database migrations. The API process creates one pool with a maximum of 10 connections, a 5-second connection timeout, and a 30-second idle timeout. The pool closes during Nest application shutdown, so the deployment's total possible connections are the per-process limit multiplied by the number of API instances.
 
 Copy `.env.example` to `.env` for local development. The API validates its environment at startup. Set `DATABASE_URL` to a PostgreSQL URL, `BETTER_AUTH_SECRET` to a random value of at least 32 characters (for example, `openssl rand -base64 32`), `BETTER_AUTH_URL` to the public dashboard URL, and provide the Discord client ID and secret. `DISCORD_TOKEN` and `DISCORD_DEVELOPMENT_GUILD_ID` are optional, but must be set together to enable the bot. `PORT` defaults to `8000`. The dashboard separately uses `API_INTERNAL_URL` to reach NestJS over the private network; set it in `apps/dashboard/.env.local`.
+
+## Facility attendance display
+
+Set these API environment variables before starting the API:
+
+- `ATTENDANCE_TOTP_SECRET`: one shared Base32 seed of at least 20 bytes. The API verifies attendance codes and gives this seed only to an unlocked facility display.
+- `ATTENDANCE_DISPLAY_PASSWORD`: a mentor-chosen password for `/attendance/display`.
+- `ATTENDANCE_DISPLAY_SESSION_SECRET`: a separate random signing secret of at least 32 characters for 12-hour display sessions. Changing it signs out every display.
+
+Generate a seed and signing secret with:
+
+```bash
+python3 -c 'import base64,secrets; print(base64.b32encode(secrets.token_bytes(20)).decode().rstrip("="))'
+openssl rand -base64 32
+```
+
+Members enter the four-digit code currently shown at the facility with `/signin` or `/signout` in Discord. It changes every 30 seconds and is padded with zeros when needed. The API accepts the previous and next 30-second windows to allow for small clock differences. The display obtains the seed after password login and computes later codes in the browser; keep that page on a trusted facility device. The login uses Nest Throttler's in-memory storage, limited to five attempts per 15 minutes per API-observed IP. Discord code submissions share a separate five-attempt-per-minute limit per member across both commands. These limits assume a single API instance.
+
+If the dashboard reaches the API through a trusted reverse proxy, set `ATTENDANCE_TRUSTED_PROXY` to that proxy's exact IP address or CIDR (`loopback` for a same-host dashboard). This lets Express use the forwarded client address, so one visitor cannot consume the facility display's login bucket. The public ingress in front of Next must discard client-supplied `X-Forwarded-For` and set or append the actual client address; Next's rewrite forwards that header. Do not enable proxy trust if that boundary is not enforced. With the setting absent, the API ignores forwarded addresses and all visitors through one dashboard proxy share a login bucket.
 
 Generate and review migrations from the repository root:
 

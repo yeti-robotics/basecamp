@@ -1,7 +1,26 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UseFilters, UseGuards, ValidationPipe } from '@nestjs/common';
+import { MessageFlags } from 'discord.js';
 import type { SlashCommandContext } from 'necord';
-import { Context, SlashCommand } from 'necord';
+import { Context, Options, SlashCommand } from 'necord';
 import { AttendanceService } from './attendance.service.js';
+import { AttendanceInteractionFilter } from './attendance-interaction.filter.js';
+import { AttendanceCodeOptions } from './attendance-options.dto.js';
+import { AttendanceThrottlerGuard } from './attendance-throttler.guard.js';
+
+function formatAttendanceError(error: Error): string {
+  switch (error.message) {
+    case 'Invalid attendance code':
+      return 'Invalid or expired code. Check the display and try again.';
+    case 'User is already signed in':
+      return "You're already signed in.";
+    case 'User is already signed out':
+      return "You're already signed out.";
+    case 'User was not signed out because they have not signed in yet':
+      return 'You need to sign in before signing out.';
+    default:
+      return 'Attendance could not be updated. Please try again or ask a mentor.';
+  }
+}
 
 @Injectable()
 export class AttendanceCommands {
@@ -23,56 +42,38 @@ export class AttendanceCommands {
     await interaction.reply('Attendance leaderboard command');
   }
 
+  @UseGuards(AttendanceThrottlerGuard)
+  @UseFilters(AttendanceInteractionFilter)
   @SlashCommand({
     name: 'signin',
     description: 'Sign in to a YETI meeting at the zone',
   })
-  async SigninCommand(@Context() [interaction]: SlashCommandContext) {
-    const result = await this.attendanceService.recordAttendance(
-      interaction.user.id,
-      'meeting',
-      null,
+  async SigninCommand(
+    @Context() [interaction]: SlashCommandContext,
+    @Options(new ValidationPipe({ validateCustomDecorators: true })) options: AttendanceCodeOptions,
+  ) {
+    await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
+    const result = await this.attendanceService.signInWithCode(interaction.user.id, options.code);
+    return interaction.editReply(
+      result.isOk() ? 'Signed in.' : formatAttendanceError(result.error),
     );
-
-    if (result.isErr()) {
-      await interaction.reply({
-        content:
-          result.error.message === 'User is already signed in'
-            ? "You're already signed in."
-            : 'Something went wrong while signing you in. Please try again later or contact a web dev mentor if the issue persists.',
-        flags: ['Ephemeral'],
-      });
-
-      return;
-    }
-
-    await interaction.reply(`<@${interaction.user.id}> has signed in.`);
   }
 
+  @UseGuards(AttendanceThrottlerGuard)
+  @UseFilters(AttendanceInteractionFilter)
   @SlashCommand({
     name: 'signout',
     description: 'Sign out of a YETI meeting at the zone',
   })
-  async SignoutCommand(@Context() [interaction]: SlashCommandContext) {
-    const result = await this.attendanceService.updateAttendance(interaction.user.id, {
-      checkedOutAt: new Date(),
-    });
-
-    if (result.isErr()) {
-      await interaction.reply({
-        content:
-          result.error.message === 'User is already signed out'
-            ? "You're already signed out."
-            : result.error.message === 'User was not signed out because they have not signed in yet'
-              ? 'You need to sign in before signing out.'
-              : 'Something went wrong while signing you out. Please try again later or contact a web dev mentor if the issue persists.',
-        flags: ['Ephemeral'],
-      });
-
-      return;
-    }
-
-    await interaction.reply(`<@${interaction.user.id}> has signed out.`);
+  async SignoutCommand(
+    @Context() [interaction]: SlashCommandContext,
+    @Options(new ValidationPipe({ validateCustomDecorators: true })) options: AttendanceCodeOptions,
+  ) {
+    await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
+    const result = await this.attendanceService.signOutWithCode(interaction.user.id, options.code);
+    return interaction.editReply(
+      result.isOk() ? 'Signed out.' : formatAttendanceError(result.error),
+    );
   }
 
   @SlashCommand({

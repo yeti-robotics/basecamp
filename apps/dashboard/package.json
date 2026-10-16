@@ -13,6 +13,7 @@
     "test:cov": "jest --coverage --passWithNoTests"
   },
   "dependencies": {
+    "@repo/attendance-code": "workspace:*",
     "@repo/ui": "workspace:*",
     "better-auth": "^1.7.2",
     "class-variance-authority": "^0.7.1",

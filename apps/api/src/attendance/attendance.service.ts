@@ -1,14 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { and, desc, eq, gt, gte, isNull, lte, or } from 'drizzle-orm';
-import {
-  err,
-  errAsync,
-  fromThrowable,
-  ok,
-  okAsync,
-  type Result,
-  type ResultAsync,
-} from 'neverthrow';
+import { err, errAsync, fromThrowable, ok, okAsync, type Result, ResultAsync } from 'neverthrow';
 import { DatabaseService } from '../database/database.service.js';
 import { attendance, hour_requirements } from '../database/schema/attendance.js';
 import { events } from '../database/schema/events.js';
@@ -16,6 +8,7 @@ import { season_memberships, seasons } from '../database/schema/seasons.js';
 import { FORGOT_SIGNOUT_CREDIT_MS, STALE_SIGNIN_MIN_HOURS_MS } from './attendance.constants.js';
 import { AttendanceRepository, type AttendanceUpdate } from './attendance.repository.js';
 import { Attendance } from './attendance.schema.js';
+import { AttendanceCodeService } from './attendance-code.service.js';
 
 type AttendanceRecord = {
   id: number;
@@ -39,7 +32,30 @@ export class AttendanceService {
   constructor(
     private readonly attendanceRepository: AttendanceRepository,
     private readonly database: DatabaseService,
+    private readonly codeService: AttendanceCodeService,
   ) {}
+
+  public signInWithCode(discordId: string, code: string): ResultAsync<void, Error> {
+    return ResultAsync.fromPromise(
+      this.codeService.verify(code),
+      (error) => new Error(String(error)),
+    ).andThen((valid) =>
+      valid
+        ? this.recordAttendance(discordId, 'meeting', null)
+        : errAsync(new Error('Invalid attendance code')),
+    );
+  }
+
+  public signOutWithCode(discordId: string, code: string): ResultAsync<void, Error> {
+    return ResultAsync.fromPromise(
+      this.codeService.verify(code),
+      (error) => new Error(String(error)),
+    ).andThen((valid) =>
+      valid
+        ? this.updateAttendance(discordId, { checkedOutAt: new Date() })
+        : errAsync(new Error('Invalid attendance code')),
+    );
+  }
 
   public recordAttendance(
     discordId: string,
