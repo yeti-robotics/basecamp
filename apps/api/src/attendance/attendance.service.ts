@@ -239,14 +239,14 @@ export class AttendanceService {
     ]);
     const membership = memberships[0];
     // Memberships currently have no leadership flag; use the standard member requirements.
-    const requirements = membership
+    const requirements = membership?.legacy_status
       ? await db
           .select()
           .from(hour_requirements)
           .where(
             and(
               eq(hour_requirements.season_id, season.id),
-              eq(hour_requirements.status, membership.status),
+              eq(hour_requirements.status, membership.legacy_status),
               eq(hour_requirements.is_leader, false),
             ),
           )
