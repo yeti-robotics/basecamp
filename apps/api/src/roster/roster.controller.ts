@@ -1,17 +1,20 @@
 import {
+  Body,
   Controller,
   ForbiddenException,
   Get,
   Header,
   Param,
   ParseIntPipe,
+  Patch,
+  Post,
   Query,
   Req,
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { SeasonAuthorizationService } from '../seasons/season-authorization.service.js';
 import { MemberContextService } from './member-context.service.js';
-import { RosterService } from './roster.service.js';
+import { type MembershipCorrection, RosterService } from './roster.service.js';
 
 @Controller('api/roster')
 export class RosterController {
@@ -66,5 +69,53 @@ export class RosterController {
       joinedAt: membership.joined_at,
       removedAt: membership.removed_at,
     };
+  }
+
+  @Patch('members/:id')
+  @Header('Cache-Control', 'private, no-store')
+  async updateCurrent(
+    @Req() request: Request,
+    @Param('id', ParseIntPipe) membershipId: number,
+    @Body() input: MembershipCorrection,
+  ) {
+    const actorId = await this.adminActor(request);
+    return this.roster.updateCurrentMember(membershipId, input, actorId);
+  }
+
+  @Patch('seasons/:seasonId/members/:id')
+  @Header('Cache-Control', 'private, no-store')
+  async updateSeason(
+    @Req() request: Request,
+    @Param('seasonId', ParseIntPipe) seasonId: number,
+    @Param('id', ParseIntPipe) membershipId: number,
+    @Body() input: MembershipCorrection,
+  ) {
+    const actorId = await this.adminActor(request);
+    return this.roster.updateSeasonMember(seasonId, membershipId, input, actorId);
+  }
+
+  @Post('members/:id/remove')
+  @Header('Cache-Control', 'private, no-store')
+  async remove(
+    @Req() request: Request,
+    @Param('id', ParseIntPipe) membershipId: number,
+    @Body() body?: { reason?: string },
+  ) {
+    const actorId = await this.adminActor(request);
+    return this.roster.removeCurrentMember(membershipId, actorId, body?.reason);
+  }
+
+  @Post('members/:id/restore')
+  @Header('Cache-Control', 'private, no-store')
+  async restore(@Req() request: Request, @Param('id', ParseIntPipe) membershipId: number) {
+    const actorId = await this.adminActor(request);
+    return this.roster.restoreCurrentMember(membershipId, actorId);
+  }
+
+  private async adminActor(request: Request): Promise<string> {
+    const userId = await this.memberContext.authenticate(request.headers);
+    const access = await this.authorization.accessFor(userId);
+    if (!access.canManage) throw new ForbiddenException('Team Admin access is required');
+    return userId;
   }
 }

@@ -12,6 +12,7 @@ vi.mock('better-auth', () => ({ betterAuth: mocks.betterAuth }));
 vi.mock('better-auth/plugins', () => ({ admin: mocks.admin }));
 vi.mock('@better-auth/drizzle-adapter', () => ({ drizzleAdapter: mocks.drizzleAdapter }));
 
+import { AccessService } from '../access/access.service.js';
 import { DatabaseService } from '../database/database.service.js';
 import * as authSchema from '../database/schema/auth.js';
 import { AUTH, AuthModule, DISCORD_ADMISSION } from './auth.module.js';
@@ -25,6 +26,7 @@ const validSettings = {
   DISCORD_ADMISSION_BOT_TOKEN: 'test-admission-token',
 };
 const admission = { verify: vi.fn() };
+const access = { isDiscordIdentitySuspended: vi.fn() };
 
 describe('AuthModule', () => {
   const database = { db: { testDatabase: true } };
@@ -35,6 +37,7 @@ describe('AuthModule', () => {
     mocks.drizzleAdapter.mockReturnValue({ kind: 'drizzle-adapter' });
     mocks.betterAuth.mockReturnValue({ kind: 'auth-instance' });
     admission.verify.mockResolvedValue('allowed');
+    access.isDiscordIdentitySuspended.mockResolvedValue(false);
   });
 
   async function makeModule(settings: Record<string, string>) {
@@ -47,6 +50,8 @@ describe('AuthModule', () => {
       .useValue(database)
       .overrideProvider(DISCORD_ADMISSION)
       .useValue(admission)
+      .overrideProvider(AccessService)
+      .useValue(access)
       .compile();
   }
 
@@ -141,6 +146,26 @@ describe('AuthModule', () => {
       ),
     ).resolves.toMatchObject({ error: expect.any(String) });
     expect(admission.verify).toHaveBeenCalledTimes(1);
+    await module.close();
+  });
+
+  it('rejects sign-in for a suspended local account even when Discord membership is valid', async () => {
+    access.isDiscordIdentitySuspended.mockResolvedValue(true);
+    const module = await makeModule(validSettings);
+    const validateUserInfo = mocks.betterAuth.mock.calls[0][0].user.validateUserInfo;
+    await expect(
+      validateUserInfo(
+        {
+          user: {},
+          source: {
+            method: 'oauth',
+            action: 'sign-in',
+            oauth: { providerId: 'discord', profile: { id: '123456789012345678' } },
+          },
+        },
+        {},
+      ),
+    ).resolves.toMatchObject({ error: 'basecamp_account_suspended' });
     await module.close();
   });
 

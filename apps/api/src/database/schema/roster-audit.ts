@@ -4,7 +4,7 @@ import { seasons } from './seasons.js';
 
 export const rosterAudit = pgTable('roster_audit', {
   id: serial('id').primaryKey(),
-  // Null actor is reserved for system migrations; user actions must set an actor.
+  // Null actor is reserved for system migrations and out-of-band operator recovery.
   actor_user_id: text('actor_user_id').references(() => user.id),
   subject_user_id: text('subject_user_id')
     .notNull()

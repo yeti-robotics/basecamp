@@ -2,6 +2,7 @@ import { drizzleAdapter } from '@better-auth/drizzle-adapter';
 import { ConfigService } from '@nestjs/config';
 import { type Auth as BetterAuthInstance, type BetterAuthOptions, betterAuth } from 'better-auth';
 import { admin } from 'better-auth/plugins';
+import { AccessService } from './access/access.service.js';
 import type { DiscordAdmissionService } from './auth/discord-admission.service.js';
 import type { AppDatabase } from './database/database.service.js';
 import * as schema from './database/schema/auth.js';
@@ -32,6 +33,7 @@ export function createAuth(
   database: AppDatabase,
   config: ConfigService,
   admission: DiscordAdmissionService,
+  access: Pick<AccessService, 'isDiscordIdentitySuspended'>,
 ): BetterAuthInstance {
   const secret = requiredSetting(config, 'BETTER_AUTH_SECRET');
   if (secret.length < 32) {
@@ -78,7 +80,15 @@ export function createAuth(
         }
 
         const result = await admission.verify(discordId);
-        if (result === 'allowed') return;
+        if (result === 'allowed') {
+          if (await access.isDiscordIdentitySuspended(discordId)) {
+            return {
+              error: 'basecamp_account_suspended',
+              errorDescription: 'This Basecamp account is suspended. Contact a Team Admin.',
+            };
+          }
+          return;
+        }
         if (result === 'denied') {
           return {
             error: 'discord_guild_membership_required',

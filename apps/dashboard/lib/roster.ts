@@ -18,6 +18,7 @@ export interface RosterMember {
   role: 'team_admin' | 'mentor' | 'student_leader' | 'student';
   studentExperience: 'rookie' | 'veteran' | null;
   state: 'active' | 'removed';
+  suspended?: boolean;
   joinedAt?: string | Date;
   removedAt?: string | Date | null;
 }
@@ -56,9 +57,18 @@ export async function getRosterView(selectedSeasonId?: number): Promise<RosterVi
       };
     }
     if (!response.ok) return null;
-    const current = (await response.json()) as Omit<RosterView, 'ownMember'>;
+    let current = (await response.json()) as Omit<RosterView, 'ownMember'>;
+    if (current.canManage) {
+      const withRemoved = await apiRequest('/current?includeRemoved=true', cookie);
+      if (withRemoved.ok) {
+        current = (await withRemoved.json()) as Omit<RosterView, 'ownMember'>;
+      }
+    }
     if (selectedSeasonId && current.canManage) {
-      const historical = await apiRequest(`/seasons/${selectedSeasonId}`, cookie);
+      const historical = await apiRequest(
+        `/seasons/${selectedSeasonId}?includeRemoved=true`,
+        cookie,
+      );
       if (historical.ok) {
         const past = (await historical.json()) as Pick<RosterView, 'season' | 'members'>;
         return { ...current, ...past, ownMember: null, selectedSeasonId };

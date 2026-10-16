@@ -1,4 +1,9 @@
-import { ForbiddenException, ServiceUnavailableException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { RosterService } from './roster.service.js';
@@ -7,6 +12,7 @@ const currentSeason = { id: 4, name: '2027–28', startsOn: '2027-05-15', endsOn
 const userId = 'member-1';
 const discordId = '123456789012345678';
 const admission = { verify: vi.fn() };
+const access = { assertEffectiveAdminRemains: vi.fn(), assertTeamAdmin: vi.fn() };
 const database = { transaction: vi.fn(), select: vi.fn() };
 
 function builder(rows: unknown[]) {
@@ -43,6 +49,7 @@ function makeService() {
     { db: database } as never,
     new ConfigService({ BASECAMP_TIME_ZONE: 'America/Los_Angeles' }),
     admission as never,
+    access as never,
   );
 }
 
@@ -64,11 +71,30 @@ function setupTransaction(queries: unknown[][], inserted: unknown[] = [membershi
   return { tx, insertValues };
 }
 
+function setupMutationTransaction(queries: unknown[][], updated = membership()) {
+  const updateSet = vi.fn().mockReturnValue({
+    where: vi.fn().mockReturnValue({ returning: vi.fn().mockResolvedValue([updated]) }),
+  });
+  const insertValues = vi.fn().mockResolvedValue(undefined);
+  const tx = {
+    execute: vi.fn().mockResolvedValue(undefined),
+    select: vi.fn(() => builder(queries.shift() ?? [])),
+    update: vi.fn(() => ({ set: updateSet })),
+    insert: vi.fn(() => ({ values: insertValues })),
+  };
+  database.transaction.mockImplementation(async (callback: (tx: typeof tx) => unknown) =>
+    callback(tx),
+  );
+  return { tx, updateSet, insertValues };
+}
+
 describe('RosterService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     database.select.mockReturnValue(builder([currentSeason]));
     admission.verify.mockResolvedValue('allowed');
+    access.assertEffectiveAdminRemains.mockResolvedValue(undefined);
+    access.assertTeamAdmin.mockResolvedValue(undefined);
   });
 
   it('returns null without a current season and does not check Discord or write', async () => {
@@ -168,6 +194,110 @@ describe('RosterService', () => {
       .mockReturnValueOnce(builder([{ id: currentSeason.id }]))
       .mockReturnValueOnce(builder([own]));
     await expect(makeService().getOwnCurrent(userId, new Date())).resolves.toEqual(own);
+  });
+
+  it('allows a Mentor correction without student experience and records before/after audit', async () => {
+    const before = membership({ role: 'student', student_experience: 'veteran' });
+    const updated = membership({ role: 'mentor', student_experience: null });
+    const { tx, updateSet, insertValues } = setupMutationTransaction(
+      [[{ id: currentSeason.id }], [before]],
+      updated,
+    );
+    await expect(
+      makeService().updateCurrentMember(
+        15,
+        { role: 'mentor' },
+        'admin-1',
+        new Date('2027-10-01T12:00:00Z'),
+      ),
+    ).resolves.toEqual(updated);
+    expect(updateSet).toHaveBeenCalledWith({ role: 'mentor', student_experience: null });
+    expect(insertValues).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actor_user_id: 'admin-1',
+        subject_user_id: userId,
+        action: 'membership_updated',
+        before: expect.objectContaining({ role: 'student', studentExperience: 'veteran' }),
+        after: expect.objectContaining({ role: 'mentor', studentExperience: null }),
+      }),
+    );
+    expect(tx.execute).toHaveBeenCalledOnce();
+    expect(access.assertTeamAdmin).toHaveBeenCalledWith(
+      tx,
+      'admin-1',
+      new Date('2027-10-01T12:00:00Z'),
+    );
+  });
+
+  it('requires experience for student roles and protects the last effective admin', async () => {
+    const service = makeService();
+    await expect(
+      service.updateCurrentMember(15, { role: 'student' }, 'admin-1', new Date()),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    const before = membership({ role: 'team_admin', student_experience: null });
+    const { tx, insertValues } = setupMutationTransaction(
+      [[{ id: currentSeason.id }], [before]],
+      membership({ role: 'student', student_experience: 'rookie' }),
+    );
+    access.assertEffectiveAdminRemains.mockRejectedValueOnce(new ConflictException());
+    await expect(
+      makeService().updateCurrentMember(
+        15,
+        { role: 'student', studentExperience: 'rookie' },
+        'admin-1',
+        new Date('2027-10-01T12:00:00Z'),
+      ),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(tx.update).toHaveBeenCalledOnce();
+    expect(insertValues).not.toHaveBeenCalled();
+  });
+
+  it('removes and restores only the current season membership with audit records', async () => {
+    const before = membership();
+    const removed = membership({ state: 'removed', removed_at: new Date(), ended_at: new Date() });
+    const first = setupMutationTransaction([[{ id: currentSeason.id }], [before]], removed);
+    await expect(
+      makeService().removeCurrentMember(15, 'admin-1', 'No longer attending', new Date()),
+    ).resolves.toEqual(removed);
+    expect(first.updateSet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        state: 'removed',
+        removed_at: expect.any(Date),
+        ended_at: expect.any(Date),
+      }),
+    );
+    expect(first.insertValues).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'membership_removed', reason: 'No longer attending' }),
+    );
+
+    const restored = membership();
+    const second = setupMutationTransaction([[{ id: currentSeason.id }], [removed]], restored);
+    await expect(makeService().restoreCurrentMember(15, 'admin-1', new Date())).resolves.toEqual(
+      restored,
+    );
+    expect(second.updateSet).toHaveBeenCalledWith({
+      state: 'active',
+      removed_at: null,
+      ended_at: null,
+    });
+    expect(second.insertValues).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'membership_restored' }),
+    );
+  });
+
+  it('does not remove the only effective Team Admin', async () => {
+    const admin = membership({ role: 'team_admin', student_experience: null });
+    const { tx, insertValues } = setupMutationTransaction(
+      [[{ id: currentSeason.id }], [admin]],
+      membership({ role: 'team_admin', student_experience: null, state: 'removed' }),
+    );
+    access.assertEffectiveAdminRemains.mockRejectedValueOnce(new ConflictException());
+    await expect(
+      makeService().removeCurrentMember(15, 'admin-1', undefined, new Date('2027-10-01T12:00:00Z')),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(tx.update).toHaveBeenCalledOnce();
+    expect(insertValues).not.toHaveBeenCalled();
   });
 
   it.each([

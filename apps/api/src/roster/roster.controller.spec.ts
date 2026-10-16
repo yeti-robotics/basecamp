@@ -9,6 +9,10 @@ const roster = {
   listSeasons: vi.fn(),
   seasonRoster: vi.fn(),
   getOwnCurrent: vi.fn(),
+  updateCurrentMember: vi.fn(),
+  updateSeasonMember: vi.fn(),
+  removeCurrentMember: vi.fn(),
+  restoreCurrentMember: vi.fn(),
 };
 const request = { headers: { cookie: 'session=test' } } as never;
 const current = {
@@ -126,5 +130,50 @@ describe('RosterController', () => {
     await expect(makeController().current(request, 'false')).resolves.toMatchObject({
       members: [],
     });
+  });
+
+  it('allows only Team Admins to correct current and explicitly selected past assignments', async () => {
+    const input = { role: 'student_leader', studentExperience: 'veteran' };
+    authorization.accessFor.mockResolvedValue({
+      canView: true,
+      canManage: false,
+      canBootstrap: false,
+    });
+    await expect(makeController().updateCurrent(request, 5, input as never)).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+    authorization.accessFor.mockResolvedValue({
+      canView: true,
+      canManage: true,
+      canBootstrap: false,
+    });
+    roster.updateCurrentMember.mockResolvedValue({ id: 5 });
+    roster.updateSeasonMember.mockResolvedValue({ id: 5 });
+    await expect(makeController().updateCurrent(request, 5, input as never)).resolves.toEqual({
+      id: 5,
+    });
+    await expect(makeController().updateSeason(request, 2, 5, input as never)).resolves.toEqual({
+      id: 5,
+    });
+    expect(roster.updateCurrentMember).toHaveBeenCalledWith(5, input, 'member-1');
+    expect(roster.updateSeasonMember).toHaveBeenCalledWith(2, 5, input, 'member-1');
+  });
+
+  it('requires Team Admin access for season removal and restoration', async () => {
+    authorization.accessFor.mockResolvedValue({
+      canView: true,
+      canManage: false,
+      canBootstrap: false,
+    });
+    await expect(makeController().remove(request, 5)).rejects.toBeInstanceOf(ForbiddenException);
+    authorization.accessFor.mockResolvedValue({
+      canView: true,
+      canManage: true,
+      canBootstrap: false,
+    });
+    roster.removeCurrentMember.mockResolvedValue({ id: 5, state: 'removed' });
+    roster.restoreCurrentMember.mockResolvedValue({ id: 5, state: 'active' });
+    await expect(makeController().remove(request, 5)).resolves.toMatchObject({ state: 'removed' });
+    await expect(makeController().restore(request, 5)).resolves.toMatchObject({ state: 'active' });
   });
 });
