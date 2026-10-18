@@ -1,4 +1,11 @@
-import { integer, pgTable, serial, text, timestamp } from 'drizzle-orm/pg-core';
+import {
+  integer,
+  pgTable,
+  serial,
+  text,
+  timestamp,
+  uniqueIndex,
+} from 'drizzle-orm/pg-core';
 import { user } from './auth.js';
 import { memberStatus } from './enums.js';
 
@@ -9,12 +16,21 @@ export const seasons = pgTable('seasons', {
   ended_at: timestamp('ended_at').notNull(),
 });
 
-export const season_memberships = pgTable('season_memberships', {
-  id: serial('id').primaryKey(),
-  season_id: integer('season_id').references(() => seasons.id),
-  user_id: text('user_id').references(() => user.id),
-  status: memberStatus('status').notNull(),
-  started_at: timestamp('started_at').defaultNow().notNull(),
-  ended_at: timestamp('ended_at'),
-  status_override: text('status_override'),
-});
+export const season_memberships = pgTable(
+  'season_memberships',
+  {
+    id: serial('id').primaryKey(),
+    season_id: integer('season_id').references(() => seasons.id),
+    user_id: text('user_id').references(() => user.id),
+    status: memberStatus('status').notNull(),
+    started_at: timestamp('started_at').defaultNow().notNull(),
+    ended_at: timestamp('ended_at'),
+    status_override: text('status_override'),
+  },
+  (table) => [
+    uniqueIndex('season_memberships_user_season_uidx').on(
+      table.user_id,
+      table.season_id,
+    ),
+  ],
+);

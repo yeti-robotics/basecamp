@@ -184,6 +184,72 @@ export class AttendanceRepository {
     );
   }
 
+  ensureCurrentSeasonMembership(
+    discordId: string,
+    asOfDate: Date = new Date(),
+  ): ResultAsync<string, Error> {
+    return this.getUserIdByDiscordId(discordId).andThen((userId) =>
+      ResultAsync.fromPromise(
+        this.database.db.transaction(async (tx) => {
+          const [activeSeason] = await tx
+            .select({ id: seasons.id })
+            .from(seasons)
+            .where(
+              and(
+                lte(seasons.started_at, asOfDate),
+                gte(seasons.ended_at, asOfDate),
+              ),
+            )
+            .orderBy(desc(seasons.started_at))
+            .limit(1);
+
+          if (!activeSeason) {
+            throw new Error("No active season found");
+          }
+
+          const [currentMembership] = await tx
+            .select({ id: season_memberships.id })
+            .from(season_memberships)
+            .where(
+              and(
+                eq(season_memberships.user_id, userId),
+                eq(season_memberships.season_id, activeSeason.id),
+              ),
+            )
+            .limit(1);
+
+          if (currentMembership) {
+            return userId;
+          }
+
+          const [previousMembership] = await tx
+            .select({ id: season_memberships.id })
+            .from(season_memberships)
+            .where(eq(season_memberships.user_id, userId))
+            .limit(1);
+
+          await tx
+            .insert(season_memberships)
+            .values({
+              season_id: activeSeason.id,
+              user_id: userId,
+              status: previousMembership ? "veteran" : "rookie",
+            })
+            .onConflictDoNothing({
+              target: [
+                season_memberships.user_id,
+                season_memberships.season_id,
+              ],
+            });
+
+          return userId;
+        }),
+        (error) =>
+          error instanceof Error ? error : new Error(String(error)),
+      ),
+    );
+  }
+
   createRecord(
     record: AttendanceCreate,
   ): ResultAsync<Attendance, Error> {

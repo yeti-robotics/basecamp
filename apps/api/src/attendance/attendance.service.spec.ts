@@ -1,4 +1,3 @@
-
 import { Test, type TestingModule } from "@nestjs/testing";
 import { errAsync, okAsync } from "neverthrow";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -9,6 +8,7 @@ import { getTotalPossibleHoursToDate as calculateTotalPossibleHoursToDate } from
 
 const mockRepository = {
   getUserIdByDiscordId: vi.fn(),
+  ensureCurrentSeasonMembership: vi.fn(),
   getLast: vi.fn(),
   createRecord: vi.fn(),
   updateLast: vi.fn(),
@@ -52,6 +52,9 @@ describe("AttendanceService", () => {
     service = module.get<AttendanceService>(AttendanceService);
 
     mockRepository.getUserIdByDiscordId.mockReturnValue(okAsync(USER_ID));
+    mockRepository.ensureCurrentSeasonMembership.mockReturnValue(
+      okAsync(USER_ID),
+    );
   });
 
   afterEach(() => {
@@ -59,16 +62,31 @@ describe("AttendanceService", () => {
   });
 
   describe("recordAttendance", () => {
-    it("creates a record when the user has no open session", async () => {
+    it("ensures a season membership before creating an attendance record", async () => {
       mockRepository.getLast.mockReturnValue(okAsync(null));
       mockRepository.createRecord.mockReturnValue(okAsync(makeAttendance()));
 
       const result = await service.recordAttendance(DISCORD_ID, "meeting", null);
 
       expect(result.isOk()).toBe(true);
+      expect(
+        mockRepository.ensureCurrentSeasonMembership,
+      ).toHaveBeenCalledWith(DISCORD_ID, expect.any(Date));
       expect(mockRepository.createRecord).toHaveBeenCalledWith(
         expect.objectContaining({ userId: USER_ID, category: "meeting" }),
       );
+    });
+
+    it("does not create attendance if ensuring membership fails", async () => {
+      mockRepository.ensureCurrentSeasonMembership.mockReturnValue(
+        errAsync(new Error("No active season found")),
+      );
+
+      const result = await service.recordAttendance(DISCORD_ID, "meeting", null);
+
+      expect(result.isErr()).toBe(true);
+      expect(mockRepository.getLast).not.toHaveBeenCalled();
+      expect(mockRepository.createRecord).not.toHaveBeenCalled();
     });
 
     it("errors when the user already has a recent open session", async () => {

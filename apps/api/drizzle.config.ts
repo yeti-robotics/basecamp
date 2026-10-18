@@ -4,7 +4,8 @@ import { config } from 'dotenv';
 import { defineConfig } from 'drizzle-kit';
 
 const apiDirectory = dirname(fileURLToPath(import.meta.url));
-const fromApi = (path: string) => relative(process.cwd(), resolve(apiDirectory, path));
+const fromApi = (path: string) =>
+  relative(process.cwd(), resolve(apiDirectory, path)).replace(/\\/g, '/');
 
 config({ path: [fromApi('./.env.local'), fromApi('./.env')], quiet: true });
 

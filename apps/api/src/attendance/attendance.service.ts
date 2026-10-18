@@ -1,4 +1,3 @@
-
 import { Injectable, Logger } from "@nestjs/common";
 import {
   errAsync,
@@ -33,30 +32,34 @@ export class AttendanceService {
     eventId: number | null,
     checkedInAt: Date = new Date(),
   ): ResultAsync<void, Error> {
-    return this.attendanceRepository.getUserIdByDiscordId(discordId).andThen((userId) => {
-      return this.attendanceRepository.getLast(userId).andThen((attendance) => {
-        if (attendance && attendance.checkedOutAt === null) {
-          const staleResult = this.isStaleSession(new Date(attendance.checkedInAt));
-          if (staleResult.isErr()) {
-            return errAsync(staleResult.error);
+    return this.attendanceRepository
+      .ensureCurrentSeasonMembership(discordId, checkedInAt)
+      .andThen((userId) =>
+        this.attendanceRepository.getLast(userId).andThen((attendance) => {
+          if (attendance && attendance.checkedOutAt === null) {
+            const staleResult = this.isStaleSession(
+              new Date(attendance.checkedInAt),
+            );
+            if (staleResult.isErr()) {
+              return errAsync(staleResult.error);
+            }
+
+            if (!staleResult.value) {
+              return errAsync(new Error("User is already signed in"));
+            }
+
+            return this.handleForgotToSignOut(discordId).andThen(() =>
+              this.attendanceRepository
+                .createRecord({ userId, checkedInAt, category, eventId })
+                .map(() => undefined),
+            );
           }
 
-          if (!staleResult.value) {
-            return errAsync(new Error("User is already signed in"));
-          }
-
-          return this.handleForgotToSignOut(discordId).andThen(() =>
-            this.attendanceRepository
-              .createRecord({ userId, checkedInAt, category, eventId })
-              .map(() => undefined),
-          );
-        }
-
-        return this.attendanceRepository
-          .createRecord({ userId, checkedInAt, category, eventId })
-          .map(() => undefined);
-      });
-    });
+          return this.attendanceRepository
+            .createRecord({ userId, checkedInAt, category, eventId })
+            .map(() => undefined);
+        }),
+      );
   }
 
   public updateAttendance(
