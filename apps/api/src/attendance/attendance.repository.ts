@@ -1,9 +1,8 @@
 import { Injectable, Logger } from "@nestjs/common";
+import { and, desc, eq, gte, isNull, lte, or, sql } from "drizzle-orm";
 import { err, ok, Result, ResultAsync } from "neverthrow";
-import { eq, desc, and, isNull, sql, lte, gte, or } from "drizzle-orm";
 
 import { DatabaseService } from "../database/database.service.js";
-import { type Attendance, AttendanceSchema } from "./attendance.schema.js";
 import {
   account,
   attendance,
@@ -11,6 +10,7 @@ import {
   season_memberships,
   seasons,
 } from "../database/schema/index.js";
+import { type Attendance, AttendanceSchema } from "./attendance.schema.js";
 
 export type AttendanceCreate = {
   userId: string;
@@ -53,8 +53,7 @@ export class AttendanceRepository {
         .where(eq(attendance.user_id, userId))
         .orderBy(desc(attendance.checked_in_at))
         .limit(1),
-      (error) =>
-        error instanceof Error ? error : new Error(String(error)),
+      (error) => (error instanceof Error ? error : new Error(String(error))),
     ).andThen((result) => this.parseRow(result[0]));
   }
 
@@ -97,8 +96,7 @@ export class AttendanceRepository {
               : undefined,
           ),
         ),
-      (error) =>
-        error instanceof Error ? error : new Error(String(error)),
+      (error) => (error instanceof Error ? error : new Error(String(error))),
     ).andThen((result) => {
       const totalSeconds = Number(result[0]?.totalSeconds ?? 0);
       const hours = Math.round((totalSeconds / 3600) * 100) / 100;
@@ -137,8 +135,7 @@ export class AttendanceRepository {
           )
           .orderBy(desc(seasons.started_at))
           .limit(1),
-        (error) =>
-          error instanceof Error ? error : new Error(String(error)),
+        (error) => (error instanceof Error ? error : new Error(String(error))),
       ).andThen((memberships) => {
         const membership = memberships[0];
 
@@ -160,8 +157,7 @@ export class AttendanceRepository {
                 eq(hour_requirements.category, "meeting"),
               ),
             ),
-          (error) =>
-            error instanceof Error ? error : new Error(String(error)),
+          (error) => (error instanceof Error ? error : new Error(String(error))),
         ).andThen((rows) => {
           const memberRequirement = rows.find((row) => !row.isLeader);
           const leadershipRequirement = rows.find((row) => row.isLeader);
@@ -244,8 +240,7 @@ export class AttendanceRepository {
 
           return userId;
         }),
-        (error) =>
-          error instanceof Error ? error : new Error(String(error)),
+        (error) => (error instanceof Error ? error : new Error(String(error))),
       ),
     );
   }
@@ -281,8 +276,7 @@ export class AttendanceRepository {
           })
           .returning();
       }),
-      (error) =>
-        error instanceof Error ? error : new Error(String(error)),
+      (error) => (error instanceof Error ? error : new Error(String(error))),
     ).andThen((rows) =>
       this.parseRow(rows[0]).andThen((row) =>
         row ? ok(row) : err(new Error("Attendance record was not created")),
@@ -337,8 +331,7 @@ export class AttendanceRepository {
           .where(condition)
           .returning();
       }),
-      (error) =>
-        error instanceof Error ? error : new Error(String(error)),
+      (error) => (error instanceof Error ? error : new Error(String(error))),
     ).andThen((result) =>
       this.parseRow(result[0]).andThen((row) =>
         row ? ok(row) : err(new Error("Attendance record was not updated")),
@@ -357,7 +350,9 @@ export class AttendanceRepository {
       id: row.id,
       userId: row.user_id,
       checkedInAt: row.checked_in_at.toISOString(),
-      checkedOutAt: row.checked_out_at ? row.checked_out_at.toISOString() : null,
+      checkedOutAt: row.checked_out_at
+        ? row.checked_out_at.toISOString()
+        : null,
       category: row.category,
       eventId: row.event_id,
     };
@@ -365,9 +360,7 @@ export class AttendanceRepository {
     const parsed = AttendanceSchema.safeParse(parseableRow);
 
     if (!parsed.success) {
-      this.logger.error(
-        `Invalid attendance row: ${parsed.error.message}`,
-      );
+      this.logger.error(`Invalid attendance row: ${parsed.error.message}`);
       return err(parsed.error);
     }
 
@@ -379,10 +372,14 @@ export class AttendanceRepository {
       this.database.db
         .select({ userId: account.userId })
         .from(account)
-        .where(and(eq(account.accountId, discordId), eq(account.providerId, "discord")))
+        .where(
+          and(
+            eq(account.accountId, discordId),
+            eq(account.providerId, "discord"),
+          ),
+        )
         .limit(1),
-      (error) =>
-        error instanceof Error ? error : new Error(String(error)),
+      (error) => (error instanceof Error ? error : new Error(String(error))),
     ).andThen((result) => {
       if (!result.length) {
         return err(new Error("User not found"));

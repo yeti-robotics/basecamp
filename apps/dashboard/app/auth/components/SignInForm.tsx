@@ -2,12 +2,19 @@
 
 import { KeyRound } from 'lucide-react';
 import { useState } from 'react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import { Spinner } from '@/components/ui/spinner';
+import { typographyVariants } from '@/components/ui/typography';
+import { authClient } from '@/lib/auth-client';
+import { navigateAfterAuth } from '@/lib/auth-navigation';
 import { DiscordIcon } from './AuthIcons';
 
 function safeRedirectUrl(redirectUrl?: string) {
-  return redirectUrl?.startsWith('/') && !redirectUrl.startsWith('//') ? redirectUrl : '/';
+  if (!redirectUrl?.startsWith('/') || redirectUrl.startsWith('//') || redirectUrl.includes('\\'))
+    return '/';
+  return redirectUrl;
 }
 
 export function SignInForm({ redirectUrl }: { redirectUrl?: string }) {
@@ -19,37 +26,24 @@ export function SignInForm({ redirectUrl }: { redirectUrl?: string }) {
     setIsPending(true);
 
     try {
-      const response = await fetch('/api/auth/sign-in/social', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          provider: 'discord',
-          callbackURL: safeRedirectUrl(redirectUrl),
-          errorCallbackURL: '/auth?error=oauth',
-        }),
+      const { data, error: signInError } = await authClient.signIn.social({
+        provider: 'discord',
+        callbackURL: safeRedirectUrl(redirectUrl),
+        errorCallbackURL: '/auth?error=oauth',
+        disableRedirect: true,
       });
-      const responseText = await response.text();
-      let result: { message?: string; url?: string } = {};
 
-      if (responseText) {
-        try {
-          result = JSON.parse(responseText) as typeof result;
-        } catch {
-          result = {};
-        }
+      if (signInError) {
+        throw new Error(signInError.message ?? 'Discord sign-in could not be started.');
       }
 
-      if (!response.ok || !result.url) {
-        throw new Error(
-          result.message ??
-            `Discord sign-in could not be started${response.status ? ` (${response.status})` : ''}.`,
-        );
-      }
-
-      window.location.assign(result.url);
+      if (!data?.url) throw new Error('Discord sign-in could not be started. Please try again.');
+      navigateAfterAuth(data.url);
     } catch (signInError) {
-      setError(signInError instanceof Error ? signInError.message : 'Discord sign-in failed.');
+      const message =
+        signInError instanceof Error ? signInError.message : 'Discord sign-in failed.';
+      setError(message);
+      toast.error('Could not sign in', { description: message });
       setIsPending(false);
     }
   }
@@ -62,12 +56,27 @@ export function SignInForm({ redirectUrl }: { redirectUrl?: string }) {
         onClick={signInDiscord}
         type="button"
       >
-        <DiscordIcon className="size-5" />
-        {isPending ? 'Connecting to Discord…' : 'Sign in with Discord'}
+        {isPending ? (
+          <>
+            <Spinner aria-hidden="true" />
+            Connecting to Discord…
+          </>
+        ) : (
+          <>
+            <DiscordIcon className="size-5" />
+            Sign in with Discord
+          </>
+        )}
       </Button>
 
       {error && (
-        <p className="mt-3 text-center text-sm text-destructive" role="alert">
+        <p
+          className={typographyVariants({
+            variant: 'p',
+            className: 'mt-3 text-center text-sm text-destructive',
+          })}
+          role="alert"
+        >
           {error}
         </p>
       )}
@@ -81,8 +90,13 @@ export function SignInForm({ redirectUrl }: { redirectUrl?: string }) {
         <Separator className="flex-1" />
       </div>
 
-      <Button className="h-12 w-full bg-card/50 text-base" disabled type="button" variant="outline">
-        <KeyRound className="size-5" />
+      <Button
+        className="h-auto min-h-12 w-full whitespace-normal bg-card/50 py-3 text-sm sm:text-base"
+        disabled
+        type="button"
+        variant="outline"
+      >
+        <KeyRound aria-hidden="true" className="size-5" />
         Sign in with Passkey — coming soon
       </Button>
     </div>

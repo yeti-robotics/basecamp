@@ -49,8 +49,8 @@ packages/
 
 ### Prerequisites
 
-- Node.js 20+
-- pnpm 10+
+- Node.js 20.19+
+- pnpm 12.10.0
 
 Install dependencies:
 
@@ -88,7 +88,7 @@ pnpm format
 
 This repository uses **Turborepo** to orchestrate builds, development servers, and caching across applications and shared packages.
 
-As the project grows, additional services such as the NestJS API and PostgreSQL database will integrate seamlessly into the existing workspace.
+The workspace contains a Next.js dashboard and NestJS API. Local PostgreSQL is defined in `docker-compose.yaml`. For development in Codex-managed Git worktrees, see [the worktree guide](docs/development/worktrees.md).
 
 ---
 

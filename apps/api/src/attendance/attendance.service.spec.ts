@@ -1,10 +1,19 @@
+import "reflect-metadata";
+
 import { Test, type TestingModule } from "@nestjs/testing";
+import { PgDialect } from "drizzle-orm/pg-core";
 import { errAsync, okAsync } from "neverthrow";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { AttendanceService } from "./attendance.service.js";
+import { DatabaseService } from "../database/database.service.js";
 import { AttendanceRepository } from "./attendance.repository.js";
 import type { Attendance } from "./attendance.schema.js";
-import { getTotalPossibleHoursToDate as calculateTotalPossibleHoursToDate } from "./schedule.util.js";
+import { AttendanceCodeService } from "./attendance-code.service.js";
+import { AttendanceService, completedHours } from "./attendance.service.js";
+import {
+  getTotalPossibleHoursToDate as calculateTotalPossibleHoursToDate,
+} from "./schedule.util.js";
+
+const mockCodeService = { verify: vi.fn() };
 
 const mockRepository = {
   getUserIdByDiscordId: vi.fn(),
@@ -45,6 +54,8 @@ describe("AttendanceService", () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AttendanceService,
+        { provide: AttendanceCodeService, useValue: mockCodeService },
+        { provide: DatabaseService, useValue: { db: {} } },
         { provide: AttendanceRepository, useValue: mockRepository },
       ],
     }).compile();
@@ -55,6 +66,7 @@ describe("AttendanceService", () => {
     mockRepository.ensureCurrentSeasonMembership.mockReturnValue(
       okAsync(USER_ID),
     );
+    mockCodeService.verify.mockResolvedValue(true);
   });
 
   afterEach(() => {
@@ -258,11 +270,8 @@ describe("AttendanceService", () => {
       vi.setSystemTime(new Date("2025-09-01T12:00:00Z"));
 
       expect(() => service.getTotalPossibleHoursToDate()).not.toThrow();
-
       expect(service.getTotalPossibleHoursToDate()).toBe(
-        calculateTotalPossibleHoursToDate(
-          new Date("2025-09-01T12:00:00Z"),
-        ),
+        calculateTotalPossibleHoursToDate(new Date("2025-09-01T12:00:00Z")),
       );
     });
   });
@@ -328,5 +337,217 @@ describe("AttendanceService", () => {
         expect(result.error).toBe(error);
       }
     });
+  });
+
+  it("requires a display code before self-service writes and lets two members share one code", async () => {
+    const secondDiscordId = "234567890123456789";
+    const records = new Map<string, Attendance>();
+
+    mockCodeService.verify.mockImplementation(
+      async (code: string) => code === "0042",
+    );
+    mockRepository.getUserIdByDiscordId.mockImplementation(
+      (discordId: string) => okAsync(discordId),
+    );
+    mockRepository.ensureCurrentSeasonMembership.mockImplementation(
+      (discordId: string) => okAsync(discordId),
+    );
+    mockRepository.getLast.mockImplementation(
+      (userId: string) => okAsync(records.get(userId) ?? null),
+    );
+    mockRepository.createRecord.mockImplementation((input) => {
+      const row = makeAttendance({
+        id: records.size + 1,
+        userId: input.userId,
+        checkedInAt: input.checkedInAt.toISOString(),
+        checkedOutAt: null,
+      });
+      records.set(input.userId, row);
+      return okAsync(row);
+    });
+    mockRepository.updateLast.mockImplementation((userId: string, updates) => {
+      const row = records.get(userId);
+      if (!row) {
+        throw new Error("Missing fake attendance record");
+      }
+
+      const updated = {
+        ...row,
+        checkedOutAt: updates.checkedOutAt?.toISOString() ?? row.checkedOutAt,
+      };
+      records.set(userId, updated);
+      return okAsync(updated);
+    });
+
+    expect((await service.signInWithCode(DISCORD_ID, "9999")).isErr()).toBe(
+      true,
+    );
+    expect((await service.signOutWithCode(DISCORD_ID, "42")).isErr()).toBe(
+      true,
+    );
+    expect(records.size).toBe(0);
+    expect(mockRepository.createRecord).not.toHaveBeenCalled();
+    expect(mockRepository.updateLast).not.toHaveBeenCalled();
+
+    expect((await service.signInWithCode(DISCORD_ID, "0042")).isOk()).toBe(true);
+    expect(
+      (await service.signInWithCode(secondDiscordId, "0042")).isOk(),
+    ).toBe(true);
+    expect(records.size).toBe(2);
+    expect((await service.signInWithCode(DISCORD_ID, "0042")).isErr()).toBe(
+      true,
+    );
+    expect((await service.signOutWithCode(DISCORD_ID, "0042")).isOk()).toBe(
+      true,
+    );
+    expect(records.get(DISCORD_ID)?.checkedOutAt).toEqual(expect.any(String));
+  });
+});
+
+const start = new Date("2026-09-01T00:00:00Z");
+const now = new Date("2026-10-13T18:00:00Z");
+const record = {
+  id: 1,
+  category: "meeting" as const,
+  name: "Build meeting",
+  checkedInAt: new Date("2026-10-12T16:00:00Z"),
+  checkedOutAt: new Date("2026-10-12T18:30:00Z"),
+};
+
+function setup(results: unknown[][]) {
+  const queries: ReturnType<typeof vi.fn>[] = [];
+  const select = vi.fn(() => {
+    const result = results.shift();
+    const chain = {
+      from: vi.fn().mockReturnThis(),
+      leftJoin: vi.fn().mockReturnThis(),
+      where: vi.fn().mockReturnThis(),
+      orderBy: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockReturnThis(),
+      // biome-ignore lint/suspicious/noThenProperty: Drizzle queries are awaitable builders.
+      then: (resolve: (value: unknown) => unknown) =>
+        Promise.resolve(result).then(resolve),
+    };
+    queries.push(chain.where);
+    return chain;
+  });
+
+  return {
+    service: new AttendanceService(
+      mockRepository as unknown as AttendanceRepository,
+      { db: { select } } as unknown as DatabaseService,
+      mockCodeService as unknown as AttendanceCodeService,
+    ),
+    select,
+    queries,
+  };
+}
+
+describe("completedHours", () => {
+  it("counts elapsed hours for completed sessions", () => {
+    expect(completedHours(record, start, now)).toBe(2.5);
+  });
+
+  it("does not credit an open or invalid session", () => {
+    expect(completedHours({ ...record, checkedOutAt: null }, start, now)).toBe(
+      0,
+    );
+    expect(
+      completedHours({ ...record, checkedOutAt: start }, start, now),
+    ).toBe(0);
+  });
+
+  it("clips sessions to the season start and current time", () => {
+    expect(
+      completedHours(
+        {
+          ...record,
+          checkedInAt: new Date(start.getTime() - 3_600_000),
+          checkedOutAt: new Date(start.getTime() + 3_600_000),
+        },
+        start,
+        now,
+      ),
+    ).toBe(1);
+
+    expect(
+      completedHours(
+        {
+          ...record,
+          checkedInAt: new Date(now.getTime() - 3_600_000),
+          checkedOutAt: new Date(now.getTime() + 3_600_000),
+        },
+        start,
+        now,
+      ),
+    ).toBe(1);
+  });
+});
+
+describe("AttendanceService overview", () => {
+  const season = {
+    id: 7,
+    name: "2026–27",
+    started_at: start,
+    ended_at: new Date("2027-08-01"),
+  };
+
+  it("returns an explicit empty state without an active season", async () => {
+    const { service, select } = setup([[]]);
+
+    expect(await service.overview("member-a", now)).toEqual({
+      season: null,
+      hours: { meeting: 0, outreach: 0, total: 0 },
+      requirements: null,
+      recentActivity: [],
+    });
+    expect(select).toHaveBeenCalledTimes(1);
+  });
+
+  it("sums categories, returns requirements, limits activity, and scopes queries to the member", async () => {
+    const records = [
+      record,
+      { ...record, id: 2, category: "outreach" as const, name: null },
+      ...Array.from({ length: 4 }, (_, i) => ({
+        ...record,
+        id: i + 3,
+        checkedOutAt: null,
+      })),
+    ];
+    const { service, queries } = setup([
+      [season],
+      records,
+      [{ status: "rookie" }],
+      [
+        { category: "meeting", required_hours: 40 },
+        { category: "outreach", required_hours: 10 },
+      ],
+    ]);
+
+    const overview = await service.overview("member-a", now);
+
+    expect(overview.hours).toEqual({ meeting: 2.5, outreach: 2.5, total: 5 });
+    expect(overview.requirements).toEqual({ meeting: 40, outreach: 10 });
+    expect(overview.recentActivity).toHaveLength(5);
+    expect(overview.recentActivity[1].name).toBe("Outreach event");
+    expect(overview.recentActivity[2].checkedOutAt).toBeNull();
+
+    for (const index of [1, 2]) {
+      const query = new PgDialect().sqlToQuery(
+        queries[index].mock.calls[0][0],
+      );
+      expect(query.sql).toContain('"user_id" =');
+      expect(query.params).toContain("member-a");
+    }
+  });
+
+  it("keeps hours visible without membership or requirements", async () => {
+    const { service, select } = setup([[season], [record], []]);
+
+    const overview = await service.overview("member-a", now);
+
+    expect(overview.hours.total).toBe(2.5);
+    expect(overview.requirements).toBeNull();
+    expect(select).toHaveBeenCalledTimes(3);
   });
 });

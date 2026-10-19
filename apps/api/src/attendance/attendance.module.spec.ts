@@ -1,7 +1,10 @@
+import { ConfigService } from '@nestjs/config';
 import { Test, type TestingModule } from '@nestjs/testing';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { AUTH } from '../auth/auth.module.js';
 import { DatabaseService } from '../database/database.service.js';
 import { AttendanceCommands } from './attendance.commands.js';
+import { AttendanceController } from './attendance.controller.js';
 import { AttendanceModule } from './attendance.module.js';
 import { AttendanceRepository } from './attendance.repository.js';
 import { AttendanceService } from './attendance.service.js';
@@ -13,9 +16,27 @@ describe('AttendanceModule', () => {
     module = await Test.createTestingModule({
       imports: [AttendanceModule],
     })
+      .overrideProvider(AUTH)
+      .useValue({ api: {} })
+      .overrideProvider(ConfigService)
+      .useValue(
+        new ConfigService({
+          ATTENDANCE_TOTP_SECRET: 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ',
+          ATTENDANCE_DISPLAY_PASSWORD: 'mentor-configured-password',
+          ATTENDANCE_DISPLAY_SESSION_SECRET: 'a-display-session-secret-longer-than-32-chars',
+        }),
+      )
       .overrideProvider(DatabaseService)
       .useValue({ db: {} })
       .compile();
+  });
+
+  afterEach(async () => {
+    await module.close();
+  });
+
+  it('should provide AttendanceController', () => {
+    expect(module.get(AttendanceController)).toBeInstanceOf(AttendanceController);
   });
 
   it('should compile successfully', () => {

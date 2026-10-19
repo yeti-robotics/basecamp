@@ -2,12 +2,18 @@ const { execFileSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const SOURCE_ROOTS = ['apps/api/src', 'apps/dashboard/src'];
+const SOURCE_ROOTS = [
+  'apps/api/src',
+  'apps/dashboard/src',
+  'apps/dashboard/app',
+  'apps/dashboard/components',
+  'apps/dashboard/lib',
+];
 const DEFAULT_THRESHOLD = 60;
 
 function isUnderSourceRoot(file, sourceRoots) {
   return (
-    !file.endsWith('.spec.ts') &&
+    !/\.(test|spec)\.[cm]?[jt]sx?$/.test(file) &&
     sourceRoots.some((root) => file === root || file.startsWith(`${root}/`))
   );
 }
