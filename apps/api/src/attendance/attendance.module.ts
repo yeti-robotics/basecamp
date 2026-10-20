@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { AuthModule } from '../auth/auth.module.js';
 import { DatabaseModule } from '../database/database.module.js';
+import { RosterModule } from '../roster/roster.module.js';
 import { AttendanceCommands } from './attendance.commands.js';
 import { AttendanceController } from './attendance.controller.js';
 import { AttendanceRepository } from './attendance.repository.js';
@@ -17,6 +18,7 @@ import { DisplaySessionService } from './display-session.service.js';
   imports: [
     AuthModule,
     DatabaseModule,
+    RosterModule,
     ConfigModule,
     ThrottlerModule.forRoot([{ name: 'attendance', ttl: 60_000, limit: 5 }]),
   ],

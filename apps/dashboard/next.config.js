@@ -25,6 +25,10 @@ const nextConfig = {
         source: '/api/seasons/:path*',
         destination: `${apiInternalUrl}/api/seasons/:path*`,
       },
+      {
+        source: '/api/roster/:path*',
+        destination: `${apiInternalUrl}/api/roster/:path*`,
+      },
     ];
   },
 };

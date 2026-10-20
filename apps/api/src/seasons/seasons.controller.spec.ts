@@ -2,7 +2,8 @@ import { UnauthorizedException } from '@nestjs/common';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SeasonsController } from './seasons.controller.js';
 
-const auth = { api: { getSession: vi.fn() } };
+const memberContext = { authenticate: vi.fn() };
+
 const seasons = {
   viewFor: vi.fn(),
   create: vi.fn(),
@@ -11,17 +12,17 @@ const seasons = {
 const request = { headers: { cookie: 'basecamp-session=test' } } as never;
 
 function makeController() {
-  return new SeasonsController(auth as never, seasons as never);
+  return new SeasonsController(memberContext as never, seasons as never);
 }
 
 describe('SeasonsController', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    auth.api.getSession.mockResolvedValue({ user: { id: 'user-1' } });
+    memberContext.authenticate.mockResolvedValue('user-1');
   });
 
   it('requires an authenticated session to read seasons', async () => {
-    auth.api.getSession.mockResolvedValue(null);
+    memberContext.authenticate.mockRejectedValue(new UnauthorizedException());
     await expect(makeController().list(request)).rejects.toBeInstanceOf(UnauthorizedException);
   });
 
@@ -40,6 +41,22 @@ describe('SeasonsController', () => {
     await expect(makeController().update(request, 4, input)).resolves.toEqual(season);
     expect(seasons.create).toHaveBeenCalledWith(input, 'user-1');
     expect(seasons.update).toHaveBeenCalledWith(4, input, 'user-1');
+  });
+
+  it('does not require a season membership to reach the first-season bootstrap action', async () => {
+    memberContext.authenticate.mockResolvedValue('bootstrap-user');
+    seasons.create.mockResolvedValue(season);
+    await expect(
+      makeController().create(request, {
+        name: season.name,
+        startsOn: season.startsOn,
+        endsOn: season.endsOn,
+      }),
+    ).resolves.toEqual(season);
+    expect(seasons.create).toHaveBeenCalledWith(
+      { name: season.name, startsOn: season.startsOn, endsOn: season.endsOn },
+      'bootstrap-user',
+    );
   });
 });
 
