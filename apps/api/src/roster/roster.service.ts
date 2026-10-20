@@ -9,10 +9,12 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { and, desc, eq, gte, lt, lte, sql } from 'drizzle-orm';
+import { AccessService } from '../access/access.service.js';
 import { DISCORD_ADMISSION } from '../auth/auth.module.js';
 import type { DiscordAdmissionService } from '../auth/discord-admission.service.js';
-import { DatabaseService } from '../database/database.service.js';
+import { type AppDatabase, DatabaseService } from '../database/database.service.js';
 import { account, user } from '../database/schema/auth.js';
+import type { SeasonRole, StudentExperience } from '../database/schema/enums.js';
 import { rosterAudit, season_memberships, seasons } from '../database/schema/index.js';
 import { deriveAssignment } from '../seasons/assignment.js';
 import { localDateInTimeZone } from '../seasons/season-timezone.js';
@@ -33,9 +35,17 @@ export interface RosterMember {
   role: string;
   studentExperience: string | null;
   state: string;
+  suspended: boolean | null;
   joinedAt: Date;
   removedAt: Date | null;
 }
+
+export interface MembershipCorrection {
+  role: SeasonRole;
+  studentExperience?: StudentExperience | null;
+}
+
+type RosterTransaction = Pick<AppDatabase, 'select' | 'insert' | 'update' | 'delete' | 'execute'>;
 
 @Injectable()
 export class RosterService {
@@ -43,6 +53,7 @@ export class RosterService {
     private readonly database: DatabaseService,
     private readonly config: ConfigService,
     @Inject(DISCORD_ADMISSION) private readonly admission: DiscordAdmissionService,
+    private readonly access: AccessService,
   ) {}
 
   async ensureCurrentMembership(userId: string, now: Date) {
@@ -252,6 +263,204 @@ export class RosterService {
     return rows.map((season) => ({ ...season, readOnly: season.endsOn < localToday }));
   }
 
+  async updateCurrentMember(
+    membershipId: number,
+    input: MembershipCorrection,
+    actorId: string,
+    now = new Date(),
+  ) {
+    this.validateCorrection(input);
+    const localToday = localDateInTimeZone(now, this.timeZone());
+    return this.database.db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('basecamp-roster-admins'))`);
+      await this.access.assertTeamAdmin(tx, actorId, now);
+      const [season] = await tx
+        .select({ id: seasons.id })
+        .from(seasons)
+        .where(and(lte(seasons.starts_on, localToday), gte(seasons.ends_on, localToday)))
+        .limit(1);
+      if (!season) throw new NotFoundException('There is no current season');
+      return this.correctMember(tx, season.id, membershipId, input, actorId, now);
+    });
+  }
+
+  async updateSeasonMember(
+    seasonId: number,
+    membershipId: number,
+    input: MembershipCorrection,
+    actorId: string,
+    now = new Date(),
+  ) {
+    this.validateCorrection(input);
+    const localToday = localDateInTimeZone(now, this.timeZone());
+    return this.database.db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('basecamp-roster-admins'))`);
+      await this.access.assertTeamAdmin(tx, actorId, now);
+      const [season] = await tx
+        .select({ id: seasons.id, endsOn: seasons.ends_on })
+        .from(seasons)
+        .where(eq(seasons.id, seasonId))
+        .limit(1);
+      if (!season) throw new NotFoundException('Season not found');
+      if (season.endsOn >= localToday) {
+        throw new BadRequestException('Past-season corrections require a past season');
+      }
+      return this.correctMember(tx, season.id, membershipId, input, actorId, now);
+    });
+  }
+
+  async removeCurrentMember(
+    membershipId: number,
+    actorId: string,
+    reason?: string,
+    now = new Date(),
+  ) {
+    const localToday = localDateInTimeZone(now, this.timeZone());
+    return this.database.db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('basecamp-roster-admins'))`);
+      await this.access.assertTeamAdmin(tx, actorId, now);
+      const [season] = await tx
+        .select({ id: seasons.id })
+        .from(seasons)
+        .where(and(lte(seasons.starts_on, localToday), gte(seasons.ends_on, localToday)))
+        .limit(1);
+      if (!season) throw new NotFoundException('There is no current season');
+      const [before] = await tx
+        .select()
+        .from(season_memberships)
+        .where(
+          and(eq(season_memberships.id, membershipId), eq(season_memberships.season_id, season.id)),
+        )
+        .limit(1);
+      if (!before) throw new NotFoundException('Season member not found');
+      if (before.state === 'removed') return before;
+
+      const [removed] = await tx
+        .update(season_memberships)
+        .set({ state: 'removed', removed_at: now, ended_at: now })
+        .where(eq(season_memberships.id, membershipId))
+        .returning();
+      if (before.role === 'team_admin') await this.access.assertEffectiveAdminRemains(tx, now);
+      await tx.insert(rosterAudit).values({
+        actor_user_id: actorId,
+        subject_user_id: before.user_id,
+        season_id: season.id,
+        action: 'membership_removed',
+        before: this.assignmentSnapshot(before),
+        after: this.assignmentSnapshot(removed),
+        reason: reason?.trim() || null,
+      });
+      return removed;
+    });
+  }
+
+  async restoreCurrentMember(membershipId: number, actorId: string, now = new Date()) {
+    const localToday = localDateInTimeZone(now, this.timeZone());
+    return this.database.db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('basecamp-roster-admins'))`);
+      await this.access.assertTeamAdmin(tx, actorId, now);
+      const [season] = await tx
+        .select({ id: seasons.id })
+        .from(seasons)
+        .where(and(lte(seasons.starts_on, localToday), gte(seasons.ends_on, localToday)))
+        .limit(1);
+      if (!season) throw new NotFoundException('There is no current season');
+      const [before] = await tx
+        .select()
+        .from(season_memberships)
+        .where(
+          and(eq(season_memberships.id, membershipId), eq(season_memberships.season_id, season.id)),
+        )
+        .limit(1);
+      if (!before) throw new NotFoundException('Season member not found');
+      if (before.state === 'active') return before;
+
+      const [restored] = await tx
+        .update(season_memberships)
+        .set({ state: 'active', removed_at: null, ended_at: null })
+        .where(eq(season_memberships.id, membershipId))
+        .returning();
+      await tx.insert(rosterAudit).values({
+        actor_user_id: actorId,
+        subject_user_id: before.user_id,
+        season_id: season.id,
+        action: 'membership_restored',
+        before: this.assignmentSnapshot(before),
+        after: this.assignmentSnapshot(restored),
+      });
+      return restored;
+    });
+  }
+
+  private async correctMember(
+    tx: RosterTransaction,
+    seasonId: number,
+    membershipId: number,
+    input: MembershipCorrection,
+    actorId: string,
+    now: Date,
+  ) {
+    const assignment = this.validateCorrection(input);
+    const [before] = await tx
+      .select()
+      .from(season_memberships)
+      .where(
+        and(eq(season_memberships.id, membershipId), eq(season_memberships.season_id, seasonId)),
+      )
+      .limit(1);
+    if (!before) throw new NotFoundException('Season member not found');
+    if (before.state === 'removed') {
+      throw new BadRequestException('Restore this member before correcting their assignment');
+    }
+    const [updated] = await tx
+      .update(season_memberships)
+      .set({ role: assignment.role, student_experience: assignment.studentExperience })
+      .where(eq(season_memberships.id, membershipId))
+      .returning();
+    if (before.role === 'team_admin' && assignment.role !== 'team_admin') {
+      await this.access.assertEffectiveAdminRemains(tx, now);
+    }
+    await tx.insert(rosterAudit).values({
+      actor_user_id: actorId,
+      subject_user_id: before.user_id,
+      season_id: seasonId,
+      action: 'membership_updated',
+      before: this.assignmentSnapshot(before),
+      after: this.assignmentSnapshot(updated),
+    });
+    return updated;
+  }
+
+  private validateCorrection(input: MembershipCorrection): {
+    role: SeasonRole;
+    studentExperience: StudentExperience | null;
+  } {
+    const roles: SeasonRole[] = ['team_admin', 'mentor', 'student_leader', 'student'];
+    if (!input || !roles.includes(input.role)) {
+      throw new BadRequestException('Choose a valid season role');
+    }
+    if (input.role === 'student' || input.role === 'student_leader') {
+      if (input.studentExperience !== 'rookie' && input.studentExperience !== 'veteran') {
+        throw new BadRequestException('Student roles require Rookie or Veteran experience');
+      }
+      return { role: input.role, studentExperience: input.studentExperience };
+    }
+    if (input.studentExperience != null) {
+      throw new BadRequestException('Mentors and Team Admins do not have student experience');
+    }
+    return { role: input.role, studentExperience: null };
+  }
+
+  private assignmentSnapshot(membership: typeof season_memberships.$inferSelect | undefined) {
+    if (!membership) return null;
+    return {
+      role: membership.role,
+      studentExperience: membership.student_experience,
+      state: membership.state,
+      removedAt: membership.removed_at,
+    };
+  }
+
   private async membersForSeason(
     seasonId: number,
     includeRemoved: boolean,
@@ -267,6 +476,7 @@ export class RosterService {
         role: season_memberships.role,
         studentExperience: season_memberships.student_experience,
         state: season_memberships.state,
+        suspended: user.banned,
         joinedAt: season_memberships.joined_at,
         removedAt: season_memberships.removed_at,
       })

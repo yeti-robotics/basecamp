@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { AccessService } from '../access/access.service.js';
 import { createAuth } from '../auth.js';
 import { DatabaseModule } from '../database/database.module.js';
 import { DatabaseService } from '../database/database.service.js';
@@ -18,14 +19,16 @@ export const DISCORD_ADMISSION = Symbol('DISCORD_ADMISSION');
     },
     {
       provide: AUTH,
-      inject: [DatabaseService, ConfigService, DISCORD_ADMISSION],
+      inject: [DatabaseService, ConfigService, DISCORD_ADMISSION, AccessService],
       useFactory: (
         database: DatabaseService,
         config: ConfigService,
         admission: DiscordAdmissionService,
-      ) => createAuth(database.db, config, admission),
+        access: AccessService,
+      ) => createAuth(database.db, config, admission, access),
     },
+    AccessService,
   ],
-  exports: [AUTH, DISCORD_ADMISSION],
+  exports: [AUTH, DISCORD_ADMISSION, AccessService],
 })
 export class AuthModule {}

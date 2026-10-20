@@ -4,9 +4,10 @@ import { MemberContextService } from './member-context.service.js';
 
 const auth = { api: { getSession: vi.fn() } };
 const roster = { ensureCurrentMembership: vi.fn() };
+const access = { isSuspended: vi.fn() };
 
 function makeService() {
-  return new MemberContextService(auth as never, roster as never);
+  return new MemberContextService(auth as never, roster as never, access as never);
 }
 
 describe('MemberContextService', () => {
@@ -14,6 +15,7 @@ describe('MemberContextService', () => {
     vi.clearAllMocks();
     auth.api.getSession.mockResolvedValue({ user: { id: 'member-1' } });
     roster.ensureCurrentMembership.mockResolvedValue(null);
+    access.isSuspended.mockResolvedValue(false);
   });
 
   it('ensures the current season membership for a session that remains active across rollover', async () => {
@@ -29,6 +31,12 @@ describe('MemberContextService', () => {
 
   it('rejects missing sessions before attempting enrollment', async () => {
     auth.api.getSession.mockResolvedValue(null);
+    await expect(makeService().authenticate({})).rejects.toBeInstanceOf(UnauthorizedException);
+    expect(roster.ensureCurrentMembership).not.toHaveBeenCalled();
+  });
+
+  it('rejects an already authenticated session when its account is suspended', async () => {
+    access.isSuspended.mockResolvedValue(true);
     await expect(makeService().authenticate({})).rejects.toBeInstanceOf(UnauthorizedException);
     expect(roster.ensureCurrentMembership).not.toHaveBeenCalled();
   });
