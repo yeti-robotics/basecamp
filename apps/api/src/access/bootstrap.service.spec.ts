@@ -68,10 +68,16 @@ describe('BootstrapService', () => {
     const insertValues = vi.fn().mockResolvedValue(undefined);
     const tx = {
       execute: vi.fn().mockResolvedValue(undefined),
-      select: vi.fn().mockReturnValue(query([])),
+      select: vi
+        .fn()
+        .mockReturnValueOnce(query([{ id: 'account-1' }]))
+        .mockReturnValueOnce(query([])),
       insert: vi.fn(() => ({ values: insertValues })),
     };
-    database.select.mockReturnValueOnce(query([{ discordId }]));
+    database.select
+      .mockReturnValueOnce(query([]))
+      .mockReturnValueOnce(query([]))
+      .mockReturnValueOnce(query([{ discordId }]));
     database.transaction.mockImplementation(async (callback: (transaction: typeof tx) => unknown) =>
       callback(tx),
     );
@@ -100,7 +106,7 @@ describe('BootstrapService', () => {
   });
 
   it('refuses to bootstrap when a Team Admin already exists', async () => {
-    database.select.mockReturnValueOnce(query([{ discordId }]));
+    database.select.mockReturnValueOnce(query([{ id: 5 }]));
     const tx = {
       execute: vi.fn().mockResolvedValue(undefined),
       select: vi.fn().mockReturnValue(query([{ id: 5 }])),
