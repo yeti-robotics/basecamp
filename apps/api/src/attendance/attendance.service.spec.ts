@@ -2,7 +2,7 @@ import 'reflect-metadata';
 
 import { Test, type TestingModule } from '@nestjs/testing';
 import { PgDialect } from 'drizzle-orm/pg-core';
-import { okAsync } from 'neverthrow';
+import { errAsync, okAsync } from 'neverthrow';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DatabaseService } from '../database/database.service.js';
 import { AttendanceRepository } from './attendance.repository.js';
@@ -57,6 +57,93 @@ describe('AttendanceService', () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  describe('summaryForDiscord', () => {
+    const overview = {
+      season: { id: 7, name: '2026–27' },
+      hours: { meeting: 12.5, outreach: 2, total: 14.5 },
+      requirements: { meeting: 40, outreach: 10 },
+      recentActivity: [],
+    };
+
+    it.each([
+      ['open', makeAttendance(), true],
+      ['closed', makeAttendance({ checkedOutAt: '2026-10-31T17:00:00.000Z' }), false],
+      ['missing', null, false],
+    ])('uses the latest %s session independently of recent activity', async (_, last, signedIn) => {
+      const overviewSpy = vi.spyOn(service, 'overview').mockResolvedValue(overview);
+      mockRepository.getLast.mockReturnValue(okAsync(last));
+
+      const result = await service.summaryForDiscord(DISCORD_ID);
+
+      expect(result._unsafeUnwrap()).toEqual({
+        season: overview.season,
+        meetingHours: 12.5,
+        meetingRequirement: 40,
+        signedIn,
+      });
+      expect(mockRepository.getUserIdByDiscordId).toHaveBeenCalledWith(DISCORD_ID);
+      expect(mockRepository.getLast).toHaveBeenCalledWith(USER_ID);
+      expect(overviewSpy).toHaveBeenCalledWith(USER_ID);
+      expect(mockRepository.updateLast).not.toHaveBeenCalled();
+      expect(mockRepository.createRecord).not.toHaveBeenCalled();
+    });
+
+    it.each([null, { meeting: null, outreach: 10 }])(
+      'keeps hours visible when meeting requirements are missing (%j)',
+      async (requirements) => {
+        vi.spyOn(service, 'overview').mockResolvedValue({ ...overview, requirements });
+        mockRepository.getLast.mockReturnValue(okAsync(null));
+        const result = await service.summaryForDiscord(DISCORD_ID);
+        expect(result._unsafeUnwrap()).toMatchObject({
+          meetingHours: 12.5,
+          meetingRequirement: null,
+        });
+      },
+    );
+
+    it('returns an empty season without hiding an existing open session', async () => {
+      vi.spyOn(service, 'overview').mockResolvedValue({
+        season: null,
+        hours: { meeting: 0, outreach: 0, total: 0 },
+        requirements: null,
+        recentActivity: [],
+      });
+      mockRepository.getLast.mockReturnValue(okAsync(makeAttendance()));
+      const result = await service.summaryForDiscord(DISCORD_ID);
+      expect(result._unsafeUnwrap()).toEqual({
+        season: null,
+        meetingHours: 0,
+        meetingRequirement: null,
+        signedIn: true,
+      });
+    });
+
+    it('stops before querying attendance when the Discord account is not linked', async () => {
+      const overviewSpy = vi.spyOn(service, 'overview');
+      mockRepository.getUserIdByDiscordId.mockReturnValue(errAsync(new Error('User not found')));
+      const result = await service.summaryForDiscord(DISCORD_ID);
+      expect(result._unsafeUnwrapErr().message).toBe('User not found');
+      expect(mockRepository.getLast).not.toHaveBeenCalled();
+      expect(overviewSpy).not.toHaveBeenCalled();
+    });
+
+    it('returns repository failures without querying the overview', async () => {
+      const overviewSpy = vi.spyOn(service, 'overview');
+      mockRepository.getLast.mockReturnValue(errAsync(new Error('Database unavailable')));
+      const result = await service.summaryForDiscord(DISCORD_ID);
+      expect(result._unsafeUnwrapErr().message).toBe('Database unavailable');
+      expect(overviewSpy).not.toHaveBeenCalled();
+    });
+
+    it('converts overview query failures to an error result', async () => {
+      vi.spyOn(service, 'overview').mockRejectedValue(new Error('Database unavailable'));
+      mockRepository.getLast.mockReturnValue(okAsync(null));
+      const result = await service.summaryForDiscord(DISCORD_ID);
+      expect(result._unsafeUnwrapErr().message).toBe('Database unavailable');
+    });
   });
 
   describe('recordAttendance', () => {

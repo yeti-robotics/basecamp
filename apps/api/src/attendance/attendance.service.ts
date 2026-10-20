@@ -18,6 +18,13 @@ type AttendanceRecord = {
   name: string | null;
 };
 
+export type AttendanceSummary = {
+  season: { id: number; name: string } | null;
+  meetingHours: number;
+  meetingRequirement: number | null;
+  signedIn: boolean;
+};
+
 // Count completed sessions only; an open sign-in is shown as in progress.
 export function completedHours(record: AttendanceRecord, start: Date, end: Date): number {
   if (!record.checkedOutAt) return 0;
@@ -34,6 +41,21 @@ export class AttendanceService {
     private readonly database: DatabaseService,
     private readonly codeService: AttendanceCodeService,
   ) {}
+
+  public summaryForDiscord(discordId: string): ResultAsync<AttendanceSummary, Error> {
+    return this.attendanceRepository.getUserIdByDiscordId(discordId).andThen((userId) =>
+      this.attendanceRepository.getLast(userId).andThen((last) =>
+        ResultAsync.fromPromise(this.overview(userId), (error) =>
+          error instanceof Error ? error : new Error(String(error)),
+        ).map((overview) => ({
+          season: overview.season,
+          meetingHours: overview.hours.meeting,
+          meetingRequirement: overview.requirements?.meeting ?? null,
+          signedIn: last !== null && last.checkedOutAt === null,
+        })),
+      ),
+    );
+  }
 
   public signInWithCode(discordId: string, code: string): ResultAsync<void, Error> {
     return ResultAsync.fromPromise(
