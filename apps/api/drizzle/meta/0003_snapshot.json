@@ -1,5 +1,5 @@
 {
-  "id": "95a98d15-c495-440d-8252-c8e20959476f",
+  "id": "87ebb204-d9b9-4ceb-9d0b-5b66036e3bbc",
   "prevId": "95ba4ba6-1d94-46a0-8339-ae0857d41f79",
   "version": "7",
   "dialect": "postgresql",
@@ -95,7 +95,7 @@
           "name": "season_id",
           "type": "integer",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "status": {
           "name": "status",
@@ -124,41 +124,7 @@
           "notNull": true
         }
       },
-      "indexes": {
-        "hour_requirements_season_status_leader_category_uidx": {
-          "name": "hour_requirements_season_status_leader_category_uidx",
-          "columns": [
-            {
-              "expression": "season_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "status",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "is_leader",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "category",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
+      "indexes": {},
       "foreignKeys": {
         "hour_requirements_season_id_seasons_id_fk": {
           "name": "hour_requirements_season_id_seasons_id_fk",
@@ -177,12 +143,7 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {
-        "hour_requirements_required_hours_nonnegative": {
-          "name": "hour_requirements_required_hours_nonnegative",
-          "value": "\"hour_requirements\".\"required_hours\" >= 0"
-        }
-      },
+      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.account": {
@@ -894,20 +855,55 @@
           "name": "season_id",
           "type": "integer",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "user_id": {
           "name": "user_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
-        "status": {
-          "name": "status",
-          "type": "member_status",
+        "role": {
+          "name": "role",
+          "type": "season_role",
           "typeSchema": "public",
           "primaryKey": false,
           "notNull": true
+        },
+        "student_experience": {
+          "name": "student_experience",
+          "type": "student_experience",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "state": {
+          "name": "state",
+          "type": "membership_state",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'active'"
+        },
+        "joined_at": {
+          "name": "joined_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "removed_at": {
+          "name": "removed_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "legacy_status": {
+          "name": "legacy_status",
+          "type": "member_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
         },
         "started_at": {
           "name": "started_at",
@@ -930,17 +926,17 @@
         }
       },
       "indexes": {
-        "season_memberships_user_season_uidx": {
-          "name": "season_memberships_user_season_uidx",
+        "season_memberships_season_user_uidx": {
+          "name": "season_memberships_season_user_uidx",
           "columns": [
             {
-              "expression": "user_id",
+              "expression": "season_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
             },
             {
-              "expression": "season_id",
+              "expression": "user_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -1002,6 +998,18 @@
           "primaryKey": false,
           "notNull": true
         },
+        "starts_on": {
+          "name": "starts_on",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ends_on": {
+          "name": "ends_on",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
         "started_at": {
           "name": "started_at",
           "type": "timestamp",
@@ -1017,6 +1025,114 @@
       },
       "indexes": {},
       "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.roster_audit": {
+      "name": "roster_audit",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "actor_user_id": {
+          "name": "actor_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "subject_user_id": {
+          "name": "subject_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "season_id": {
+          "name": "season_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "action": {
+          "name": "action",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "before": {
+          "name": "before",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "after": {
+          "name": "after",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "roster_audit_actor_user_id_user_id_fk": {
+          "name": "roster_audit_actor_user_id_user_id_fk",
+          "tableFrom": "roster_audit",
+          "tableTo": "user",
+          "columnsFrom": [
+            "actor_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "roster_audit_subject_user_id_user_id_fk": {
+          "name": "roster_audit_subject_user_id_user_id_fk",
+          "tableFrom": "roster_audit",
+          "tableTo": "user",
+          "columnsFrom": [
+            "subject_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "roster_audit_season_id_seasons_id_fk": {
+          "name": "roster_audit_season_id_seasons_id_fk",
+          "tableFrom": "roster_audit",
+          "tableTo": "seasons",
+          "columnsFrom": [
+            "season_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
@@ -1041,6 +1157,32 @@
         "veteran",
         "alumni",
         "mentor"
+      ]
+    },
+    "public.membership_state": {
+      "name": "membership_state",
+      "schema": "public",
+      "values": [
+        "active",
+        "removed"
+      ]
+    },
+    "public.season_role": {
+      "name": "season_role",
+      "schema": "public",
+      "values": [
+        "team_admin",
+        "mentor",
+        "student_leader",
+        "student"
+      ]
+    },
+    "public.student_experience": {
+      "name": "student_experience",
+      "schema": "public",
+      "values": [
+        "rookie",
+        "veteran"
       ]
     }
   },

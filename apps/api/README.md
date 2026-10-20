@@ -24,7 +24,20 @@ Run the API tests with `pnpm --filter api test` or `pnpm --filter api test:e2e`.
 
 The API owns the PostgreSQL connection pool, Better Auth, and database migrations. The API process creates one pool with a maximum of 10 connections, a 5-second connection timeout, and a 30-second idle timeout. The pool closes during Nest application shutdown, so the deployment's total possible connections are the per-process limit multiplied by the number of API instances.
 
-Copy `.env.example` to `.env` for local development. The API validates its environment at startup. Set `DATABASE_URL` to a PostgreSQL URL, `BETTER_AUTH_SECRET` to a random value of at least 32 characters (for example, `openssl rand -base64 32`), `BETTER_AUTH_URL` to the public dashboard URL, and provide the Discord client ID and secret. `DISCORD_TOKEN` and `DISCORD_DEVELOPMENT_GUILD_ID` are optional, but must be set together to enable the bot. `PORT` defaults to `8000`. The dashboard separately uses `API_INTERNAL_URL` to reach NestJS over the private network; set it in `apps/dashboard/.env.local`.
+Copy `.env.example` to `.env` for local development. The API validates its environment at startup. Set `DATABASE_URL` to a PostgreSQL URL, `BETTER_AUTH_SECRET` to a random value of at least 32 characters (for example, `openssl rand -base64 32`), `BETTER_AUTH_URL` to the public dashboard URL, and provide the Discord client ID and secret. `DISCORD_GUILD_ID` and `DISCORD_ADMISSION_BOT_TOKEN` are required for OAuth admission. The bot must be a member of that server; set the admission token to the same value as `DISCORD_TOKEN` if you use one bot for both jobs. The direct membership check does not depend on Necord or `DISCORD_DEVELOPMENT_GUILD_ID`. Discord OAuth sign-in and account linking are rejected when membership is absent or Discord cannot be reached. Members without a Discord email can still sign in; Basecamp stores a non-deliverable placeholder email derived from their stable Discord ID, and never uses email for admission. `DISCORD_TOKEN` and `DISCORD_DEVELOPMENT_GUILD_ID` remain optional, but must be set together to enable the Discord attendance bot. `PORT` defaults to `8000`. The dashboard separately uses `API_INTERNAL_URL` to reach NestJS over the private network; set it in `apps/dashboard/.env.local`.
+
+To establish the first Team Admin, set `BASECAMP_BOOTSTRAP_ADMIN_DISCORD_IDS` to a comma-separated list of Discord user IDs for admitted mentors. The setting only grants first-admin setup authority while no Team Admin membership exists. After the first Team Admin membership is recorded, remove the setting; roster assignments then control all permissions.
+
+Set `BASECAMP_TIME_ZONE` to the team's IANA timezone (for example, `America/New_York`). Season dates are local calendar dates, and API authorization selects the current season using this timezone.
+
+Each installation serves one self-hosted team. Signed-in admitted members join the current season roster on their first dashboard API visit during that season. A new season starts empty. Team Admins can correct current assignments and make explicit, audited corrections to past season assignments. They can remove or restore a person for the current season and read past rosters. Mentors can read current rosters. Students and Student Leaders can read only their own assignment. Team assignments are stored on season memberships rather than Better Auth's global user role.
+
+Account suspension is separate from season removal. Suspending an account revokes its sessions and prevents future sign-in while preserving all season memberships and attendance. Team Admins can restore account access. If all Team Admin access is lost, an operator with database access can restore a known local account with the one-off recovery command below. It requires an explicit account ID and season ID, reads `apps/api/.env`, clears any account suspension, grants Team Admin for the selected season, and records an operator recovery audit entry:
+
+```bash
+cd apps/api
+node scripts/recover-admin.mjs <userId> <seasonId>
+```
 
 ## Facility attendance display
 

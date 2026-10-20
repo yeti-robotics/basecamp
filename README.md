@@ -1,6 +1,8 @@
 # Basecamp
 
-Basecamp is the web platform for managing and interacting with the Yeti Robotics offical Discord bot. It replaces Discord-only commands with a modern dashboard, providing administrators, mentors, students, and team members with an intuitive interface to manage robotics team data and update students attendance hours, outreach hours, and other things within its reach.
+Basecamp is a self-hosted web platform for FRC teams. Each installation serves one team, and that team hosts and owns its data; YETI is the first installation. The dashboard and API support season-based roster management and team operations, alongside Discord attendance workflows.
+
+Read the [domain context](CONTEXT.md), [architecture decisions](docs/adr/README.md), and the [seasons and self-joining roster design](docs/superpowers/specs/2026-10-15-seasons-and-self-joining-roster-design.md) for the product language and boundaries.
 
 The project is built as a Turborepo monorepo to share code, tooling, and types across multiple applications and packages.
 
@@ -14,12 +16,12 @@ The project is built as a Turborepo monorepo to share code, tooling, and types a
 - TypeScript
 - Tailwind CSS
 
-### Backend *(coming soon)*
+### Backend
 - NestJS
 - TypeScript
 - REST API
 
-### Database *(coming soon)*
+### Database
 - PostgreSQL
 
 
@@ -35,12 +37,12 @@ The project is built as a Turborepo monorepo to share code, tooling, and types a
 ```text
 apps/
 ├── dashboard/      # Next.js web dashboard
-└── api/            # NestJS backend (planned) to work as middle man from discord bot to the dashboards incoming requests 
+└── api/            # NestJS API for auth, seasons, roster, attendance, and Discord workflows
 
 packages/
-├── ui/             # Shared UI components
-|-> shared biome configuration
-└── typescript-config/ # Shared TypeScript configuration
+├── attendance-code/    # Shared attendance code generation and validation
+├── ui/                 # Shared UI components
+└── typescript-config/  # Shared TypeScript configuration
 ```
 
 ---
