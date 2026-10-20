@@ -31,7 +31,31 @@ export class AttendanceCommands {
     description: 'Get your current attendance',
   })
   async AttendanceCommand(@Context() [interaction]: SlashCommandContext) {
-    await interaction.reply('Attendance command');
+    await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
+    const result = await this.attendanceService.summaryForDiscord(interaction.user.id);
+    if (result.isErr()) {
+      return interaction.editReply(
+        result.error.message === 'User not found'
+          ? 'Sign in to the Basecamp dashboard with Discord first, then try /attendance again.'
+          : 'Attendance could not be loaded. Please try again or ask a mentor.',
+      );
+    }
+
+    const summary = result.value;
+    const status = summary.signedIn ? 'Signed in' : 'Signed out';
+    const content = summary.season
+      ? [
+          `Season: ${summary.season.name}`,
+          `Meeting hours: ${summary.meetingHours.toFixed(1)} hrs`,
+          summary.meetingRequirement === null
+            ? 'Meeting requirement: not configured'
+            : `Meeting requirement: ${summary.meetingRequirement} hrs`,
+          `Status: ${status}`,
+          'Hours only include completed sessions.',
+        ].join('\n')
+      : `No active season is configured yet.\nStatus: ${status}`;
+
+    return interaction.editReply({ content, allowedMentions: { parse: [] } });
   }
 
   @SlashCommand({
