@@ -39,7 +39,7 @@ describe('ensureSeasonMembership', () => {
   const userId = 'discord-user-1';
   const asOfDate = new Date('2026-10-15T12:00:00Z');
 
-  it('creates a rookie membership when the user has no membership history', async () => {
+  it('creates a rookie student membership when the user has no membership history', async () => {
     const db = createDatabase([[{ id: 5 }], [], []]);
 
     await expect(
@@ -49,12 +49,13 @@ describe('ensureSeasonMembership', () => {
     expect(db.values).toHaveBeenCalledWith({
       season_id: 5,
       user_id: userId,
-      status: 'rookie',
+      role: 'student',
+      student_experience: 'rookie',
     });
     expect(db.onConflictDoNothing).toHaveBeenCalled();
   });
 
-  it('creates a veteran membership when the user has previous membership history', async () => {
+  it('creates a veteran student membership when the user has previous membership history', async () => {
     const db = createDatabase([[{ id: 5 }], [], [{ id: 2 }]]);
 
     await expect(
@@ -64,7 +65,8 @@ describe('ensureSeasonMembership', () => {
     expect(db.values).toHaveBeenCalledWith({
       season_id: 5,
       user_id: userId,
-      status: 'veteran',
+      role: 'student',
+      student_experience: 'veteran',
     });
   });
 

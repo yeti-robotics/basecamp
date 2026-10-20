@@ -1,0 +1,3 @@
+ALTER TABLE "hour_requirements" ALTER COLUMN "season_id" SET NOT NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX "hour_requirements_season_status_leader_category_uidx" ON "hour_requirements" USING btree ("season_id","status","is_leader","category");--> statement-breakpoint
+ALTER TABLE "hour_requirements" ADD CONSTRAINT "hour_requirements_required_hours_nonnegative" CHECK ("hour_requirements"."required_hours" >= 0);

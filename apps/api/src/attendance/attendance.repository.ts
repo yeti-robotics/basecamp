@@ -1,5 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { and, desc, eq, gte, isNull, lte, or, sql } from "drizzle-orm";
+import { and, desc, eq, gt, gte, isNull, lte, or, sql } from "drizzle-orm";
 import { err, ok, Result, ResultAsync } from "neverthrow";
 
 import { DatabaseService } from "../database/database.service.js";
@@ -34,10 +34,29 @@ export type AttendanceSumFilter = {
 };
 
 export type AttendanceRequirementSummary = {
-  status: typeof season_memberships.$inferSelect.status;
+  status: typeof hour_requirements.$inferSelect.status;
   member: number;
   leadership: number;
 };
+
+type MembershipRequirementFields = Pick<
+  typeof season_memberships.$inferSelect,
+  "role" | "student_experience" | "legacy_status"
+>;
+
+export function getRequirementStatus(
+  membership: MembershipRequirementFields,
+): AttendanceRequirementSummary["status"] | null {
+  if (membership.legacy_status) {
+    return membership.legacy_status;
+  }
+
+  if (membership.role === "mentor" || membership.role === "team_admin") {
+    return "mentor";
+  }
+
+  return membership.student_experience;
+}
 
 @Injectable()
 export class AttendanceRepository {
@@ -117,19 +136,27 @@ export class AttendanceRepository {
         this.database.db
           .select({
             seasonId: seasons.id,
-            status: season_memberships.status,
+            role: season_memberships.role,
+            student_experience: season_memberships.student_experience,
+            legacy_status: season_memberships.legacy_status,
           })
           .from(season_memberships)
           .innerJoin(seasons, eq(season_memberships.season_id, seasons.id))
           .where(
             and(
               eq(season_memberships.user_id, userId),
+              eq(season_memberships.state, "active"),
               lte(seasons.started_at, asOfDate),
               gte(seasons.ended_at, asOfDate),
               lte(season_memberships.started_at, asOfDate),
               or(
                 isNull(season_memberships.ended_at),
                 gte(season_memberships.ended_at, asOfDate),
+              ),
+              lte(season_memberships.joined_at, asOfDate),
+              or(
+                isNull(season_memberships.removed_at),
+                gt(season_memberships.removed_at, asOfDate),
               ),
             ),
           )
@@ -143,6 +170,16 @@ export class AttendanceRepository {
           return err(new Error("No active season membership found"));
         }
 
+        const status = getRequirementStatus(membership);
+
+        if (!status) {
+          return err(
+            new Error(
+              `No attendance requirement status is configured for membership role "${membership.role}"`,
+            ),
+          );
+        }
+
         return ResultAsync.fromPromise(
           this.database.db
             .select({
@@ -152,7 +189,7 @@ export class AttendanceRepository {
             .from(hour_requirements)
             .where(
               and(
-                eq(hour_requirements.status, membership.status),
+                eq(hour_requirements.status, status),
                 eq(hour_requirements.season_id, membership.seasonId),
                 eq(hour_requirements.category, "meeting"),
               ),
@@ -165,13 +202,13 @@ export class AttendanceRepository {
           if (!memberRequirement || !leadershipRequirement) {
             return err(
               new Error(
-                `Meeting requirements are not configured for status "${membership.status}" in season ${membership.seasonId}`,
+                `Meeting requirements are not configured for status "${status}" in season ${membership.seasonId}`,
               ),
             );
           }
 
           return ok({
-            status: membership.status,
+            status,
             member: memberRequirement.requiredHours,
             leadership: leadershipRequirement.requiredHours,
           });
@@ -204,7 +241,10 @@ export class AttendanceRepository {
           }
 
           const [currentMembership] = await tx
-            .select({ id: season_memberships.id })
+            .select({
+              id: season_memberships.id,
+              state: season_memberships.state,
+            })
             .from(season_memberships)
             .where(
               and(
@@ -215,6 +255,10 @@ export class AttendanceRepository {
             .limit(1);
 
           if (currentMembership) {
+            if (currentMembership.state !== "active") {
+              throw new Error("Season membership is removed");
+            }
+
             return userId;
           }
 
@@ -229,7 +273,8 @@ export class AttendanceRepository {
             .values({
               season_id: activeSeason.id,
               user_id: userId,
-              status: previousMembership ? "veteran" : "rookie",
+              role: "student",
+              student_experience: previousMembership ? "veteran" : "rookie",
             })
             .onConflictDoNothing({
               target: [

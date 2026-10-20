@@ -1,406 +1,235 @@
-import { Injectable } from "@nestjs/common";
-import { and, desc, eq, gt, gte, isNull, lte, or } from "drizzle-orm";
-import {
-  err,
-  errAsync,
-  fromThrowable,
-  ok,
-  okAsync,
-  type Result,
-  ResultAsync,
-} from "neverthrow";
-
-import { DatabaseService } from "../database/database.service.js";
-import {
-  attendance,
-  hour_requirements,
-} from "../database/schema/attendance.js";
-import { events } from "../database/schema/events.js";
-import { season_memberships, seasons } from "../database/schema/seasons.js";
-import {
-  AttendanceRepository,
-  type AttendanceRequirementSummary,
-  type AttendanceSumFilter,
-  type AttendanceUpdate,
-} from "./attendance.repository.js";
+import { errAsync, okAsync } from "neverthrow";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { AttendanceRepository } from "./attendance.repository.js";
 import { AttendanceCodeService } from "./attendance-code.service.js";
-import {
-  FORGOT_SIGNOUT_CREDIT_MS,
-  STALE_SIGNIN_MIN_HOURS_MS,
-} from "./attendance.constants.js";
-import type { Attendance } from "./attendance.schema.js";
-import {
-  getTotalPossibleHoursToDate as calculateTotalPossibleHoursToDate,
-} from "./schedule.util.js";
+import { AttendanceService, completedHours } from "./attendance.service.js";
 
-type AttendanceRecord = {
-  id: number;
-  category: "meeting" | "outreach";
-  checkedInAt: Date;
-  checkedOutAt: Date | null;
-  name: string | null;
-};
+const discordId = "123456789012345678";
+const userId = "user-1";
 
-// Count completed sessions only; an open sign-in is shown as in progress.
-export function completedHours(
-  record: AttendanceRecord,
-  start: Date,
-  end: Date,
-): number {
-  if (!record.checkedOutAt) {
-    return 0;
-  }
-
-  const milliseconds =
-    Math.min(record.checkedOutAt.getTime(), end.getTime()) -
-    Math.max(record.checkedInAt.getTime(), start.getTime());
-
-  return Math.max(0, milliseconds / 3_600_000);
+function makeAttendance(
+  checkedInAt: Date,
+  checkedOutAt: Date | null = null,
+) {
+  return {
+    id: 1,
+    userId,
+    checkedInAt: checkedInAt.toISOString(),
+    checkedOutAt: checkedOutAt?.toISOString() ?? null,
+    category: "meeting" as const,
+    eventId: null,
+  };
 }
 
-@Injectable()
-export class AttendanceService {
-  constructor(
-    private readonly attendanceRepository: AttendanceRepository,
-    private readonly database: DatabaseService,
-    private readonly codeService: AttendanceCodeService,
-  ) {}
+describe("AttendanceService", () => {
+  const repository = {
+    ensureCurrentSeasonMembership: vi.fn(),
+    getLast: vi.fn(),
+    createRecord: vi.fn(),
+    getUserIdByDiscordId: vi.fn(),
+    updateLast: vi.fn(),
+  };
 
-  public signInWithCode(
-    discordId: string,
-    code: string,
-  ): ResultAsync<void, Error> {
-    return ResultAsync.fromPromise(
-      this.codeService.verify(code),
-      (error) => new Error(String(error)),
-    ).andThen((valid) =>
-      valid
-        ? this.recordAttendance(discordId, "meeting", null)
-        : errAsync(new Error("Invalid attendance code")),
+  const codeService = {
+    verify: vi.fn(),
+  };
+
+  let service: AttendanceService;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+
+    service = new AttendanceService(
+      repository as unknown as AttendanceRepository,
+      {} as never,
+      codeService as unknown as AttendanceCodeService,
     );
-  }
+  });
 
-  public signOutWithCode(
-    discordId: string,
-    code: string,
-  ): ResultAsync<void, Error> {
-    return ResultAsync.fromPromise(
-      this.codeService.verify(code),
-      (error) => new Error(String(error)),
-    ).andThen((valid) =>
-      valid
-        ? this.updateAttendance(discordId, { checkedOutAt: new Date() })
-        : errAsync(new Error("Invalid attendance code")),
-    );
-  }
+  describe("recordAttendance", () => {
+    it("creates a record when the user has no open session", async () => {
+      const checkedInAt = new Date("2026-10-15T14:00:00Z");
 
-  public recordAttendance(
-    discordId: string,
-    category: "meeting" | "outreach",
-    eventId: number | null,
-    checkedInAt: Date = new Date(),
-  ): ResultAsync<void, Error> {
-    return this.attendanceRepository
-      .ensureCurrentSeasonMembership(discordId, checkedInAt)
-      .andThen((userId) =>
-        this.attendanceRepository.getLast(userId).andThen((attendance) => {
-          if (attendance && attendance.checkedOutAt === null) {
-            const staleResult = this.isStaleSession(
-              new Date(attendance.checkedInAt),
-            );
-
-            if (staleResult.isErr()) {
-              return errAsync(staleResult.error);
-            }
-
-            if (!staleResult.value) {
-              return errAsync(new Error("User is already signed in"));
-            }
-
-            return this.handleForgotToSignOut(discordId).andThen(() =>
-              this.attendanceRepository
-                .createRecord({ userId, checkedInAt, category, eventId })
-                .map(() => undefined),
-            );
-          }
-
-          return this.attendanceRepository
-            .createRecord({ userId, checkedInAt, category, eventId })
-            .map(() => undefined);
-        }),
+      repository.ensureCurrentSeasonMembership.mockReturnValue(
+        okAsync(userId),
       );
-  }
+      repository.getLast.mockReturnValue(okAsync(null));
+      repository.createRecord.mockReturnValue(
+        okAsync(makeAttendance(checkedInAt)),
+      );
 
-  public updateAttendance(
-    discordId: string,
-    updates: AttendanceUpdate,
-  ): ResultAsync<void, Error> {
-    return this.attendanceRepository
-      .getUserIdByDiscordId(discordId)
-      .andThen((userId) => {
-        if (updates.checkedOutAt === undefined || updates.checkedOutAt === null) {
-          return this.attendanceRepository
-            .updateLast(userId, updates)
-            .map(() => undefined);
-        }
+      const result = await service.recordAttendance(
+        discordId,
+        "meeting",
+        null,
+        checkedInAt,
+      );
 
-        return this.attendanceRepository.getLast(userId).andThen((attendance) => {
-          if (!attendance) {
-            return errAsync(
-              new Error(
-                "User was not signed out because they have not signed in yet",
-              ),
-            );
-          }
-
-          if (attendance.checkedOutAt !== null) {
-            return errAsync(new Error("User is already signed out"));
-          }
-
-          return this.attendanceRepository
-            .updateLast(userId, updates)
-            .map(() => undefined);
-        });
+      expect(result.isOk()).toBe(true);
+      expect(repository.ensureCurrentSeasonMembership).toHaveBeenCalledWith(
+        discordId,
+        checkedInAt,
+      );
+      expect(repository.createRecord).toHaveBeenCalledWith({
+        userId,
+        checkedInAt,
+        category: "meeting",
+        eventId: null,
       });
-  }
+    });
 
-  private isStaleSession(signInTime: Date): Result<boolean, Error> {
-    const toEasternYMD = fromThrowable(
-      (date: Date) => {
-        const parts = new Intl.DateTimeFormat("en-US", {
-          timeZone: "America/New_York",
-          year: "numeric",
-          month: "2-digit",
-          day: "2-digit",
-        }).formatToParts(date);
+    it("errors when the user already has a recent open session", async () => {
+      vi.useFakeTimers();
 
-        const getPart = (type: "year" | "month" | "day") => {
-          const part = parts.find((p) => p.type === type);
-          if (part == null) {
-            throw new Error(`Missing ${type} in date parts`);
-          }
-          return Number(part.value);
-        };
+      const checkedInAt = new Date("2026-10-15T14:00:00Z");
+      vi.setSystemTime(checkedInAt);
 
-        return {
-          year: getPart("year"),
-          month: getPart("month"),
-          day: getPart("day"),
-        };
-      },
-      (error) =>
-        error instanceof Error ? error : new Error(String(error)),
-    );
-
-    const now = new Date();
-    const signInResult = toEasternYMD(signInTime);
-
-    if (signInResult.isErr()) {
-      return err(signInResult.error);
-    }
-
-    const nowResult = toEasternYMD(now);
-
-    if (nowResult.isErr()) {
-      return err(nowResult.error);
-    }
-
-    const signInEastern = signInResult.value;
-    const nowEastern = nowResult.value;
-    const differentDay =
-      nowEastern.year !== signInEastern.year ||
-      nowEastern.month !== signInEastern.month ||
-      nowEastern.day !== signInEastern.day;
-    const enoughTimeElapsed =
-      now.getTime() - signInTime.getTime() > STALE_SIGNIN_MIN_HOURS_MS;
-
-    return ok(differentDay && enoughTimeElapsed);
-  }
-
-  // Resolve a stale session.
-  public handleForgotToSignOut(
-    discordId: string,
-  ): ResultAsync<Attendance, Error> {
-    return this.attendanceRepository
-      .getUserIdByDiscordId(discordId)
-      .andThen((userId) =>
-        this.attendanceRepository.getLast(userId).andThen((attendance) => {
-          if (!attendance) {
-            return errAsync(new Error("No attendance record found for user"));
-          }
-
-          if (attendance.checkedOutAt !== null) {
-            return okAsync(attendance);
-          }
-
-          const staleResult = this.isStaleSession(
-            new Date(attendance.checkedInAt),
-          );
-
-          if (staleResult.isErr()) {
-            return errAsync(staleResult.error);
-          }
-
-          if (!staleResult.value) {
-            return okAsync(attendance);
-          }
-
-          const creditTime = new Date(
-            new Date(attendance.checkedInAt).getTime() +
-              FORGOT_SIGNOUT_CREDIT_MS,
-          );
-
-          return this.attendanceRepository
-            .updateLast(userId, { checkedOutAt: creditTime })
-            .andThen((updated) => {
-              if (!updated) {
-                return errAsync(
-                  new Error("Failed to credit forgotten sign-out"),
-                );
-              }
-
-              return okAsync(updated);
-            });
-        }),
+      repository.ensureCurrentSeasonMembership.mockReturnValue(
+        okAsync(userId),
       );
-  }
-
-  public getAttendanceSum(
-    discordId: string,
-    filter?: AttendanceSumFilter,
-  ): ResultAsync<number, Error> {
-    return this.attendanceRepository
-      .getUserIdByDiscordId(discordId)
-      .andThen((userId) => this.attendanceRepository.getSum(userId, filter));
-  }
-
-  public getCurrentHourRequirements(
-    discordId: string,
-    asOfDate: Date = new Date(),
-  ): ResultAsync<AttendanceRequirementSummary, Error> {
-    return this.attendanceRepository.getCurrentHourRequirements(
-      discordId,
-      asOfDate,
-    );
-  }
-
-  public getTotalPossibleHoursToDate(asOfDate: Date = new Date()): number {
-    return calculateTotalPossibleHoursToDate(asOfDate);
-  }
-
-  async overview(userId: string, now = new Date()) {
-    const db = this.database.db;
-    const [season] = await db
-      .select()
-      .from(seasons)
-      .where(and(lte(seasons.started_at, now), gt(seasons.ended_at, now)))
-      .orderBy(desc(seasons.started_at))
-      .limit(1);
-
-    if (!season) {
-      return {
-        season: null,
-        hours: { meeting: 0, outreach: 0, total: 0 },
-        requirements: null,
-        recentActivity: [],
-      };
-    }
-
-    const [records, memberships] = await Promise.all([
-      db
-        .select({
-          id: attendance.id,
-          category: attendance.category,
-          checkedInAt: attendance.checked_in_at,
-          checkedOutAt: attendance.checked_out_at,
-          name: events.name,
-        })
-        .from(attendance)
-        .leftJoin(events, eq(attendance.event_id, events.id))
-        .where(
-          and(
-            eq(attendance.user_id, userId),
-            lte(attendance.checked_in_at, now),
-            or(
-              and(
-                isNull(attendance.checked_out_at),
-                gte(attendance.checked_in_at, season.started_at),
-              ),
-              gt(attendance.checked_out_at, season.started_at),
-            ),
-            lte(attendance.checked_in_at, season.ended_at),
-          ),
-        )
-        .orderBy(desc(attendance.checked_in_at), desc(attendance.id)),
-      db
-        .select()
-        .from(season_memberships)
-        .where(
-          and(
-            eq(season_memberships.user_id, userId),
-            eq(season_memberships.season_id, season.id),
-            lte(season_memberships.started_at, now),
-            or(
-              isNull(season_memberships.ended_at),
-              gt(season_memberships.ended_at, now),
-            ),
-          ),
-        )
-        .orderBy(desc(season_memberships.started_at))
-        .limit(1),
-    ]);
-
-    const membership = memberships[0];
-
-    // Memberships currently have no leadership flag; use the standard member requirements.
-    const requirements = membership
-      ? await db
-          .select()
-          .from(hour_requirements)
-          .where(
-            and(
-              eq(hour_requirements.season_id, season.id),
-              eq(hour_requirements.status, membership.status),
-              eq(hour_requirements.is_leader, false),
-            ),
-          )
-      : [];
-
-    const hours = { meeting: 0, outreach: 0, total: 0 };
-
-    for (const record of records) {
-      hours[record.category] += completedHours(
-        record,
-        season.started_at,
-        now,
+      repository.getLast.mockReturnValue(
+        okAsync(makeAttendance(new Date("2026-10-15T13:00:00Z"))),
       );
-    }
 
-    hours.total = hours.meeting + hours.outreach;
+      try {
+        const result = await service.recordAttendance(
+          discordId,
+          "meeting",
+          null,
+          checkedInAt,
+        );
 
-    return {
-      season: { id: season.id, name: season.name },
-      hours,
-      requirements: membership
-        ? {
-            meeting:
-              requirements.find((row) => row.category === "meeting")
-                ?.required_hours ?? null,
-            outreach:
-              requirements.find((row) => row.category === "outreach")
-                ?.required_hours ?? null,
-          }
-        : null,
-      recentActivity: records.slice(0, 5).map((record) => ({
-        id: record.id,
-        category: record.category,
-        name:
-          record.name ??
-          (record.category === "meeting" ? "Team meeting" : "Outreach event"),
-        checkedInAt: record.checkedInAt.toISOString(),
-        checkedOutAt: record.checkedOutAt?.toISOString() ?? null,
-        hours: completedHours(record, season.started_at, now),
-      })),
-    };
-  }
-}
+        expect(result.isErr()).toBe(true);
+        expect(result._unsafeUnwrapErr().message).toBe(
+          "User is already signed in",
+        );
+        expect(repository.createRecord).not.toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("credits a stale open session and signs the user in", async () => {
+      const checkedInAt = new Date("2026-10-15T14:00:00Z");
+      const staleSignIn = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const staleAttendance = makeAttendance(staleSignIn);
+      const creditedAttendance = makeAttendance(
+        staleSignIn,
+        new Date(staleSignIn.getTime() + 90 * 60 * 1000),
+      );
+
+      repository.ensureCurrentSeasonMembership.mockReturnValue(
+        okAsync(userId),
+      );
+      repository.getLast
+        .mockReturnValueOnce(okAsync(staleAttendance))
+        .mockReturnValueOnce(okAsync(staleAttendance));
+      repository.getUserIdByDiscordId.mockReturnValue(okAsync(userId));
+      repository.updateLast.mockReturnValue(okAsync(creditedAttendance));
+      repository.createRecord.mockReturnValue(
+        okAsync(makeAttendance(checkedInAt)),
+      );
+
+      const result = await service.recordAttendance(
+        discordId,
+        "meeting",
+        null,
+        checkedInAt,
+      );
+
+      expect(result.isOk()).toBe(true);
+      expect(repository.updateLast).toHaveBeenCalledWith(userId, {
+        checkedOutAt: new Date(staleSignIn.getTime() + 90 * 60 * 1000),
+      });
+      expect(repository.createRecord).toHaveBeenCalledWith({
+        userId,
+        checkedInAt,
+        category: "meeting",
+        eventId: null,
+      });
+    });
+
+    it("returns an error when ensuring the season membership fails", async () => {
+      repository.ensureCurrentSeasonMembership.mockReturnValue(
+        errAsync(new Error("No active season found")),
+      );
+
+      const result = await service.recordAttendance(
+        discordId,
+        "meeting",
+        null,
+      );
+
+      expect(result.isErr()).toBe(true);
+      expect(repository.getLast).not.toHaveBeenCalled();
+      expect(repository.createRecord).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("signInWithCode", () => {
+    it("rejects an invalid code without recording attendance", async () => {
+      codeService.verify.mockResolvedValue(false);
+
+      const result = await service.signInWithCode(discordId, "bad-code");
+
+      expect(result.isErr()).toBe(true);
+      expect(result._unsafeUnwrapErr().message).toBe(
+        "Invalid attendance code",
+      );
+      expect(repository.ensureCurrentSeasonMembership).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("completedHours", () => {
+  const start = new Date("2026-10-15T14:00:00Z");
+  const end = new Date("2026-10-15T18:00:00Z");
+
+  it("returns the duration of a completed session", () => {
+    expect(
+      completedHours(
+        {
+          id: 1,
+          category: "meeting",
+          checkedInAt: start,
+          checkedOutAt: new Date("2026-10-15T16:30:00Z"),
+          name: null,
+        },
+        start,
+        end,
+      ),
+    ).toBe(2.5);
+  });
+
+  it("clips session hours to the requested time range", () => {
+    expect(
+      completedHours(
+        {
+          id: 1,
+          category: "meeting",
+          checkedInAt: new Date("2026-10-15T13:00:00Z"),
+          checkedOutAt: new Date("2026-10-15T19:00:00Z"),
+          name: null,
+        },
+        start,
+        end,
+      ),
+    ).toBe(4);
+  });
+
+  it("counts no hours for an open session", () => {
+    expect(
+      completedHours(
+        {
+          id: 1,
+          category: "meeting",
+          checkedInAt: start,
+          checkedOutAt: null,
+          name: null,
+        },
+        start,
+        end,
+      ),
+    ).toBe(0);
+  });
+});

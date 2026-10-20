@@ -50,7 +50,8 @@ export async function ensureSeasonMembership(
       .values({
         season_id: activeSeason.id,
         user_id: userId,
-        status: previousMembership ? 'veteran' : 'rookie',
+        role: 'student',
+        student_experience: previousMembership ? 'veteran' : 'rookie',
       })
       .onConflictDoNothing();
 

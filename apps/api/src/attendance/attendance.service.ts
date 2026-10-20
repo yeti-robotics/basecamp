@@ -19,6 +19,7 @@ import { events } from "../database/schema/events.js";
 import { season_memberships, seasons } from "../database/schema/seasons.js";
 import {
   AttendanceRepository,
+  getRequirementStatus,
   type AttendanceRequirementSummary,
   type AttendanceSumFilter,
   type AttendanceUpdate,
@@ -293,7 +294,7 @@ export class AttendanceService {
     const [season] = await db
       .select()
       .from(seasons)
-      .where(and(lte(seasons.started_at, now), gt(seasons.ended_at, now)))
+      .where(and(lte(seasons.started_at, now), gte(seasons.ended_at, now)))
       .orderBy(desc(seasons.started_at))
       .limit(1);
 
@@ -339,10 +340,16 @@ export class AttendanceService {
           and(
             eq(season_memberships.user_id, userId),
             eq(season_memberships.season_id, season.id),
+            eq(season_memberships.state, "active"),
             lte(season_memberships.started_at, now),
             or(
               isNull(season_memberships.ended_at),
               gt(season_memberships.ended_at, now),
+            ),
+            lte(season_memberships.joined_at, now),
+            or(
+              isNull(season_memberships.removed_at),
+              gt(season_memberships.removed_at, now),
             ),
           ),
         )
@@ -351,16 +358,18 @@ export class AttendanceService {
     ]);
 
     const membership = memberships[0];
+    const requirementStatus = membership
+      ? getRequirementStatus(membership)
+      : null;
 
-    // Memberships currently have no leadership flag; use the standard member requirements.
-    const requirements = membership?.legacy_status
+    const requirements = requirementStatus
       ? await db
           .select()
           .from(hour_requirements)
           .where(
             and(
               eq(hour_requirements.season_id, season.id),
-              eq(hour_requirements.status, membership.legacy_status),
+              eq(hour_requirements.status, requirementStatus),
               eq(hour_requirements.is_leader, false),
             ),
           )
