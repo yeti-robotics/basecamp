@@ -10,6 +10,15 @@ const optionalNonblank = z
 
 const httpUrl = z.url({ protocol: /^https?$/, hostname: /.+/ }).trim();
 const postgresUrl = z.url({ protocol: /^postgres(?:ql)?$/, hostname: /.+/ }).trim();
+const bootstrapDiscordIds = z
+  .string()
+  .trim()
+  .optional()
+  .transform((value) => value || undefined)
+  .refine(
+    (value) => value === undefined || value.split(',').every((id) => /^\d{17,20}$/.test(id.trim())),
+    'BASECAMP_BOOTSTRAP_ADMIN_DISCORD_IDS must be a comma-separated list of Discord snowflakes',
+  );
 
 export const envSchema = z
   .object({
@@ -29,6 +38,11 @@ export const envSchema = z
     }, 'ATTENDANCE_TOTP_SECRET must be a Base32 seed of at least 20 bytes'),
     DISCORD_CLIENT_ID: nonblank,
     DISCORD_CLIENT_SECRET: nonblank,
+    DISCORD_GUILD_ID: z
+      .string()
+      .regex(/^\d{17,20}$/, 'DISCORD_GUILD_ID must be a Discord snowflake'),
+    DISCORD_ADMISSION_BOT_TOKEN: nonblank,
+    BASECAMP_BOOTSTRAP_ADMIN_DISCORD_IDS: bootstrapDiscordIds,
     DISCORD_TOKEN: optionalNonblank,
     DISCORD_DEVELOPMENT_GUILD_ID: optionalNonblank,
     PORT: z.coerce.number().int().min(1).max(65535).default(8000),
