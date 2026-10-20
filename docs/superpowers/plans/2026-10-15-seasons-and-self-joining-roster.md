@@ -36,9 +36,10 @@
 | 2 | Discord admission and first-admin bootstrap | `apps/api/src/auth.ts`, `apps/api/src/auth/discord-admission.service.ts`, `apps/api/src/env.validation.ts`, auth tests and setup docs |
 | 3 | Season API and admin page | `apps/api/src/seasons/{seasons.service,seasons.controller,seasons.module}.ts`, `apps/dashboard/app/seasons/*`, `apps/dashboard/lib/seasons.ts` |
 | 4 | Self-enrollment and roster read | `apps/api/src/roster/{roster.service,roster.controller,roster.module}.ts`, `apps/dashboard/app/roster/*`, `apps/dashboard/lib/roster.ts` |
-| 5 | Assignment corrections, removal, suspension, audit, recovery | roster service/controller, `apps/api/src/access/*`, `apps/api/scripts/recover-admin.mts`, roster page controls |
+| 5 | Assignment corrections, removal, suspension, audit, recovery | roster service/controller, `apps/api/src/access/*`, `apps/api/scripts/recover-admin.mjs`, roster page controls |
+| 6 | Domain language, architecture decisions, and operator-facing documentation | `CONTEXT.md`, `docs/adr/*`, approved spec and plan, `apps/api/README.md` |
 
-Use five `codex/` branches and open five PRs as a stack: `codex/seasons-model` targets the default branch; `codex/discord-admission` targets `codex/seasons-model`; `codex/season-management` targets `codex/discord-admission`; `codex/self-joining-roster` targets `codex/season-management`; `codex/roster-admin-actions` targets `codex/self-joining-roster`. Include the approved spec, this plan, and the local mockup ignore rule in the first PR, since they remain uncommitted after the earlier direct-to-`main` commit was rejected. Each PR description names its parent PR and includes only its own incremental diff. Keep the lower PRs stable while reviewing the upper ones; when a lower PR changes, rebase/retest descendants and update their bases after merges. Do not implement later PR behavior ahead of its boundary.
+Use six `codex/` branches and open six PRs as a stack: `codex/seasons-model` targets the default branch; `codex/discord-admission` targets `codex/seasons-model`; `codex/season-management` targets `codex/discord-admission`; `codex/self-joining-roster` targets `codex/season-management`; `codex/roster-admin-actions` targets `codex/self-joining-roster`; `codex/season-roster-docs` targets `codex/roster-admin-actions`. PR 1 includes the approved spec, this plan, and the local mockup ignore rule. PR 6 adds the domain context, architecture decisions, and documentation alignment discovered during implementation. Each PR description identifies its base branch and summarizes its incremental diff. Keep lower PRs stable while reviewing upper ones; when a lower PR changes, rebase and retest descendants and update their bases after merges. Do not implement later PR behavior ahead of its boundary.
 
 ---
 
@@ -154,7 +155,7 @@ Use five `codex/` branches and open five PRs as a stack: `codex/seasons-model` t
 - Modify: `apps/api/src/roster/roster.module.ts`, `apps/dashboard/next.config.js`
 
 **Interfaces:**
-- API: `GET /api/roster/current` returns the full current list to Team Admins/Mentors; `GET /api/roster/seasons/:seasonId` returns a read-only past list to Team Admins; `GET /api/roster/me` returns the caller's assignment. No list endpoint returns removed members by default; admins can request `?includeRemoved=true` for restoration.
+- API: `GET /api/roster/current` returns the full current list to Team Admins/Mentors; `GET /api/roster/seasons/:seasonId` returns a past list to Team Admins; `GET /api/roster/me` returns the caller's assignment. Past assignment corrections use the explicit `PATCH /api/roster/seasons/:seasonId/members/:id` action. The roster UI exposes removal and restoration from the current roster and account access actions there; removal is season-scoped and account suspension is account-wide. No list endpoint returns removed memberships by default; admins can request `?includeRemoved=true` to view removed memberships for current-season restoration.
 
 - [ ] **Step 1: Write failing API and page tests.** Mentor/admin can read the current roster, only admin can read past rosters, Student/Student Leader cannot enumerate, a member can view only self, an empty new season is shown as empty, and prior seasons retain their assignments.
 - [ ] **Step 2: Run focused tests.** Expect failure.
@@ -177,6 +178,22 @@ Use five `codex/` branches and open five PRs as a stack: `codex/seasons-model` t
 - [ ] **Step 3: Implement mutations, suspension, audit, recovery command, and UI controls.** Keep season removal and account suspension visibly distinct; preserve all historical memberships and attendance.
 - [ ] **Step 4: Run focused tests, then root `pnpm test` and `pnpm check-types`.** Expect pass. Check the recovery command against a disposable local database only.
 - [ ] **Step 5: Commit this task on the PR branch.**
+
+### Task 9 (PR 6): Record domain language and align implementation docs
+
+**Files:**
+- Create: `CONTEXT.md`, `docs/adr/0001-one-team-per-installation.md`, `docs/adr/0002-season-scoped-assignments.md`, `docs/adr/0003-separate-season-removal-from-account-suspension.md`
+- Modify: this plan, `docs/superpowers/specs/2026-10-15-seasons-and-self-joining-roster-design.md`, `apps/api/README.md`
+
+**Interfaces:**
+- Define the domain terms Person, Basecamp user, linked identity, Season, Season membership, season role, student experience, season removal, and account suspension.
+- Record the one-team-per-installation boundary, season-scoped assignments, and distinct removal/suspension semantics as accepted decisions.
+- Keep the approved product scope and implementation notes consistent with the shipped API and UI. Goals and calendar behavior remain separate follow-up work.
+
+- [x] Review the approved spec, implementation plan, API, and dashboard against the domain language agreed in the design session.
+- [x] Add the root domain context and only the ADRs that capture durable, non-obvious trade-offs.
+- [x] Correct documentation that described past roster views as wholly read-only or named the recovery script incorrectly.
+- [x] Verify links, terminology, and diffs against the implemented behavior.
 
 ## Final Verification Before Each PR
 
