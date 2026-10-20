@@ -231,6 +231,9 @@ export function RosterTable({
   selectedSeasonId,
   canManage,
 }: RosterTableProps) {
+  const [search, setSearch] = useState('');
+  const query = search.trim().toLowerCase();
+  const filteredMembers = members.filter((member) => member.name.toLowerCase().includes(query));
   const pastSeasons = seasons.filter((item) => item.readOnly);
 
   return (
@@ -269,42 +272,60 @@ export function RosterTable({
           No one has joined this season yet.
         </p>
       ) : season ? (
-        <div className="mt-6 overflow-x-auto rounded-lg border border-zinc-800">
-          <table className="w-full border-collapse text-left text-sm">
-            <thead className="bg-zinc-900 text-xs uppercase tracking-wide text-zinc-400">
-              <tr>
-                <th scope="col" className="px-4 py-3 font-medium">
-                  Member
-                </th>
-                <th scope="col" className="px-4 py-3 font-medium">
-                  Role
-                </th>
-                <th scope="col" className="px-4 py-3 font-medium">
-                  Experience
-                </th>
-                <th scope="col" className="px-4 py-3 font-medium">
-                  Status
-                </th>
-                {canManage && (
+        <section className="mt-6">
+          <label className="mb-4 grid max-w-sm gap-1 text-sm text-zinc-400">
+            Search members
+            <input
+              type="search"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              className="rounded border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-white"
+            />
+          </label>
+          <div className="overflow-x-auto rounded-lg border border-zinc-800">
+            <table className="w-full border-collapse text-left text-sm">
+              <thead className="bg-zinc-900 text-xs uppercase tracking-wide text-zinc-400">
+                <tr>
                   <th scope="col" className="px-4 py-3 font-medium">
-                    Admin actions
+                    Member
                   </th>
+                  <th scope="col" className="px-4 py-3 font-medium">
+                    Role
+                  </th>
+                  <th scope="col" className="px-4 py-3 font-medium">
+                    Experience
+                  </th>
+                  <th scope="col" className="px-4 py-3 font-medium">
+                    Status
+                  </th>
+                  {canManage && (
+                    <th scope="col" className="px-4 py-3 font-medium">
+                      Admin actions
+                    </th>
+                  )}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-800">
+                {filteredMembers.map((member) => (
+                  <MemberRow
+                    key={member.id}
+                    member={member}
+                    canManage={canManage}
+                    readOnly={Boolean(season.readOnly)}
+                    seasonId={season.id}
+                  />
+                ))}
+                {filteredMembers.length === 0 && (
+                  <tr>
+                    <td colSpan={canManage ? 5 : 4} className="px-4 py-5 text-zinc-400">
+                      No members match your search
+                    </td>
+                  </tr>
                 )}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-800">
-              {members.map((member) => (
-                <MemberRow
-                  key={member.id}
-                  member={member}
-                  canManage={canManage}
-                  readOnly={Boolean(season.readOnly)}
-                  seasonId={season.id}
-                />
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </tbody>
+            </table>
+          </div>
+        </section>
       ) : null}
 
       {canManage && pastSeasons.length > 0 && (

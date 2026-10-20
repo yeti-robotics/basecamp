@@ -1,11 +1,32 @@
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import type { RosterMember } from '@/lib/roster';
 import { RosterTable } from './RosterTable';
 
 const mockRefresh = jest.fn();
 jest.mock('next/navigation', () => ({ useRouter: () => ({ refresh: mockRefresh }) }));
 
 const season = { id: 4, name: '2027–28', startsOn: '2027-05-15', endsOn: '2028-05-14' };
+const searchableMembers: RosterMember[] = [
+  {
+    id: 1,
+    userId: 'member-1',
+    name: 'Alex Member',
+    image: null,
+    role: 'student',
+    studentExperience: 'rookie',
+    state: 'active',
+  },
+  {
+    id: 2,
+    userId: 'mentor-1',
+    name: 'Morgan Mentor',
+    image: null,
+    role: 'mentor',
+    studentExperience: null,
+    state: 'active',
+  },
+];
 
 beforeEach(() => {
   global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({}) }) as jest.Mock;
@@ -53,6 +74,73 @@ it('shows the current season and roster roles with student experience', () => {
 it('shows an explicit empty state for a new season roster', () => {
   render(<RosterTable season={season} members={[]} ownMember={null} seasons={[]} canManage />);
   expect(screen.getByText('No one has joined this season yet.')).toBeInTheDocument();
+  expect(screen.queryByRole('searchbox')).not.toBeInTheDocument();
+  expect(screen.queryByText('No members match your search')).not.toBeInTheDocument();
+});
+
+it('filters by partial member name ignoring capitalization and surrounding whitespace', () => {
+  render(
+    <RosterTable season={season} members={searchableMembers} ownMember={null} canManage={false} />,
+  );
+  fireEvent.change(screen.getByRole('searchbox', { name: 'Search members' }), {
+    target: { value: '  oRgAn  ' },
+  });
+  expect(screen.getByText('Morgan Mentor')).toBeInTheDocument();
+  expect(screen.queryByText('Alex Member')).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Save assignment' })).not.toBeInTheDocument();
+  expect(global.fetch).not.toHaveBeenCalled();
+});
+
+it.each(['', '   '])('shows all members for an empty or whitespace-only search (%j)', (value) => {
+  render(
+    <RosterTable season={season} members={searchableMembers} ownMember={null} canManage={false} />,
+  );
+  const input = screen.getByRole('searchbox', { name: 'Search members' });
+  fireEvent.change(input, { target: { value: 'Alex' } });
+  expect(screen.queryByText('Morgan Mentor')).not.toBeInTheDocument();
+  fireEvent.change(input, { target: { value } });
+  expect(screen.getByText('Alex Member')).toBeInTheDocument();
+  expect(screen.getByText('Morgan Mentor')).toBeInTheDocument();
+});
+
+it.each([false, true])('shows no matches and recovers when cleared (canManage=%s)', (canManage) => {
+  render(
+    <RosterTable
+      season={season}
+      members={searchableMembers}
+      ownMember={null}
+      canManage={canManage}
+    />,
+  );
+  const input = screen.getByRole('searchbox', { name: 'Search members' });
+  fireEvent.change(input, { target: { value: 'Nobody' } });
+  expect(screen.getByRole('cell', { name: 'No members match your search' })).toHaveAttribute(
+    'colspan',
+    canManage ? '5' : '4',
+  );
+  expect(screen.queryByText('Alex Member')).not.toBeInTheDocument();
+  expect(screen.queryByText('Morgan Mentor')).not.toBeInTheDocument();
+  expect(screen.queryByText('No one has joined this season yet.')).not.toBeInTheDocument();
+  fireEvent.change(input, { target: { value: '' } });
+  expect(screen.getByText('Alex Member')).toBeInTheDocument();
+  expect(screen.getByText('Morgan Mentor')).toBeInTheDocument();
+  expect(screen.queryByText('No members match your search')).not.toBeInTheDocument();
+});
+
+it('preserves administrator member actions after filtering', async () => {
+  render(<RosterTable season={season} members={searchableMembers} ownMember={null} canManage />);
+  fireEvent.change(screen.getByRole('searchbox', { name: 'Search members' }), {
+    target: { value: 'Morgan' },
+  });
+  expect(screen.getByRole('button', { name: 'Remove from season' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Suspend account access' })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Save assignment' }));
+  await waitFor(() =>
+    expect(global.fetch).toHaveBeenCalledWith(
+      '/api/roster/members/2',
+      expect.objectContaining({ method: 'PATCH' }),
+    ),
+  );
 });
 
 it('shows a member their own assignment without exposing the roster', () => {
@@ -76,6 +164,13 @@ it('shows a member their own assignment without exposing the roster', () => {
   expect(screen.getByText('Your current membership')).toBeInTheDocument();
   expect(screen.getByText('Rookie')).toBeInTheDocument();
   expect(screen.queryByRole('table')).not.toBeInTheDocument();
+  expect(screen.queryByRole('searchbox')).not.toBeInTheDocument();
+});
+
+it('does not offer search when there is no season', () => {
+  render(<RosterTable season={null} members={[]} ownMember={null} canManage={false} />);
+  expect(screen.getByText('No active season is configured yet.')).toBeInTheDocument();
+  expect(screen.queryByRole('searchbox')).not.toBeInTheDocument();
 });
 
 it('links administrators to prior seasons and explains historical correction access', () => {
