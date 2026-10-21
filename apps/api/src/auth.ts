@@ -2,8 +2,12 @@ import { drizzleAdapter } from '@better-auth/drizzle-adapter';
 import { ConfigService } from '@nestjs/config';
 import { type Auth as BetterAuthInstance, type BetterAuthOptions, betterAuth } from 'better-auth';
 import { admin } from 'better-auth/plugins';
+import type { DiscordProfile } from 'better-auth/social-providers';
 import { AccessService } from './access/access.service.js';
-import type { DiscordAdmissionService } from './auth/discord-admission.service.js';
+import type {
+  DiscordAdmissionResult,
+  DiscordAdmissionService,
+} from './auth/discord-admission.service.js';
 import type { AppDatabase } from './database/database.service.js';
 import * as schema from './database/schema/auth.js';
 
@@ -44,6 +48,13 @@ export function createAuth(
   requiredHttpUrl(config, 'BETTER_AUTH_URL');
   const clientId = requiredSetting(config, 'DISCORD_CLIENT_ID');
   const clientSecret = requiredSetting(config, 'DISCORD_CLIENT_SECRET');
+  const mapDiscordProfileToUser = (profile: DiscordProfile) => {
+    const email = typeof profile.email === 'string' ? profile.email.trim() : '';
+    return {
+      email: email || `discord-${profile.id}@users.invalid`,
+      emailVerified: Boolean(email && profile.verified),
+    };
+  };
 
   const options: BetterAuthOptions = {
     baseURL,
@@ -59,11 +70,70 @@ export function createAuth(
       discord: {
         clientId,
         clientSecret,
-        mapProfileToUser: (profile) => {
-          const email = typeof profile.email === 'string' ? profile.email.trim() : '';
+        scope: ['guilds.members.read'],
+        mapProfileToUser: mapDiscordProfileToUser,
+        getUserInfo: async (tokens) => {
+          const accessToken = tokens.accessToken?.trim();
+          if (!accessToken) return null;
+
+          let response: Response;
+          try {
+            response = await fetch('https://discord.com/api/users/@me', {
+              headers: { Authorization: `Bearer ${accessToken}` },
+              signal: AbortSignal.timeout(5_000),
+            });
+          } catch {
+            return null;
+          }
+          if (!response.ok) return null;
+
+          let rawProfile: unknown;
+          try {
+            rawProfile = await response.json();
+          } catch {
+            return null;
+          }
+          if (
+            typeof rawProfile !== 'object' ||
+            rawProfile === null ||
+            !('id' in rawProfile) ||
+            typeof rawProfile.id !== 'string' ||
+            !/^\d{17,20}$/.test(rawProfile.id) ||
+            !('username' in rawProfile) ||
+            typeof rawProfile.username !== 'string'
+          ) {
+            return null;
+          }
+
+          const profile = rawProfile as DiscordProfile;
+          const avatar = typeof profile.avatar === 'string' ? profile.avatar : null;
+          const discriminator =
+            typeof profile.discriminator === 'string' ? profile.discriminator : '0';
+          const image =
+            avatar === null
+              ? `https://cdn.discordapp.com/embed/avatars/${
+                  discriminator === '0'
+                    ? Number(BigInt(profile.id) >> 22n) % 6
+                    : (Number.parseInt(discriminator, 10) || 0) % 5
+                }.png`
+              : `https://cdn.discordapp.com/avatars/${profile.id}/${avatar}.${avatar.startsWith('a_') ? 'gif' : 'png'}`;
+          const admissionResult: DiscordAdmissionResult = await admission.verify(
+            accessToken,
+            profile.id,
+          );
+          const mappedUser = mapDiscordProfileToUser(profile);
+
           return {
-            email: email || `discord-${profile.id}@users.invalid`,
-            emailVerified: Boolean(email && profile.verified),
+            user: {
+              name: profile.global_name || profile.username || '',
+              image,
+              ...mappedUser,
+            },
+            data: {
+              ...profile,
+              image_url: image,
+              basecampAdmissionResult: admissionResult,
+            },
           };
         },
       },
@@ -71,15 +141,16 @@ export function createAuth(
     user: {
       validateUserInfo: async ({ source }) => {
         if (source.method !== 'oauth' || source.oauth?.providerId !== 'discord') return;
-        const discordId = source.oauth.profile?.id;
-        if (typeof discordId !== 'string') {
+        const profile = source.oauth.profile;
+        const discordId = profile?.id;
+        if (!profile || typeof discordId !== 'string' || !/^\d{17,20}$/.test(discordId)) {
           return {
             error: 'discord_identity_unavailable',
             errorDescription: 'Discord did not provide a valid account identity.',
           };
         }
 
-        const result = await admission.verify(discordId);
+        const result = profile.basecampAdmissionResult;
         if (result === 'allowed') {
           if (await access.isDiscordIdentitySuspended(discordId)) {
             return {
@@ -97,7 +168,8 @@ export function createAuth(
         }
         return {
           error: 'discord_admission_unavailable',
-          errorDescription: 'Basecamp could not verify team server membership. Try again later.',
+          errorDescription:
+            'Basecamp could not verify server membership. Try again later; if this continues, reconnect Discord and grant server-membership access.',
         };
       },
     },

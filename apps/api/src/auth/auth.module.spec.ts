@@ -1,6 +1,6 @@
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   admin: vi.fn(),
@@ -23,7 +23,6 @@ const validSettings = {
   DISCORD_CLIENT_ID: 'test-client-id',
   DISCORD_CLIENT_SECRET: 'test-client-secret',
   DISCORD_GUILD_ID: '408711970305474560',
-  DISCORD_ADMISSION_BOT_TOKEN: 'test-admission-token',
 };
 const admission = { verify: vi.fn() };
 const access = { isDiscordIdentitySuspended: vi.fn() };
@@ -38,6 +37,10 @@ describe('AuthModule', () => {
     mocks.betterAuth.mockReturnValue({ kind: 'auth-instance' });
     admission.verify.mockResolvedValue('allowed');
     access.isDiscordIdentitySuspended.mockResolvedValue(false);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   async function makeModule(settings: Record<string, string>) {
@@ -72,6 +75,8 @@ describe('AuthModule', () => {
           discord: {
             clientId: validSettings.DISCORD_CLIENT_ID,
             clientSecret: validSettings.DISCORD_CLIENT_SECRET,
+            scope: ['guilds.members.read'],
+            getUserInfo: expect.any(Function),
             mapProfileToUser: expect.any(Function),
           },
         },
@@ -80,6 +85,29 @@ describe('AuthModule', () => {
       }),
     );
     const options = mocks.betterAuth.mock.calls[0][0];
+    const getUserInfo = options.socialProviders.discord.getUserInfo;
+    const profile = {
+      id: '123456789012345678',
+      username: 'discord-user',
+      global_name: 'Discord User',
+      discriminator: '0',
+      avatar: 'avatar-hash',
+      email: null,
+      verified: false,
+    };
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => profile }));
+    const info = await getUserInfo({ accessToken: 'user-oauth-token' });
+    expect(admission.verify).toHaveBeenCalledWith('user-oauth-token', profile.id);
+    expect(info).toMatchObject({
+      user: {
+        name: 'Discord User',
+        email: `discord-${profile.id}@users.invalid`,
+        emailVerified: false,
+        image: `https://cdn.discordapp.com/avatars/${profile.id}/${profile.avatar}.png`,
+      },
+      data: { id: profile.id, basecampAdmissionResult: 'allowed' },
+    });
+
     const validateUserInfo = options.user.validateUserInfo;
     await expect(
       validateUserInfo(
@@ -88,13 +116,15 @@ describe('AuthModule', () => {
           source: {
             method: 'oauth',
             action: 'create-user',
-            oauth: { providerId: 'discord', profile: { id: '123456789012345678' } },
+            oauth: {
+              providerId: 'discord',
+              profile: { id: profile.id, basecampAdmissionResult: 'allowed' },
+            },
           },
         },
         {},
       ),
     ).resolves.toBeUndefined();
-    expect(admission.verify).toHaveBeenCalledWith('123456789012345678');
     await module.close();
   });
 
@@ -111,7 +141,10 @@ describe('AuthModule', () => {
             source: {
               method: 'oauth',
               action,
-              oauth: { providerId: 'discord', profile: { id: '123456789012345678' } },
+              oauth: {
+                providerId: 'discord',
+                profile: { id: '123456789012345678', basecampAdmissionResult: 'denied' },
+              },
             },
           },
           {},
@@ -130,11 +163,16 @@ describe('AuthModule', () => {
       action: 'sign-in',
       oauth: {
         providerId: 'discord',
-        profile: { id: '123456789012345678', email: 'member@example.org' },
+        profile: {
+          id: '123456789012345678',
+          email: 'member@example.org',
+          basecampAdmissionResult: 'unavailable',
+        },
       },
     };
     await expect(validateUserInfo({ user: {}, source }, {})).resolves.toMatchObject({
-      error: expect.any(String),
+      error: 'discord_admission_unavailable',
+      errorDescription: expect.stringContaining('reconnect Discord'),
     });
     await expect(
       validateUserInfo(
@@ -145,7 +183,7 @@ describe('AuthModule', () => {
         {},
       ),
     ).resolves.toMatchObject({ error: expect.any(String) });
-    expect(admission.verify).toHaveBeenCalledTimes(1);
+    expect(admission.verify).not.toHaveBeenCalled();
     await module.close();
   });
 
@@ -160,7 +198,10 @@ describe('AuthModule', () => {
           source: {
             method: 'oauth',
             action: 'sign-in',
-            oauth: { providerId: 'discord', profile: { id: '123456789012345678' } },
+            oauth: {
+              providerId: 'discord',
+              profile: { id: '123456789012345678', basecampAdmissionResult: 'allowed' },
+            },
           },
         },
         {},

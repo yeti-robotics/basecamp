@@ -30,7 +30,7 @@ export class BootstrapService {
 
   async mayCreateFirstSeason(userId: string, discordId: string): Promise<boolean> {
     if (!this.configuredDiscordIds.has(discordId)) return false;
-    if ((await this.admission.verify(discordId)) !== 'allowed') return false;
+    if ((await this.admission.verifyWithAdmissionBot(discordId)) !== 'allowed') return false;
     if (!(await this.hasLinkedConfiguredIdentity(userId, [discordId]))) return false;
     return !(await this.hasTeamAdmin());
   }
@@ -49,7 +49,9 @@ export class BootstrapService {
       )
       .limit(1);
     const discordId = linkedIdentity[0]?.discordId;
-    if (!discordId || (await this.admission.verify(discordId)) !== 'allowed') return null;
+    if (!discordId || (await this.admission.verifyWithAdmissionBot(discordId)) !== 'allowed') {
+      return null;
+    }
     return discordId;
   }
 

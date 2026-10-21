@@ -11,7 +11,7 @@ import { RosterService } from './roster.service.js';
 const currentSeason = { id: 4, name: '2027–28', startsOn: '2027-05-15', endsOn: '2028-05-14' };
 const userId = 'member-1';
 const discordId = '123456789012345678';
-const admission = { verify: vi.fn() };
+const admission = { verifyWithAdmissionBot: vi.fn() };
 const access = { assertEffectiveAdminRemains: vi.fn(), assertTeamAdmin: vi.fn() };
 const database = { transaction: vi.fn(), select: vi.fn() };
 
@@ -92,7 +92,7 @@ describe('RosterService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     database.select.mockReturnValue(builder([currentSeason]));
-    admission.verify.mockResolvedValue('allowed');
+    admission.verifyWithAdmissionBot.mockResolvedValue('allowed');
     access.assertEffectiveAdminRemains.mockResolvedValue(undefined);
     access.assertTeamAdmin.mockResolvedValue(undefined);
   });
@@ -101,13 +101,13 @@ describe('RosterService', () => {
     database.select.mockReturnValue(builder([]));
     await expect(makeService().ensureCurrentMembership(userId, new Date())).resolves.toBeNull();
     expect(database.transaction).not.toHaveBeenCalled();
-    expect(admission.verify).not.toHaveBeenCalled();
+    expect(admission.verifyWithAdmissionBot).not.toHaveBeenCalled();
   });
 
   it('creates a new member as Student/Rookie after verifying their linked Discord identity', async () => {
     const { tx, insertValues } = setupTransaction([[], [{ discordId }], []]);
     await makeService().ensureCurrentMembership(userId, new Date('2027-06-01T12:00:00Z'));
-    expect(admission.verify).toHaveBeenCalledWith(discordId);
+    expect(admission.verifyWithAdmissionBot).toHaveBeenCalledWith(discordId);
     expect(tx.execute).toHaveBeenCalledOnce();
     expect(tx.insert).toHaveBeenCalledTimes(2);
     expect(insertValues).toHaveBeenCalledWith(
@@ -175,7 +175,7 @@ describe('RosterService', () => {
     await expect(makeService().ensureCurrentMembership(userId, new Date())).resolves.toEqual(
       corrected,
     );
-    expect(admission.verify).not.toHaveBeenCalled();
+    expect(admission.verifyWithAdmissionBot).not.toHaveBeenCalled();
     expect(tx.insert).not.toHaveBeenCalled();
   });
 
@@ -304,7 +304,7 @@ describe('RosterService', () => {
     ['denied', ForbiddenException],
     ['unavailable', ServiceUnavailableException],
   ] as const)('does not enroll when Discord admission is %s', async (result, exception) => {
-    admission.verify.mockResolvedValue(result);
+    admission.verifyWithAdmissionBot.mockResolvedValue(result);
     const { tx } = setupTransaction([[], [{ discordId }]]);
     await expect(makeService().ensureCurrentMembership(userId, new Date())).rejects.toBeInstanceOf(
       exception,

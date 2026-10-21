@@ -96,7 +96,7 @@ export class RosterService {
       if (!discordId)
         throw new ForbiddenException('A linked Discord identity is required to join the roster');
 
-      const admission = await this.admission.verify(discordId);
+      const admission = await this.admission.verifyWithAdmissionBot(discordId);
       if (admission === 'denied') {
         throw new ForbiddenException(
           'Discord server membership is required to join the current roster',
