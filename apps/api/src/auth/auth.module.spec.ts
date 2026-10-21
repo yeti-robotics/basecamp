@@ -75,7 +75,7 @@ describe('AuthModule', () => {
           discord: {
             clientId: validSettings.DISCORD_CLIENT_ID,
             clientSecret: validSettings.DISCORD_CLIENT_SECRET,
-            scope: ['guilds.members.read'],
+            scope: ['identify', 'email', 'guilds.members.read'],
             getUserInfo: expect.any(Function),
             mapProfileToUser: expect.any(Function),
           },

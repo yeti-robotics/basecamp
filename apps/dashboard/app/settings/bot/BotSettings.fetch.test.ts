@@ -12,6 +12,7 @@ it('forwards the session cookie without caching and never returns token data', a
       desiredEnabled: false,
       tokenConfigured: true,
       connection: 'off',
+      statusMessage: 'YETI ARE YOU READY?',
       token: 'must-not-reach-the-page',
       tokenCiphertext: 'must-not-reach-the-page-either',
     }),
@@ -21,6 +22,7 @@ it('forwards the session cookie without caching and never returns token data', a
     desiredEnabled: false,
     tokenConfigured: true,
     connection: 'off',
+    statusMessage: 'YETI ARE YOU READY?',
   });
   expect(JSON.stringify(result)).not.toContain('must-not-reach-the-page');
   expect(global.fetch).toHaveBeenCalledWith(

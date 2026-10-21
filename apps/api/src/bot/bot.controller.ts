@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Header, Put, UseGuards, ValidationPipe } from '@nestjs/common';
 import { SessionGuard } from '../access/session.guard.js';
 import { TeamAdminGuard } from '../access/team-admin.guard.js';
-import { SetBotEnabledDto, SetBotTokenDto } from './bot.dto.js';
+import { SetBotEnabledDto, SetBotStatusMessageDto, SetBotTokenDto } from './bot.dto.js';
 import { BotRuntimeService } from './bot-runtime.service.js';
 
 const writeBody = new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true });
@@ -27,5 +27,11 @@ export class BotController {
   @Header('Cache-Control', 'private, no-store')
   setEnabled(@Body(writeBody) body: SetBotEnabledDto) {
     return this.runtime.setEnabled(body.enabled);
+  }
+
+  @Put('status-message')
+  @Header('Cache-Control', 'private, no-store')
+  setStatusMessage(@Body(writeBody) body: SetBotStatusMessageDto) {
+    return this.runtime.setStatusMessage(body.statusMessage);
   }
 }

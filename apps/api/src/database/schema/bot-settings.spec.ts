@@ -12,6 +12,8 @@ describe('bot settings schema', () => {
     expect(bot_settings.enabled.default).toBe(false);
     expect(bot_settings.token_ciphertext.name).toBe('token_ciphertext');
     expect(bot_settings.token_ciphertext.notNull).toBe(false);
+    expect(bot_settings.status_message.notNull).toBe(true);
+    expect(bot_settings.status_message.default).toBe('YETI ARE YOU READY?');
     expect(config.checks.map((check) => check.name)).toContain('bot_settings_singleton_check');
   });
 });

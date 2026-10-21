@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { IntentsBitField } from 'discord.js';
 import { NecordModule } from 'necord';
 import { DiscordCommandsModule } from './discord-commands.module.js';
+import './rebind-necord-discovery.js';
 
 class DeferredLoginNecordModule extends NecordModule {
   override async onApplicationBootstrap(): Promise<string> {

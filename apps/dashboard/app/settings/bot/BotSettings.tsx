@@ -18,6 +18,8 @@ function safeBotStatus(value: unknown): BotStatus | null {
   if (
     typeof status.desiredEnabled !== 'boolean' ||
     typeof status.tokenConfigured !== 'boolean' ||
+    typeof status.statusMessage !== 'string' ||
+    !status.statusMessage.trim() ||
     !['off', 'connecting', 'connected', 'failed'].includes(String(status.connection))
   ) {
     return null;
@@ -26,6 +28,7 @@ function safeBotStatus(value: unknown): BotStatus | null {
     desiredEnabled: status.desiredEnabled,
     tokenConfigured: status.tokenConfigured,
     connection: status.connection as BotStatus['connection'],
+    statusMessage: status.statusMessage,
   };
 }
 
@@ -39,9 +42,11 @@ const connectionLabels: Record<BotStatus['connection'], string> = {
 export function BotSettings({ initialStatus }: { initialStatus: BotStatus }) {
   const [status, setStatus] = useState(initialStatus);
   const [token, setToken] = useState('');
+  const [statusMessage, setStatusMessage] = useState(initialStatus.statusMessage);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [statusSaved, setStatusSaved] = useState(false);
   const pendingRequests = useRef(new Set<string>());
 
   useEffect(() => {
@@ -83,6 +88,7 @@ export function BotSettings({ initialStatus }: { initialStatus: BotStatus }) {
     setPending(true);
     setError(null);
     setSaved(false);
+    setStatusSaved(false);
     setStatus((current) => ({
       ...current,
       desiredEnabled: enabled,
@@ -122,6 +128,7 @@ export function BotSettings({ initialStatus }: { initialStatus: BotStatus }) {
     setPending(true);
     setError(null);
     setSaved(false);
+    setStatusSaved(false);
     try {
       const response = await fetch('/api/settings/bot/token', {
         method: 'PUT',
@@ -138,6 +145,37 @@ export function BotSettings({ initialStatus }: { initialStatus: BotStatus }) {
       setError('The token could not be saved. Check the encryption key and try again.');
     } finally {
       pendingRequests.current.delete('token');
+      setPending(pendingRequests.current.size > 0);
+    }
+  }
+
+  async function saveStatusMessage(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const nextMessage = statusMessage.trim();
+    if (pendingRequests.current.has('status-message') || !nextMessage || nextMessage.length > 128) {
+      return;
+    }
+    pendingRequests.current.add('status-message');
+    setPending(true);
+    setError(null);
+    setSaved(false);
+    setStatusSaved(false);
+    try {
+      const response = await fetch('/api/settings/bot/status-message', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ statusMessage: nextMessage }),
+      });
+      if (!response.ok) throw new Error('request failed');
+      const next = safeBotStatus(await response.json());
+      if (!next) throw new Error('invalid status');
+      setStatus(next);
+      setStatusMessage(next.statusMessage);
+      setStatusSaved(true);
+    } catch {
+      setError('The status message could not be saved. Try again.');
+    } finally {
+      pendingRequests.current.delete('status-message');
       setPending(pendingRequests.current.size > 0);
     }
   }
@@ -197,6 +235,39 @@ export function BotSettings({ initialStatus }: { initialStatus: BotStatus }) {
             </Alert>
           </CardContent>
         ) : null}
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Status message</CardTitle>
+          <CardDescription>
+            Shown as the bot&apos;s Discord status. Saving updates a connected bot immediately, and
+            the same message is used the next time the bot logs in.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="border-t pt-5">
+          <form className="space-y-4" onSubmit={saveStatusMessage}>
+            <div className="space-y-2">
+              <Label htmlFor="bot-status-message">Status message</Label>
+              <Input
+                id="bot-status-message"
+                value={statusMessage}
+                maxLength={128}
+                onChange={(event) => setStatusMessage(event.target.value)}
+                disabled={pending}
+              />
+              <p className="text-xs text-muted-foreground">128 characters maximum.</p>
+            </div>
+            <Button type="submit" disabled={pending || !statusMessage.trim()}>
+              {pending ? 'Saving…' : 'Save status message'}
+            </Button>
+            {statusSaved ? (
+              <p role="status" className="text-sm text-muted-foreground">
+                Status message saved.
+              </p>
+            ) : null}
+          </form>
+        </CardContent>
       </Card>
 
       <Card>

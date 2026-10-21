@@ -5,6 +5,12 @@ import { DatabaseService } from '../database/database.service.js';
 import { LifecycleService } from './lifecycle.service.js';
 
 const execute = vi.fn();
+const limit = vi.fn().mockResolvedValue([]);
+const select = vi.fn(() => ({
+  from: vi.fn(() => ({
+    where: vi.fn(() => ({ limit })),
+  })),
+}));
 
 // ─── Client helper ────────────────────────────────────────────────────────────
 
@@ -21,7 +27,10 @@ function makeClient(username = 'TestBot') {
 
 async function makeModule(): Promise<TestingModule> {
   return Test.createTestingModule({
-    providers: [LifecycleService, { provide: DatabaseService, useValue: { db: { execute } } }],
+    providers: [
+      LifecycleService,
+      { provide: DatabaseService, useValue: { db: { execute, select } } },
+    ],
   }).compile();
 }
 
@@ -33,6 +42,9 @@ describe('LifecycleService', () => {
 
   beforeEach(async () => {
     execute.mockReset();
+    limit.mockReset();
+    limit.mockResolvedValue([]);
+    select.mockClear();
     module = await makeModule();
     service = module.get(LifecycleService);
   });
@@ -57,6 +69,17 @@ describe('LifecycleService', () => {
       await service.onReady([client] as never);
 
       expect(logSpy).toHaveBeenCalledWith('Bot logged in as YetiBot');
+    });
+
+    it('uses a saved status message when the bot becomes ready', async () => {
+      limit.mockResolvedValueOnce([{ statusMessage: 'Scrimmage tonight' }]);
+      const client = makeClient();
+
+      await service.onReady([client] as never);
+
+      expect(client.user.setActivity).toHaveBeenCalledWith('Scrimmage tonight', {
+        type: ActivityType.Custom,
+      });
     });
 
     it("sets activity to 'YETI ARE YOU READY?' with Custom type", async () => {

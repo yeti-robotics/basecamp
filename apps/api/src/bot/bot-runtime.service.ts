@@ -6,6 +6,8 @@ import {
   type OnApplicationShutdown,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { ActivityType, Client } from 'discord.js';
+import { DEFAULT_BOT_STATUS_MESSAGE } from '../database/schema/bot-settings.js';
 import { BotContextFactory } from './bot-context.factory.js';
 import { BotSettingsStore } from './bot-settings.store.js';
 import { BotTokenCipher } from './bot-token-cipher.js';
@@ -16,6 +18,7 @@ export interface BotStatus {
   desiredEnabled: boolean;
   tokenConfigured: boolean;
   connection: BotConnectionState;
+  statusMessage: string;
   message?: string;
 }
 
@@ -23,6 +26,7 @@ export interface BotStatus {
 export class BotRuntimeService implements OnApplicationBootstrap, OnApplicationShutdown {
   private desiredEnabled = false;
   private tokenCiphertext: string | null = null;
+  private statusMessage = DEFAULT_BOT_STATUS_MESSAGE;
   private connection: BotConnectionState = 'off';
   private message: string | undefined;
   private context: INestApplicationContext | null = null;
@@ -41,6 +45,7 @@ export class BotRuntimeService implements OnApplicationBootstrap, OnApplicationS
       const saved = await this.settings.load();
       this.desiredEnabled = saved.enabled;
       this.tokenCiphertext = saved.tokenCiphertext;
+      this.statusMessage = saved.statusMessage;
     } catch {
       this.connection = 'failed';
       this.message = 'Discord bot settings could not be loaded';
@@ -73,8 +78,22 @@ export class BotRuntimeService implements OnApplicationBootstrap, OnApplicationS
       desiredEnabled: this.desiredEnabled,
       tokenConfigured: Boolean(this.tokenCiphertext),
       connection: this.connection,
+      statusMessage: this.statusMessage,
       ...(this.message ? { message: this.message } : {}),
     };
+  }
+
+  async setStatusMessage(statusMessage: string): Promise<BotStatus> {
+    const trimmed = statusMessage.trim();
+    if (!trimmed) throw new BadRequestException('Status message is required');
+    if (trimmed.length > 128) {
+      throw new BadRequestException('Status message must be 128 characters or fewer');
+    }
+
+    await this.settings.setStatusMessage(trimmed);
+    this.statusMessage = trimmed;
+    this.publishStatus(trimmed);
+    return this.status();
   }
 
   async setEnabled(enabled: boolean): Promise<BotStatus> {
@@ -147,6 +166,26 @@ export class BotRuntimeService implements OnApplicationBootstrap, OnApplicationS
     const ciphertext = this.tokenCiphertext;
     const startup = new AbortController();
     this.startup = startup;
+    let startedContext: INestApplicationContext | null = null;
+    let failedBeforeContextWasReturned = false;
+    const reportClientError = () => {
+      this.connection = 'failed';
+      this.message = 'Discord bot encountered an error and was stopped';
+      if (!startedContext) {
+        failedBeforeContextWasReturned = true;
+        return;
+      }
+      const failedContext = startedContext;
+      void this.enqueue(async () => {
+        if (this.context !== failedContext) return;
+        this.context = null;
+        try {
+          await failedContext.close();
+        } catch {
+          // The connection remains failed; do not expose Discord's raw error.
+        }
+      });
+    };
     let token: string;
     try {
       token = this.cipher.decrypt(ciphertext);
@@ -165,8 +204,16 @@ export class BotRuntimeService implements OnApplicationBootstrap, OnApplicationS
         token,
         this.config.get<string>('DISCORD_DEVELOPMENT_GUILD_ID')?.trim() || undefined,
         startup.signal,
+        reportClientError,
       );
       if (this.startup === startup) this.startup = null;
+      startedContext = context;
+      if (failedBeforeContextWasReturned) {
+        await context.close();
+        this.connection = 'failed';
+        this.message = 'Discord bot encountered an error and was stopped';
+        return;
+      }
       if (!this.desiredEnabled || this.tokenCiphertext !== ciphertext) {
         await context.close();
         return;
@@ -178,6 +225,16 @@ export class BotRuntimeService implements OnApplicationBootstrap, OnApplicationS
       if (!this.desiredEnabled || this.tokenCiphertext !== ciphertext) return;
       this.connection = 'failed';
       this.message = 'Discord bot connection failed. Check the token and try again.';
+    }
+  }
+
+  private publishStatus(statusMessage: string): void {
+    if (!this.context || this.connection !== 'connected') return;
+    try {
+      const client = this.context.get(Client, { strict: false });
+      client.user?.setActivity(statusMessage, { type: ActivityType.Custom });
+    } catch {
+      // A closing context should not fail the saved setting.
     }
   }
 
