@@ -7,6 +7,11 @@ const optionalNonblank = z
   .trim()
   .optional()
   .transform((value) => value || undefined);
+const optionalEncryptionKey = optionalNonblank.refine((value) => {
+  if (!value) return true;
+  const key = Buffer.from(value, 'base64');
+  return key.length === 32 && key.toString('base64') === value;
+}, 'BOT_SETTINGS_ENCRYPTION_KEY must be a base64-encoded 32-byte key');
 
 const httpUrl = z.url({ protocol: /^https?$/, hostname: /.+/ }).trim();
 const postgresUrl = z.url({ protocol: /^postgres(?:ql)?$/, hostname: /.+/ }).trim();
@@ -53,6 +58,7 @@ export const envSchema = z
     DISCORD_GUILD_ID: z
       .string()
       .regex(/^\d{17,20}$/, 'DISCORD_GUILD_ID must be a Discord snowflake'),
+    BOT_SETTINGS_ENCRYPTION_KEY: optionalEncryptionKey,
     BASECAMP_BOOTSTRAP_ADMIN_DISCORD_IDS: bootstrapDiscordIds,
     BASECAMP_TIME_ZONE: ianaTimeZone,
     DISCORD_TOKEN: optionalNonblank,
