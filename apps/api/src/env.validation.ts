@@ -53,7 +53,6 @@ export const envSchema = z
     DISCORD_GUILD_ID: z
       .string()
       .regex(/^\d{17,20}$/, 'DISCORD_GUILD_ID must be a Discord snowflake'),
-    DISCORD_ADMISSION_BOT_TOKEN: nonblank,
     BASECAMP_BOOTSTRAP_ADMIN_DISCORD_IDS: bootstrapDiscordIds,
     BASECAMP_TIME_ZONE: ianaTimeZone,
     DISCORD_TOKEN: optionalNonblank,

@@ -1,8 +1,7 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { and, eq, inArray, sql } from 'drizzle-orm';
-import { DISCORD_ADMISSION } from '../auth/auth.module.js';
-import type { DiscordAdmissionService } from '../auth/discord-admission.service.js';
+import { LinkedDiscordAdmissionService } from '../auth/linked-discord-admission.service.js';
 import type { AppDatabase } from '../database/database.service.js';
 import { DatabaseService } from '../database/database.service.js';
 import { account } from '../database/schema/auth.js';
@@ -18,7 +17,7 @@ export class BootstrapService {
   constructor(
     private readonly database: DatabaseService,
     config: ConfigService,
-    @Inject(DISCORD_ADMISSION) private readonly admission: DiscordAdmissionService,
+    private readonly admission: LinkedDiscordAdmissionService,
   ) {
     this.configuredDiscordIds = new Set(
       (config.get<string>('BASECAMP_BOOTSTRAP_ADMIN_DISCORD_IDS') ?? '')
@@ -30,7 +29,7 @@ export class BootstrapService {
 
   async mayCreateFirstSeason(userId: string, discordId: string): Promise<boolean> {
     if (!this.configuredDiscordIds.has(discordId)) return false;
-    if ((await this.admission.verifyWithAdmissionBot(discordId)) !== 'allowed') return false;
+    if ((await this.admission.verifyLinked(userId, discordId)) !== 'allowed') return false;
     if (!(await this.hasLinkedConfiguredIdentity(userId, [discordId]))) return false;
     return !(await this.hasTeamAdmin());
   }
@@ -49,7 +48,7 @@ export class BootstrapService {
       )
       .limit(1);
     const discordId = linkedIdentity[0]?.discordId;
-    if (!discordId || (await this.admission.verifyWithAdmissionBot(discordId)) !== 'allowed') {
+    if (!discordId || (await this.admission.verifyLinked(userId, discordId)) !== 'allowed') {
       return null;
     }
     return discordId;

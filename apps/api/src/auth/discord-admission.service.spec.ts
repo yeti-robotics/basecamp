@@ -30,30 +30,6 @@ describe('DiscordAdmissionService', () => {
     );
   });
 
-  it('preserves bot-token admission for existing season callers until they migrate', async () => {
-    const fetcher = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: async () => ({ user: { id: discordId } }),
-    });
-    const service = new DiscordAdmissionService(
-      new ConfigService({
-        ...settings,
-        DISCORD_ADMISSION_BOT_TOKEN: 'legacy-admission-token',
-      }),
-      fetcher,
-    );
-
-    await expect(service.verifyWithAdmissionBot(discordId)).resolves.toBe('allowed');
-    expect(fetcher).toHaveBeenCalledWith(
-      `https://discord.com/api/v10/guilds/${settings.DISCORD_GUILD_ID}/members/${discordId}`,
-      expect.objectContaining({
-        headers: { Authorization: 'Bot legacy-admission-token' },
-        signal: expect.any(AbortSignal),
-      }),
-    );
-  });
-
   it('denies an identity that is not a member of the configured guild', async () => {
     const fetcher = vi.fn().mockResolvedValue({ ok: false, status: 404 });
     await expect(makeService(fetcher).verify(userAccessToken, discordId)).resolves.toBe('denied');

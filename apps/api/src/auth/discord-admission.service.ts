@@ -23,17 +23,6 @@ export class DiscordAdmissionService {
     return this.checkMembership(url, `Bearer ${accessToken}`, discordId);
   }
 
-  async verifyWithAdmissionBot(discordId: string): Promise<DiscordAdmissionResult> {
-    if (!snowflakePattern.test(discordId)) return 'denied';
-
-    const guildId = this.config.get<string>('DISCORD_GUILD_ID')?.trim();
-    const token = this.config.get<string>('DISCORD_ADMISSION_BOT_TOKEN')?.trim();
-    if (!guildId || !snowflakePattern.test(guildId) || !token) return 'unavailable';
-
-    const url = `https://discord.com/api/v10/guilds/${guildId}/members/${discordId}`;
-    return this.checkMembership(url, `Bot ${token}`, discordId);
-  }
-
   private async checkMembership(
     url: string,
     authorization: string,
