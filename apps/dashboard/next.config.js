@@ -33,6 +33,14 @@ const nextConfig = {
         source: '/api/access/:path*',
         destination: `${apiInternalUrl}/api/access/:path*`,
       },
+      {
+        source: '/api/settings/bot',
+        destination: `${apiInternalUrl}/api/settings/bot`,
+      },
+      {
+        source: '/api/settings/bot/:path*',
+        destination: `${apiInternalUrl}/api/settings/bot/:path*`,
+      },
     ];
   },
 };
