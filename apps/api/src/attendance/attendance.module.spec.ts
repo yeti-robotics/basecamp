@@ -3,7 +3,6 @@ import { Test, type TestingModule } from '@nestjs/testing';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { AUTH } from '../auth/auth.module.js';
 import { DatabaseService } from '../database/database.service.js';
-import { AttendanceCommands } from './attendance.commands.js';
 import { AttendanceController } from './attendance.controller.js';
 import { AttendanceModule } from './attendance.module.js';
 import { AttendanceRepository } from './attendance.repository.js';
@@ -47,12 +46,6 @@ describe('AttendanceModule', () => {
     const service = module.get(AttendanceService);
     expect(service).toBeDefined();
     expect(service).toBeInstanceOf(AttendanceService);
-  });
-
-  it('should provide AttendanceCommands', () => {
-    const commands = module.get(AttendanceCommands);
-    expect(commands).toBeDefined();
-    expect(commands).toBeInstanceOf(AttendanceCommands);
   });
 
   it('should provide AttendanceRepository', () => {

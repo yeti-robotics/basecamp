@@ -2,8 +2,12 @@ import 'reflect-metadata';
 import { MODULE_METADATA } from '@nestjs/common/constants';
 import { ConfigModule } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
-import { NecordModule } from 'necord';
+import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { BotContextFactory } from './bot/bot-context.factory.js';
+import { BotRuntimeService } from './bot/bot-runtime.service.js';
+import { BotSettingsStore } from './bot/bot-settings.store.js';
+import { BotTokenCipher } from './bot/bot-token-cipher.js';
 
 describe('AppModule', () => {
   const envKeys = [
@@ -18,7 +22,6 @@ describe('AppModule', () => {
     'DISCORD_GUILD_ID',
     'BASECAMP_BOOTSTRAP_ADMIN_DISCORD_IDS',
     'BASECAMP_TIME_ZONE',
-    'DISCORD_TOKEN',
     'DISCORD_DEVELOPMENT_GUILD_ID',
     'PORT',
   ];
@@ -38,7 +41,6 @@ describe('AppModule', () => {
       DISCORD_GUILD_ID: '408711970305474560',
       BASECAMP_BOOTSTRAP_ADMIN_DISCORD_IDS: '123456789012345678',
       BASECAMP_TIME_ZONE: 'America/New_York',
-      DISCORD_TOKEN: ' ',
       DISCORD_DEVELOPMENT_GUILD_ID: ' ',
       PORT: '8000',
     });
@@ -52,49 +54,51 @@ describe('AppModule', () => {
     }
   });
 
-  it('does not register the Discord bot when both optional settings are blank', async () => {
+  it('does not import a Discord client into the HTTP application', async () => {
     const { AppModule } = await import('./app.module.js');
     const imports = Reflect.getMetadata(MODULE_METADATA.IMPORTS, AppModule) as unknown[];
-    const registersNecord = imports.some(
-      (entry) =>
-        typeof entry === 'object' &&
-        entry !== null &&
-        'module' in entry &&
-        entry.module === NecordModule,
-    );
-
-    expect(registersNecord).toBe(false);
-  });
-
-  it('registers the Discord bot when both settings are configured', async () => {
-    vi.resetModules();
-    process.env.DISCORD_TOKEN = 'bot-token';
-    process.env.DISCORD_DEVELOPMENT_GUILD_ID = 'guild-id';
-
-    const { AppModule } = await import('./app.module.js');
-    const imports = Reflect.getMetadata(MODULE_METADATA.IMPORTS, AppModule) as unknown[];
-    const registersNecord = imports.some(
-      (entry) =>
-        typeof entry === 'object' &&
-        entry !== null &&
-        'module' in entry &&
-        entry.module === NecordModule,
-    );
-
-    expect(registersNecord).toBe(true);
+    expect(
+      imports.some((entry) => typeof entry === 'function' && entry.name === 'NecordModule'),
+    ).toBe(false);
   });
 
   it('loads validated configuration from the extracted options', async () => {
-    vi.resetModules();
-    process.env.DISCORD_TOKEN = ' ';
     process.env.DISCORD_DEVELOPMENT_GUILD_ID = ' ';
 
     const { AppModule } = await import('./app.module.js');
-    const module = await Test.createTestingModule({ imports: [AppModule] }).compile();
+    const module = await Test.createTestingModule({ imports: [AppModule] })
+      .overrideProvider(BotSettingsStore)
+      .useValue({ load: vi.fn().mockResolvedValue({ enabled: false, tokenCiphertext: null }) })
+      .compile();
     await module.init();
 
     expect(module.get(ConfigModule, { strict: false })).toBeDefined();
 
     await module.close();
+  });
+
+  it('serves health when a saved bot token fails during startup', async () => {
+    const { AppModule } = await import('./app.module.js');
+    const module = await Test.createTestingModule({ imports: [AppModule] })
+      .overrideProvider(BotSettingsStore)
+      .useValue({
+        load: vi.fn().mockResolvedValue({ enabled: true, tokenCiphertext: 'ciphertext' }),
+      })
+      .overrideProvider(BotTokenCipher)
+      .useValue({ decrypt: vi.fn(() => 'invalid-token') })
+      .overrideProvider(BotContextFactory)
+      .useValue({ start: vi.fn().mockRejectedValue(new Error('bad Discord token')) })
+      .compile();
+    const app = module.createNestApplication();
+    await app.init();
+    await new Promise<void>((resolve) => setImmediate(resolve));
+
+    await request(app.getHttpServer()).get('/health').expect(200, { status: 'ok' });
+    await expect(app.get(BotRuntimeService).status()).resolves.toMatchObject({
+      desiredEnabled: true,
+      connection: 'failed',
+    });
+
+    await app.close();
   });
 });

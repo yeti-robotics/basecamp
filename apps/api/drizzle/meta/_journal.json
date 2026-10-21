@@ -36,6 +36,13 @@
       "when": 1792125797741,
       "tag": "0004_naive_doctor_strange",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792542810269,
+      "tag": "0005_skinny_sumo",
+      "breakpoints": true
     }
   ]
 }
