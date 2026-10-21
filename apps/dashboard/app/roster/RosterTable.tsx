@@ -232,8 +232,10 @@ export function RosterTable({
   canManage,
 }: RosterTableProps) {
   const [search, setSearch] = useState('');
-  const query = search.trim().toLowerCase();
-  const filteredMembers = members.filter((member) => member.name.toLowerCase().includes(query));
+  const searchWords = search.trim().toLowerCase().split(/\s+/);
+  const filteredMembers = members.filter((member) =>
+    searchWords.every((word) => member.name.toLowerCase().includes(word)),
+  );
   const pastSeasons = seasons.filter((item) => item.readOnly);
 
   return (

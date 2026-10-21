@@ -91,6 +91,35 @@ it('filters by partial member name ignoring capitalization and surrounding white
   expect(global.fetch).not.toHaveBeenCalled();
 });
 
+it.each(['Mentor Morgan', '  mEnToR   Morgan  ', 'Morgan\tMentor'])(
+  'matches all search words regardless of order and whitespace (%j)',
+  (value) => {
+    render(
+      <RosterTable
+        season={season}
+        members={searchableMembers}
+        ownMember={null}
+        canManage={false}
+      />,
+    );
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Search members' }), {
+      target: { value },
+    });
+    expect(screen.getByText('Morgan Mentor')).toBeVisible();
+    expect(screen.queryByRole('cell', { name: 'Alex Member' })).not.toBeInTheDocument();
+  },
+);
+
+it('requires every search word to match the member name', () => {
+  render(
+    <RosterTable season={season} members={searchableMembers} ownMember={null} canManage={false} />,
+  );
+  fireEvent.change(screen.getByRole('searchbox', { name: 'Search members' }), {
+    target: { value: 'Morgan Alex' },
+  });
+  expect(screen.getByText('No members match your search')).toBeVisible();
+});
+
 it.each(['', '   '])('shows all members for an empty or whitespace-only search (%j)', (value) => {
   render(
     <RosterTable season={season} members={searchableMembers} ownMember={null} canManage={false} />,
