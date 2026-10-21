@@ -6,7 +6,7 @@
 
 **Architecture:** Move admission to Discord user OAuth. Run Necord in a separately created Nest application context inside the API process so the HTTP application can open and close the bot context. Persist desired state and an encrypted token in PostgreSQL; guard settings routes with Nest session and Team Admin guards.
 
-**Tech Stack:** NestJS 12, Better Auth 1.7.4, Discord OAuth2 and discord.js 14, Necord 7, Drizzle/PostgreSQL, Next.js 16, Vitest, Jest, Docker Compose.
+**Tech Stack:** NestJS 12, Better Auth 1.7.4, Discord OAuth2 and discord.js 14, Necord 7, Drizzle/PostgreSQL, Next.js 16, Vitest, Jest.
 
 **Spec:** `docs/superpowers/specs/2026-10-20-optional-discord-bot-design.md`
 
@@ -19,6 +19,8 @@
 - A bot connection failure must never stop the HTTP API. The token must never appear in read responses, logs, errors, or rendered page data.
 - Use the existing effective `team_admin` season permission, not Better Auth's global `user.role`. Protect API routes server-side; UI hiding is supplementary.
 - Keep the bot in the API deployment for this stack. Do not give the API a Docker socket or add a separate bot sidecar.
+- Do not add production Compose files, Dockerfiles, or other container packaging in this stack.
+- Use existing shadcn primitives for the portal. Install missing primitives with the repository's configured shadcn CLI; do not hand-build a switch, input, label, or other primitive.
 - Node.js is `>=20.19`, pnpm is `12.10.0`. Run `pnpm test` and `pnpm check-types` from the repository root. No migrations or database resets in worktree setup.
 
 ## Review Focus
@@ -40,8 +42,8 @@
 | 2: state | `apps/api/src/database/schema/bot-settings.ts`, generated `apps/api/drizzle/*`, `apps/api/src/bot/bot-settings.store.ts`, `apps/api/src/bot/bot-token-cipher.ts` | Persist one desired-enabled flag and a write-only encrypted token. |
 | 2: runtime | `apps/api/src/bot/discord-commands.module.ts`, `apps/api/src/bot/bot-context.module.ts`, `apps/api/src/bot/bot-context.factory.ts`, `apps/api/src/bot/bot-runtime.service.ts`, `apps/api/src/bot/bot.module.ts`, `apps/api/src/app.module.ts`, `apps/api/src/attendance/attendance.module.ts`, `apps/api/src/lifecycle/lifecycle.module.ts` | Keep Necord and command providers in an independently closable Nest context; reconcile saved state. |
 | 2: access | `apps/api/src/access/session.guard.ts`, `apps/api/src/access/team-admin.guard.ts`, `apps/api/src/bot/bot.controller.ts`, `apps/api/src/bot/bot.dto.ts`, module/test files | Authenticate with Better Auth, authorize with the effective Team Admin role, validate requests, and expose safe status/mutations. |
-| 3: portal | `apps/dashboard/app/settings/bot/page.tsx`, `apps/dashboard/app/settings/bot/BotSettings.tsx`, `apps/dashboard/lib/bot-settings.ts`, `apps/dashboard/next.config.js`, dashboard navigation/tests | Give Team Admins the token and switch controls with observed status. |
-| 3: deployment | `apps/api/Dockerfile`, `apps/dashboard/Dockerfile`, `.dockerignore`, `docker-compose.prod.yaml`, `scripts/check-prod-compose.sh`, `apps/api/README.md`, `docs/development/worktrees.md` | Make the API/dashboard/postgres VPS deployment concrete and document local bot-free setup and key backup. |
+| 3: portal | `apps/dashboard/app/settings/bot/page.tsx`, `apps/dashboard/app/settings/bot/BotSettings.tsx`, `apps/dashboard/lib/bot-settings.ts`, `apps/dashboard/components/ui/{switch,input,label}.tsx`, `apps/dashboard/next.config.js`, dashboard navigation/tests | Give Team Admins the token and switch controls with observed status, using shadcn primitives. |
+| 3: operating docs | `apps/api/.env.example`, `apps/api/README.md`, `docs/development/worktrees.md`, root `README.md` | Document local bot-free setup, VPS settings, and encryption-key backup. |
 
 Use one `codex/` branch per PR, stacked in that order. PR 1 targets current main; PR 2 targets PR 1; PR 3 targets PR 2. Include the approved spec and this plan in PR 1. Do not commit copied `.env` files. Each task below ends with a focused commit; PR boundaries are review gates.
 
@@ -111,31 +113,29 @@ For the new HTTP surface, follow Nest's documented guard pattern: DI-provided `C
 - [ ] **Step 4: Verify PR 2.** Run `pnpm test` and `pnpm check-types` from the repo root; both pass. Review the migration SQL and test that the API starts without Discord.
 - [ ] **Step 5: Commit and open PR 2.** Commit `feat(bot): guard admin bot settings API` and open PR 2 against PR 1.
 
-## PR 3 — Portal and VPS operation
+## PR 3 — Portal and operating guidance
 
 ### Task 6: Build the Team Admin portal control
 
-**Files:** Create `apps/dashboard/app/settings/bot/page.tsx`, `apps/dashboard/app/settings/bot/BotSettings.tsx`, `apps/dashboard/lib/bot-settings.ts`, component tests; modify `apps/dashboard/next.config.js` and dashboard navigation.
+**Files:** Create `apps/dashboard/app/settings/bot/page.tsx`, `apps/dashboard/app/settings/bot/BotSettings.tsx`, `apps/dashboard/lib/bot-settings.ts`, component tests; install shadcn `apps/dashboard/components/ui/switch.tsx`, `input.tsx`, and `label.tsx`; modify `apps/dashboard/next.config.js` and dashboard navigation.
 
 **Interfaces:** `getBotStatus():Promise<BotStatus|null>` forwards the session cookie server-side with `cache:'no-store'`. The client calls same-origin `/api/settings/bot/token` and `/api/settings/bot/enabled`; Next rewrites those paths to the private API. The page requires a session and an API-authorized status response; a 403 gets a neutral no-access view. The token input is write-only and clears after save. Render desired on/off separately from observed connection and poll while connecting/failed, stopping when the page unmounts.
 
-- [ ] **Step 1: Write failing tests.** A Team Admin sees configured/unconfigured and connection states; saving a token does not turn the bot on; enabling after token save shows connecting/connected or failed; disabling shows off; nonadmins cannot reach controls; the saved token never appears in rendered HTML, input value, or status fetch data; duplicate clicks do not issue duplicate writes.
+- [ ] **Step 1: Write failing tests.** A Team Admin sees configured/unconfigured and connection states; saving a token does not turn the bot on; enabling after token save shows connecting/connected or failed; disabling shows off; nonadmins cannot reach controls; the saved token never appears in rendered HTML, input value, or status fetch data; duplicate clicks do not issue duplicate writes; the shadcn switch has an accessible label and supports keyboard activation.
 - [ ] **Step 2: Run the focused tests to see the failure.** Run `pnpm --filter web test -- BotSettings.test.tsx`; expect the new tests to fail.
-- [ ] **Step 3: Implement page, client control, server fetch, navigation, and rewrite.** Keep permission enforcement in the API guards from Task 5. Present a failed connection with a retry action that reapplies the saved enabled setting; never display raw Discord error text.
-- [ ] **Step 4: Rerun focused tests and type checks.** Focused tests and `pnpm check-types` pass.
-- [ ] **Step 5: Commit.** Stage only Task 6 files and commit `feat(portal): manage interactive Discord bot`.
+- [ ] **Step 3: Install the missing primitives.** Run `pnpm --filter web exec shadcn add switch input label` using `apps/dashboard/components.json`; check that the generated components land under `apps/dashboard/components/ui/`.
+- [ ] **Step 4: Implement the page.** Reuse the installed Button, Card, Alert, Switch, Input, and Label components. Add the client control, server fetch, navigation, and rewrite. Keep permission enforcement in the API guards from Task 5. Present a failed connection with a retry action that reapplies the saved enabled setting; never display raw Discord error text.
+- [ ] **Step 5: Rerun focused tests and type checks.** Focused tests and `pnpm check-types` pass.
+- [ ] **Step 6: Commit.** Stage only Task 6 files and commit `feat(portal): manage interactive Discord bot`.
 
-### Task 7: Make local and VPS operation reproducible
+### Task 7: Document local and VPS settings
 
-**Files:** Create `apps/api/Dockerfile`, `apps/dashboard/Dockerfile`, `.dockerignore`, `docker-compose.prod.yaml`, `scripts/check-prod-compose.sh`; modify `apps/api/.env.example`, `apps/api/README.md`, `docs/development/worktrees.md`, and root `README.md` as needed.
+**Files:** Modify `apps/api/.env.example`, `apps/api/README.md`, `docs/development/worktrees.md`, and root `README.md` as needed.
 
-**Interfaces:** A production Compose project runs PostgreSQL, API, and dashboard on one VPS, with no separate bot service. The API receives OAuth settings, `DISCORD_GUILD_ID`, optional `DISCORD_DEVELOPMENT_GUILD_ID`, and `BOT_SETTINGS_ENCRYPTION_KEY` through deployment secrets/environment; the dashboard reaches the API on the private network. The portal switch is the interactive bot's on/off source of truth. Document manual migration as a deployment step, never as worktree setup or an automatic database reset.
-
-- [ ] **Step 1: Write the deployment check.** In `scripts/check-prod-compose.sh`, run `docker compose -f docker-compose.prod.yaml config` with example nonsecret placeholders and assert API/dashboard/postgres services and no bot service. Record local `pnpm dev` with no `DISCORD_TOKEN` and no `DISCORD_ADMISSION_BOT_TOKEN` as a required smoke check.
-- [ ] **Step 2: Run the check to see the failure.** Compose config fails before the new file exists.
-- [ ] **Step 3: Add container definitions and documentation.** Pin a Node image compatible with `>=20.19` and pnpm 12.10.0; build from the monorepo root so workspace packages resolve. Remove obsolete interactive `DISCORD_TOKEN` startup configuration and docs. Explain encrypted-token key backup/rotation consequences, first-admin bootstrap, production command registration without a development guild ID, the default-off state, last-setting restoration, and how a failed bot connection leaves the portal usable.
-- [ ] **Step 4: Verify PR 3.** Run the Compose config check, `pnpm test`, and `pnpm check-types` from the repo root. If Docker is available, build both images; do not start or stop another worktree's servers or run destructive DB commands.
-- [ ] **Step 5: Commit and open PR 3.** Commit `docs(deploy): run Basecamp with optional bot` and open PR 3 against PR 2. Review each PR's diff separately; rebase and retest descendants if a lower PR changes.
+- [ ] **Step 1: Update the configuration examples and operating docs.** Remove obsolete interactive `DISCORD_TOKEN` startup configuration and docs. Explain local `pnpm dev` without `DISCORD_TOKEN` or `DISCORD_ADMISSION_BOT_TOKEN`, the VPS environment settings for the existing API/portal deployment, encrypted-token key backup/rotation consequences, first-admin bootstrap, production command registration without a development guild ID, the default-off state, last-setting restoration, and how a failed bot connection leaves the portal usable.
+- [ ] **Step 2: Check the documented bot-free startup.** Run `pnpm dev` without the two bot tokens and confirm the API and dashboard start while the bot stays off. Do not stop another worktree's servers or run destructive DB commands.
+- [ ] **Step 3: Verify PR 3.** Run `pnpm test` and `pnpm check-types` from the repo root; both pass. Check the docs against the final environment validation and settings UI.
+- [ ] **Step 4: Commit and open PR 3.** Commit `docs: explain optional bot operation` and open PR 3 against PR 2. Review each PR's diff separately; rebase and retest descendants if a lower PR changes.
 
 ## Final handoff
 

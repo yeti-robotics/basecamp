@@ -13,7 +13,7 @@ This work is a stack of manageable pull requests. The first removes the bot cred
 - A fresh installation starts with the interactive bot off. Saving a token alone leaves it off. After an administrator changes the setting, every API restart restores that last saved on/off setting and attempts to connect if it was on. A Team Admin can change the live Discord connection from the portal without an API restart.
 - A Team Admin can enter or replace the interactive bot token in the portal. The portal shows whether a token is configured and whether the bot is connected, connecting, disconnected, or failed; it never returns the token value.
 - A failed connection or bad token leaves the API and portal running and gives the Team Admin a useful status. Turning the bot off makes its Discord commands unavailable promptly.
-- The setup and deployment documentation explains local bot-free development and a single-VPS installation. A separate bot container remains possible later, but is not required by this stack.
+- The setup documentation explains local bot-free development and the settings needed when running the existing API and portal on a VPS. A separate bot container remains possible later, but is not required by this stack.
 
 ## Non-goals and anti-goals
 
@@ -21,11 +21,12 @@ This work is a stack of manageable pull requests. The first removes the bot cred
 - Configurable authentication providers and management of the Discord OAuth client ID or secret in the portal are out of scope.
 - The development guild ID is an environment/development setting, not a portal secret. The team admission guild ID remains an installation setting.
 - No Docker socket access or container lifecycle controls are exposed to the API or portal merely to operate the switch.
+- Production Compose files and new container packaging are outside this stack.
 - Do not allow a bot startup failure to prevent the HTTP API from serving requests. Do not expose a bot token through read APIs, logs, errors, audit events, or client-rendered page data.
 
 ## Current repository state
 
-The design is based on `origin/main` at `1c48ff8`. The API currently includes `NecordModule.forRoot` only when `DISCORD_TOKEN` and `DISCORD_DEVELOPMENT_GUILD_ID` are both present at process startup. This makes local bot startup optional already, but does not provide a runtime switch. The interactive command providers live inside the attendance and lifecycle modules. `docker-compose.yaml` currently runs only PostgreSQL; it is not yet a complete VPS Compose deployment.
+The design is based on `origin/main` at `1c48ff8`. The API currently includes `NecordModule.forRoot` only when `DISCORD_TOKEN` and `DISCORD_DEVELOPMENT_GUILD_ID` are both present at process startup. This makes local bot startup optional already, but does not provide a runtime switch. The interactive command providers live inside the attendance and lifecycle modules. `docker-compose.yaml` currently runs only PostgreSQL.
 
 The newer main branch already has Discord admission, Team Admin season roles, first-admin bootstrap, and an admin recovery command. Admission currently calls Discord's guild-member API with `DISCORD_ADMISSION_BOT_TOKEN`, so disabling the interactive bot does not eliminate dependence on a bot credential. The portal has season and roster management but no installation settings page. The existing facility display and `/signin` and `/signout` Discord commands remain as they are until the later portal attendance work.
 
@@ -53,15 +54,17 @@ Use Basecamp's existing effective `team_admin` season-role authorization, includ
 
 The Team Admin portal surface shows the bot's desired setting and observed connection state, whether a token is configured, an action to replace it, and a switch to enable/disable the bot. It must communicate failures without echoing Discord credentials. Changes should be idempotent and avoid duplicate bot connections if two administrators act close together. The builder may settle the exact page location and UI wording.
 
+Use the dashboard's configured shadcn component library for portal primitives. Install any missing switch, input, label, or similar primitive through shadcn instead of hand-building a replacement.
+
 ### Deployment and local development
 
-The API and dashboard remain available with the bot disabled. Local startup through `pnpm dev` should work without an interactive bot token. The repository's current Compose file only provisions PostgreSQL; this stack should document a practical VPS deployment and may add service definitions if they make that deployment concrete, but does not need an optional sidecar to satisfy the live switch. If a future deployment splits the bot into a process or container, it should consume the same persisted desired state and token rather than requiring Docker control from the portal.
+The API and dashboard remain available with the bot disabled. Local startup through `pnpm dev` should work without an interactive bot token. Document the required settings and bot behavior for an existing VPS deployment, without adding production Compose or container build files. If a future deployment splits the bot into a process or container, it should consume the same persisted desired state and token rather than requiring Docker control from the portal.
 
 ## PR boundaries
 
 1. **OAuth admission:** replace bot-token membership checks at sign-in and season self-joining, migrate configuration and docs, and prove admitted/nonmember/unavailable behavior. Portal and bot runtime otherwise remain as they are.
 2. **Controllable bot runtime:** isolate bot startup from HTTP startup; default a new installation to off, restore its saved setting on later starts, persist desired state and encrypted token, and expose narrow server-side settings and observed status guarded by Team Admin authorization. The exact division of API and UI work between PRs 2 and 3 may be adjusted for reviewability.
-3. **Admin portal and deployment guidance:** add the token and switch interface, surface live/failed states, and document local and VPS operation. Remove obsolete interactive-bot environment settings after their replacement is usable.
+3. **Admin portal and operating guidance:** add the token and switch interface, surface live/failed states, and document local and VPS settings. Remove obsolete interactive-bot environment settings after their replacement is usable.
 
 Tests should cover the authorization boundary, OAuth admission and failure behavior, fresh-install default-off and saved-setting restoration after restart, connect/disconnect/reconnect behavior, token non-disclosure, and HTTP availability when Discord fails. The implementation plan can choose specific tests and sequence within these boundaries.
 
