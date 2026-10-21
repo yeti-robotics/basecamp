@@ -5,6 +5,7 @@ import {
   AttendanceCreate,
   AttendanceUpdate,
   AttendanceRepository,
+  getRequirementStatus,
 } from "./attendance.repository.js";
 
 describe("AttendanceRepository", () => {
@@ -339,5 +340,47 @@ describe("AttendanceRepository", () => {
     it("is exposed by the repository", () => {
       expect(repository.getCurrentHourRequirements).toBeTypeOf("function");
     });
+  });
+});
+
+describe("getRequirementStatus", () => {
+  it("uses rookie experience even when legacy status says veteran", () => {
+    expect(
+      getRequirementStatus({
+        role: "student",
+        student_experience: "rookie",
+        legacy_status: "veteran",
+      }),
+    ).toBe("rookie");
+  });
+
+  it("uses veteran experience even when legacy status says rookie", () => {
+    expect(
+      getRequirementStatus({
+        role: "student_leader",
+        student_experience: "veteran",
+        legacy_status: "rookie",
+      }),
+    ).toBe("veteran");
+  });
+
+  it("uses mentor status for mentors despite a legacy student status", () => {
+    expect(
+      getRequirementStatus({
+        role: "mentor",
+        student_experience: null,
+        legacy_status: "rookie",
+      }),
+    ).toBe("mentor");
+  });
+
+  it("uses mentor status for team admins despite a legacy student status", () => {
+    expect(
+      getRequirementStatus({
+        role: "team_admin",
+        student_experience: null,
+        legacy_status: "veteran",
+      }),
+    ).toBe("mentor");
   });
 });
