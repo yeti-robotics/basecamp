@@ -56,11 +56,11 @@ For the new HTTP surface, follow Nest's documented guard pattern: DI-provided `C
 
 **Interfaces:** Produce `DiscordAdmissionService.verify(accessToken: string, discordId: string): Promise<'allowed' | 'denied' | 'unavailable'>`. In the Discord provider, request `guilds.members.read`; custom `getUserInfo(tokens)` fetches `/users/@me`, calls `verify` with the same user token and profile ID, and passes the result in server-fetched profile data to the existing `validateUserInfo` gate. Preserve the current profile name/image and phone-only email mapping.
 
-- [ ] **Step 1: Write failing tests.** Assert `GET /users/@me/guilds/{DISCORD_GUILD_ID}/member` uses `Bearer <user token>`; valid matching member allows `create-user`, `sign-in`, and `link-account`; 404 denies; 401/403, missing scope, timeout, mismatched ID, and malformed JSON return unavailable; no rejected callback creates a user or session. Assert the authorization URL requests `guilds.members.read` and never `bot`.
-- [ ] **Step 2: Run the focused tests to see the failure.** Run `pnpm --filter api test -- src/auth/discord-admission.service.spec.ts src/auth/auth.module.spec.ts` and `pnpm --filter api test:e2e -- discord-oauth-admission.e2e-spec.ts`; expect the new assertions to fail against bot-token admission.
-- [ ] **Step 3: Implement the interface.** Use the installed Better Auth 1.7.4 `getUserInfo` and `validateUserInfo` hooks. Keep the verified admission marker server-created and scoped to this callback; never derive it from email or a client parameter. A missing scope must produce an explicit reauthorization message. Retain the suspended-account gate.
-- [ ] **Step 4: Rerun the focused tests.** Both commands above pass.
-- [ ] **Step 5: Commit.** Stage only Task 1 files and commit `feat(auth): verify Discord admission with user OAuth`.
+- [x] **Step 1: Write failing tests.** Assert `GET /users/@me/guilds/{DISCORD_GUILD_ID}/member` uses `Bearer <user token>`; valid matching member allows `create-user`, `sign-in`, and `link-account`; 404 denies; 401/403, missing scope, timeout, mismatched ID, and malformed JSON return unavailable; no rejected callback creates a user or session. Assert the authorization URL requests `guilds.members.read` and never `bot`.
+- [x] **Step 2: Run the focused tests to see the failure.** Run `pnpm --filter api test -- src/auth/discord-admission.service.spec.ts src/auth/auth.module.spec.ts` and `pnpm --filter api test:e2e -- discord-oauth-admission.e2e-spec.ts`; expect the new assertions to fail against bot-token admission.
+- [x] **Step 3: Implement the interface.** Use the installed Better Auth 1.7.4 `getUserInfo` and `validateUserInfo` hooks. Keep the verified admission marker server-created and scoped to this callback; never derive it from email or a client parameter. A missing scope must produce an explicit reauthorization message. Retain the suspended-account gate.
+- [x] **Step 4: Rerun the focused tests.** Both commands above pass.
+- [x] **Step 5: Commit.** Stage only Task 1 files and commit `feat(auth): verify Discord admission with user OAuth` (`7eedc7c`).
 
 ### Task 2: Recheck linked accounts without a bot token
 
@@ -68,11 +68,11 @@ For the new HTTP surface, follow Nest's documented guard pattern: DI-provided `C
 
 **Interfaces:** Produce `LinkedDiscordAdmissionService.verifyLinked(userId: string, discordId: string): Promise<'allowed' | 'denied' | 'unavailable'>`. Select the exact Better Auth `account.id` linked to `(userId, providerId='discord', accountId=discordId)`, call server-side `auth.api.getAccessToken({body:{accountId,userId}})` so Better Auth can refresh it, then call Task 1's `verify(accessToken, discordId)`. A missing account/token/refresh or Discord error is unavailable. Place this service in a module importing `AuthModule` and `DatabaseModule`; do not inject `AUTH` into `DiscordAdmissionService` and create a provider cycle.
 
-- [ ] **Step 1: Write failing tests.** The bootstrap configured Discord ID and a member crossing seasons succeed with a valid linked user token. A revoked/unrefreshable token adds no season membership; a nonmember is denied; an unrelated account ID cannot be used. Existing membership remains readable during an outage. Env validation accepts startup without `DISCORD_ADMISSION_BOT_TOKEN`.
-- [ ] **Step 2: Run the focused tests to see the failure.** Run `pnpm --filter api test -- src/access/bootstrap.service.spec.ts src/roster/roster.service.spec.ts src/env.validation.spec.ts`; expect the new tests to fail.
-- [ ] **Step 3: Implement the interface and update callers.** Preserve the existing 403 vs 503 admission meaning. Remove required admission-bot-token config and docs. Keep OAuth client credentials and `DISCORD_GUILD_ID` required.
-- [ ] **Step 4: Verify PR 1.** Run `pnpm test` and `pnpm check-types` from the repo root; both pass. Review auth callback behavior with both a new and returning account.
-- [ ] **Step 5: Commit and open PR 1.** Commit Task 2 as `feat(auth): recheck roster admission with linked OAuth` and open PR 1 with the spec and plan. Do not start PR 2 until PR 1 is reviewable.
+- [x] **Step 1: Write failing tests.** The bootstrap configured Discord ID and a member crossing seasons succeed with a valid linked user token. A revoked/unrefreshable token adds no season membership; a nonmember is denied; an unrelated account ID cannot be used. Existing membership remains readable during an outage. Env validation accepts startup without `DISCORD_ADMISSION_BOT_TOKEN`.
+- [x] **Step 2: Run the focused tests to see the failure.** Run `pnpm --filter api test -- src/access/bootstrap.service.spec.ts src/roster/roster.service.spec.ts src/env.validation.spec.ts`; expect the new tests to fail.
+- [x] **Step 3: Implement the interface and update callers.** Preserve the existing 403 vs 503 admission meaning. Remove required admission-bot-token config and docs. Keep OAuth client credentials and `DISCORD_GUILD_ID` required.
+- [x] **Step 4: Verify PR 1.** Run `pnpm test` and `pnpm check-types` from the repo root; both pass. Review auth callback behavior with both a new and returning account. `pnpm --filter api build` passes.
+- [x] **Step 5: Commit and open PR 1.** Commit Task 2 as `feat(auth): recheck roster admission with linked OAuth` (`0e8ab59`) and open [PR 1](https://github.com/yeti-robotics/basecamp/pull/37) with the spec and plan. Do not start PR 2 until PR 1 is reviewable.
 
 ## PR 2 — Controllable Nest bot runtime
 

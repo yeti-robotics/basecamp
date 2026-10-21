@@ -27,7 +27,7 @@ This work is a stack of manageable pull requests. The first removes the bot cred
 
 The design is based on `origin/main` at `1c48ff8`. The API currently includes `NecordModule.forRoot` only when `DISCORD_TOKEN` and `DISCORD_DEVELOPMENT_GUILD_ID` are both present at process startup. This makes local bot startup optional already, but does not provide a runtime switch. The interactive command providers live inside the attendance and lifecycle modules.
 
-The newer main branch already has Discord admission, Team Admin season roles, first-admin bootstrap, and an admin recovery command. Admission currently calls Discord's guild-member API with `DISCORD_ADMISSION_BOT_TOKEN`, so disabling the interactive bot does not eliminate dependence on a bot credential. The portal has season and roster management but no installation settings page. The existing facility display and `/signin` and `/signout` Discord commands remain as they are until the later portal attendance work.
+At planning time, the newer main branch already had Discord admission, Team Admin season roles, first-admin bootstrap, and an admin recovery command. Admission called Discord's guild-member API with `DISCORD_ADMISSION_BOT_TOKEN`, so disabling the interactive bot did not eliminate dependence on a bot credential. PR 1 migrates admission to the linked user's OAuth token. The portal has season and roster management but no installation settings page. The existing facility display and `/signin` and `/signout` Discord commands remain as they are until the later portal attendance work.
 
 ## Decisions and behavior
 
