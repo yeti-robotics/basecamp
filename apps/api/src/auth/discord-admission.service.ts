@@ -12,17 +12,25 @@ export class DiscordAdmissionService {
     private readonly timeoutMs = 5_000,
   ) {}
 
-  async verify(discordId: string): Promise<DiscordAdmissionResult> {
+  async verify(accessToken: string, discordId: string): Promise<DiscordAdmissionResult> {
     if (!snowflakePattern.test(discordId)) return 'denied';
+    if (!accessToken.trim()) return 'unavailable';
 
     const guildId = this.config.get<string>('DISCORD_GUILD_ID')?.trim();
-    const token = this.config.get<string>('DISCORD_ADMISSION_BOT_TOKEN')?.trim();
-    if (!guildId || !snowflakePattern.test(guildId) || !token) return 'unavailable';
+    if (!guildId || !snowflakePattern.test(guildId)) return 'unavailable';
 
-    const url = `https://discord.com/api/v10/guilds/${guildId}/members/${discordId}`;
+    const url = `https://discord.com/api/v10/users/@me/guilds/${guildId}/member`;
+    return this.checkMembership(url, `Bearer ${accessToken}`, discordId);
+  }
+
+  private async checkMembership(
+    url: string,
+    authorization: string,
+    discordId: string,
+  ): Promise<DiscordAdmissionResult> {
     try {
       const response = await this.fetcher(url, {
-        headers: { Authorization: `Bot ${token}` },
+        headers: { Authorization: authorization },
         signal: AbortSignal.timeout(this.timeoutMs),
       });
       if (response.status === 404) return 'denied';

@@ -17,7 +17,6 @@ const valid = {
   DISCORD_CLIENT_ID: 'client-id',
   DISCORD_CLIENT_SECRET: 'client-secret',
   DISCORD_GUILD_ID: '408711970305474560',
-  DISCORD_ADMISSION_BOT_TOKEN: 'admission-bot-token',
   BASECAMP_BOOTSTRAP_ADMIN_DISCORD_IDS: '123456789012345678, 234567890123456789',
   BASECAMP_TIME_ZONE: 'America/New_York',
 };
@@ -26,6 +25,13 @@ describe('API environment schema', () => {
   it('defaults the port and coerces an explicitly configured port', () => {
     expect(envSchema.parse(valid).PORT).toBe(8000);
     expect(envSchema.parse({ ...valid, PORT: '3001' }).PORT).toBe(3001);
+  });
+
+  it('does not require an admission bot token', () => {
+    expect(envSchema.safeParse(valid).success).toBe(true);
+    expect(
+      envSchema.safeParse({ ...valid, DISCORD_ADMISSION_BOT_TOKEN: 'obsolete-token' }).success,
+    ).toBe(true);
   });
 
   it('accepts Discord bot configuration when both settings are present or absent', () => {
@@ -62,7 +68,6 @@ describe('API environment schema', () => {
     ['DISCORD_CLIENT_SECRET', ''],
     ['DISCORD_GUILD_ID', 'guild-id'],
     ['DISCORD_GUILD_ID', '12345678901234567x'],
-    ['DISCORD_ADMISSION_BOT_TOKEN', ' '],
     ['BASECAMP_BOOTSTRAP_ADMIN_DISCORD_IDS', 'not-a-snowflake'],
     ['BASECAMP_TIME_ZONE', 'Mars/Olympus'],
     ['PORT', '0'],
@@ -92,7 +97,6 @@ describe('ConfigModule environment validation', () => {
     'DISCORD_CLIENT_ID',
     'DISCORD_CLIENT_SECRET',
     'DISCORD_GUILD_ID',
-    'DISCORD_ADMISSION_BOT_TOKEN',
     'BASECAMP_BOOTSTRAP_ADMIN_DISCORD_IDS',
     'BASECAMP_TIME_ZONE',
     'DISCORD_TOKEN',
@@ -114,7 +118,6 @@ describe('ConfigModule environment validation', () => {
       DISCORD_CLIENT_ID: 'client-id',
       DISCORD_CLIENT_SECRET: 'client-secret',
       DISCORD_GUILD_ID: '408711970305474560',
-      DISCORD_ADMISSION_BOT_TOKEN: 'admission-bot-token',
       BASECAMP_BOOTSTRAP_ADMIN_DISCORD_IDS: '123456789012345678',
       BASECAMP_TIME_ZONE: 'America/New_York',
     });
