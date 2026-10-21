@@ -70,7 +70,7 @@ export function createAuth(
       discord: {
         clientId,
         clientSecret,
-        scope: ['guilds.members.read'],
+        scope: ['identify', 'email', 'guilds.members.read'],
         mapProfileToUser: mapDiscordProfileToUser,
         getUserInfo: async (tokens) => {
           const accessToken = tokens.accessToken?.trim();

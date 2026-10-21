@@ -1,5 +1,6 @@
 import { BadRequestException, type INestApplicationContext } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { ActivityType } from 'discord.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { BotContextFactory } from './bot-context.factory.js';
 import { BotRuntimeService } from './bot-runtime.service.js';
@@ -14,11 +15,12 @@ function makeContext() {
 }
 
 describe('BotRuntimeService', () => {
-  let settings: { enabled: boolean; tokenCiphertext: string | null };
+  let settings: { enabled: boolean; tokenCiphertext: string | null; statusMessage: string };
   let store: {
     load: ReturnType<typeof vi.fn>;
     setEnabled: ReturnType<typeof vi.fn>;
     setToken: ReturnType<typeof vi.fn>;
+    setStatusMessage: ReturnType<typeof vi.fn>;
   };
   let cipher: { encrypt: ReturnType<typeof vi.fn>; decrypt: ReturnType<typeof vi.fn> };
   let factory: { start: ReturnType<typeof vi.fn> };
@@ -37,7 +39,11 @@ describe('BotRuntimeService', () => {
   }
 
   beforeEach(() => {
-    settings = { enabled: false, tokenCiphertext: null };
+    settings = {
+      enabled: false,
+      tokenCiphertext: null,
+      statusMessage: 'YETI ARE YOU READY?',
+    };
     store = {
       load: vi.fn(async () => ({ ...settings })),
       setEnabled: vi.fn(async (enabled: boolean) => {
@@ -45,6 +51,9 @@ describe('BotRuntimeService', () => {
       }),
       setToken: vi.fn(async (value: string) => {
         settings.tokenCiphertext = value;
+      }),
+      setStatusMessage: vi.fn(async (value: string) => {
+        settings.statusMessage = value;
       }),
     };
     cipher = {
@@ -68,7 +77,35 @@ describe('BotRuntimeService', () => {
       desiredEnabled: false,
       tokenConfigured: false,
       connection: 'off',
+      statusMessage: 'YETI ARE YOU READY?',
     });
+  });
+
+  it('saves a trimmed status message and updates a connected bot immediately', async () => {
+    const setActivity = vi.fn();
+    const context = {
+      close: vi.fn().mockResolvedValue(undefined),
+      get: vi.fn(() => ({ user: { setActivity } })),
+    } as unknown as INestApplicationContext;
+    factory.start.mockResolvedValue(context);
+    const service = makeService();
+    await service.onApplicationBootstrap();
+    await service.replaceToken(token);
+    await service.setEnabled(true);
+
+    await service.setStatusMessage('  Scrimmage tonight  ');
+
+    expect(store.setStatusMessage).toHaveBeenCalledWith('Scrimmage tonight');
+    expect(setActivity).toHaveBeenCalledWith('Scrimmage tonight', { type: ActivityType.Custom });
+    await expect(service.status()).resolves.toMatchObject({ statusMessage: 'Scrimmage tonight' });
+  });
+
+  it('rejects a blank status message before storing it', async () => {
+    const service = makeService();
+    await service.onApplicationBootstrap();
+
+    await expect(service.setStatusMessage('   ')).rejects.toBeInstanceOf(BadRequestException);
+    expect(store.setStatusMessage).not.toHaveBeenCalled();
   });
 
   it('keeps a saved disabled state off after restart even with a token configured', async () => {
@@ -92,7 +129,12 @@ describe('BotRuntimeService', () => {
     await flushStartup();
 
     expect(factory.start).toHaveBeenCalledOnce();
-    expect(factory.start).toHaveBeenCalledWith(token, 'dev-guild', expect.any(AbortSignal));
+    expect(factory.start).toHaveBeenCalledWith(
+      token,
+      'dev-guild',
+      expect.any(AbortSignal),
+      expect.any(Function),
+    );
     await expect(service.status()).resolves.toMatchObject({ connection: 'connected' });
   });
 
@@ -141,6 +183,7 @@ describe('BotRuntimeService', () => {
       'new-token',
       'dev-guild',
       expect.any(AbortSignal),
+      expect.any(Function),
     );
     await expect(service.status()).resolves.toMatchObject({ connection: 'connected' });
   });
@@ -214,6 +257,30 @@ describe('BotRuntimeService', () => {
     expect(factory.start).toHaveBeenCalledTimes(2);
   });
 
+  it('stops and reports a failed runtime after an async Discord client error', async () => {
+    const context = makeContext();
+    let reportClientError!: () => void;
+    factory.start.mockImplementationOnce(
+      (_token: string, _guildId: string | undefined, _signal: AbortSignal, onError: () => void) => {
+        reportClientError = onError;
+        return Promise.resolve(context);
+      },
+    );
+    const service = makeService();
+    await service.replaceToken(token);
+    await service.setEnabled(true);
+
+    reportClientError();
+    await vi.waitFor(async () => {
+      await expect(service.status()).resolves.toMatchObject({
+        desiredEnabled: true,
+        connection: 'failed',
+        message: 'Discord bot encountered an error and was stopped',
+      });
+      expect(context.close).toHaveBeenCalledOnce();
+    });
+  });
+
   it('supports production configuration without a development guild ID', async () => {
     settings = { enabled: true, tokenCiphertext: ciphertext };
     const service = new BotRuntimeService(
@@ -225,7 +292,12 @@ describe('BotRuntimeService', () => {
     await service.onApplicationBootstrap();
     await flushStartup();
 
-    expect(factory.start).toHaveBeenCalledWith(token, undefined, expect.any(AbortSignal));
+    expect(factory.start).toHaveBeenCalledWith(
+      token,
+      undefined,
+      expect.any(AbortSignal),
+      expect.any(Function),
+    );
     await expect(service.status()).resolves.toMatchObject({ connection: 'connected' });
   });
 

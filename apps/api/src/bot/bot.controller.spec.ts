@@ -20,6 +20,10 @@ describe('BotController', () => {
       status: vi.fn().mockResolvedValue(status),
       replaceToken: vi.fn().mockResolvedValue(status),
       setEnabled: vi.fn().mockResolvedValue(status),
+      setStatusMessage: vi.fn().mockResolvedValue({
+        ...status,
+        statusMessage: 'Scrimmage tonight',
+      }),
     } as unknown as BotRuntimeService;
     const controller = new BotController(runtime);
     const tokenResponse = { setHeader: vi.fn() };
@@ -33,6 +37,10 @@ describe('BotController', () => {
     ).resolves.toEqual(status);
     expect(runtime.replaceToken).toHaveBeenCalledWith('secret-token');
     expect(runtime.setEnabled).toHaveBeenCalledWith(false);
+    await expect(
+      controller.setStatusMessage({ statusMessage: 'Scrimmage tonight' }),
+    ).resolves.toMatchObject({ statusMessage: 'Scrimmage tonight' });
+    expect(runtime.setStatusMessage).toHaveBeenCalledWith('Scrimmage tonight');
     expect(JSON.stringify([status, tokenResponse, enabledResponse])).not.toContain('secret-token');
   });
 });

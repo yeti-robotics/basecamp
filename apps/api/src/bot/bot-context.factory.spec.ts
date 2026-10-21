@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import { EventEmitter } from 'node:events';
 import { MODULE_METADATA } from '@nestjs/common/constants';
 import { NestFactory } from '@nestjs/core';
 import { Client } from 'discord.js';
@@ -14,14 +15,15 @@ vi.mock('@nestjs/core', async (importOriginal) => {
 describe('BotContextFactory', () => {
   const login = vi.fn();
   const close = vi.fn();
-  const context = { get: vi.fn(() => ({ login })), close };
+  const client = Object.assign(new EventEmitter(), { login });
+  const context = { get: vi.fn(() => client), close };
   let factory: BotContextFactory;
 
   beforeEach(() => {
     vi.clearAllMocks();
     login.mockResolvedValue('token');
     close.mockResolvedValue(undefined);
-    context.get.mockImplementation((token) => (token === Client ? { login } : undefined));
+    context.get.mockImplementation((token) => (token === Client ? client : undefined));
     vi.mocked(NestFactory.createApplicationContext).mockResolvedValue(context as never);
     factory = new BotContextFactory();
   });
@@ -46,15 +48,28 @@ describe('BotContextFactory', () => {
   });
 
   it('closes a partially initialized context when startup is cancelled', async () => {
-    login.mockImplementationOnce(() => new Promise(() => undefined));
+    let finishLogin!: (token: string) => void;
+    login.mockImplementationOnce(() => new Promise((resolve) => (finishLogin = resolve)));
     const controller = new AbortController();
     const starting = factory.start('bot-token', undefined, controller.signal);
     await vi.waitFor(() => expect(login).toHaveBeenCalledOnce());
 
     controller.abort();
+    await Promise.resolve();
+    expect(close).not.toHaveBeenCalled();
+    finishLogin('bot-token');
 
     await expect(starting).rejects.toThrow('Discord bot startup was cancelled');
     expect(close).toHaveBeenCalledOnce();
+  });
+
+  it('contains client errors and reports them to the runtime', async () => {
+    const onError = vi.fn();
+    await factory.start('bot-token', undefined, undefined, onError);
+
+    client.emit('error', new Error('command registration failed'));
+
+    expect(onError).toHaveBeenCalledOnce();
   });
 
   it('passes a development guild when configured', async () => {

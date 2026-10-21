@@ -6,6 +6,7 @@ const status: BotStatus = {
   desiredEnabled: false,
   tokenConfigured: false,
   connection: 'off',
+  statusMessage: 'YETI ARE YOU READY?',
 };
 
 beforeEach(() => {
@@ -124,17 +125,28 @@ it('shows a safe failure state and retries with the saved setting', async () => 
     desiredEnabled: true,
     tokenConfigured: true,
     connection: 'connected' as const,
+    statusMessage: 'YETI ARE YOU READY?',
   };
   global.fetch = jest
     .fn()
     .mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ desiredEnabled: true, tokenConfigured: true, connection: 'failed' }),
+      json: async () => ({
+        desiredEnabled: true,
+        tokenConfigured: true,
+        connection: 'failed',
+        statusMessage: 'YETI ARE YOU READY?',
+      }),
     })
     .mockResolvedValue({ ok: true, json: async () => connected }) as jest.Mock;
   render(
     <BotSettings
-      initialStatus={{ desiredEnabled: true, tokenConfigured: true, connection: 'failed' }}
+      initialStatus={{
+        desiredEnabled: true,
+        tokenConfigured: true,
+        connection: 'failed',
+        statusMessage: 'YETI ARE YOU READY?',
+      }}
     />,
   );
   expect(screen.getByText('Discord could not connect')).toBeInTheDocument();
@@ -144,6 +156,30 @@ it('shows a safe failure state and retries with the saved setting', async () => 
     '/api/settings/bot/enabled',
     expect.objectContaining({ body: JSON.stringify({ enabled: true }) }),
   );
+});
+
+it('saves a custom Discord status message', async () => {
+  const saved = { ...status, statusMessage: 'Scrimmage tonight' };
+  global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => saved }) as jest.Mock;
+  render(<BotSettings initialStatus={{ ...status, statusMessage: 'YETI ARE YOU READY?' }} />);
+
+  const input = screen.getByLabelText('Status message');
+  expect(input).toHaveValue('YETI ARE YOU READY?');
+  fireEvent.change(input, { target: { value: '   ' } });
+  expect(screen.getByRole('button', { name: 'Save status message' })).toBeDisabled();
+  fireEvent.change(input, { target: { value: 'Scrimmage tonight' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Save status message' }));
+
+  await waitFor(() =>
+    expect(global.fetch).toHaveBeenCalledWith(
+      '/api/settings/bot/status-message',
+      expect.objectContaining({
+        method: 'PUT',
+        body: JSON.stringify({ statusMessage: 'Scrimmage tonight' }),
+      }),
+    ),
+  );
+  expect(input).toHaveValue('Scrimmage tonight');
 });
 
 it('supports keyboard use of the shadcn switch', () => {

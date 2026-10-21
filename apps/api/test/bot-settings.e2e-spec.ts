@@ -17,6 +17,7 @@ describe('Bot settings API (e2e)', () => {
   let runtimeStatus: Record<string, unknown>;
   const setEnabled = vi.fn();
   const replaceToken = vi.fn();
+  const setStatusMessage = vi.fn();
   const envKeys = [
     'DATABASE_URL',
     'BETTER_AUTH_SECRET',
@@ -81,6 +82,7 @@ describe('Bot settings API (e2e)', () => {
         status: vi.fn(async () => runtimeStatus),
         setEnabled,
         replaceToken,
+        setStatusMessage,
       })
       .overrideProvider(BotSettingsStore)
       .useValue({ load: async () => ({ enabled: false, tokenCiphertext: null }) })
@@ -179,5 +181,33 @@ describe('Bot settings API (e2e)', () => {
     expect(response.headers['cache-control']).toBe('private, no-store');
     expect(JSON.stringify(response.body)).not.toContain('plain-secret-token');
     expect(response.body).not.toHaveProperty('tokenCiphertext');
+  });
+
+  it('saves a status message and rejects a blank or oversized one', async () => {
+    setStatusMessage.mockImplementation(async (statusMessage: string) => {
+      runtimeStatus = { ...runtimeStatus, statusMessage };
+      return runtimeStatus;
+    });
+
+    const saved = await request(app.getHttpServer())
+      .put('/api/settings/bot/status-message')
+      .send({ statusMessage: 'Scrimmage tonight' })
+      .expect(200);
+    expect(saved.headers['cache-control']).toBe('private, no-store');
+    expect(setStatusMessage).toHaveBeenCalledWith('Scrimmage tonight');
+    expect(saved.body).toMatchObject({ statusMessage: 'Scrimmage tonight' });
+
+    await request(app.getHttpServer())
+      .put('/api/settings/bot/status-message')
+      .send({ statusMessage: '   ' })
+      .expect(400);
+    await request(app.getHttpServer())
+      .put('/api/settings/bot/status-message')
+      .send({ statusMessage: 'x'.repeat(129) })
+      .expect(400);
+    await request(app.getHttpServer())
+      .put('/api/settings/bot/status-message')
+      .send({ statusMessage: 'Scrimmage tonight', extra: true })
+      .expect(400);
   });
 });
