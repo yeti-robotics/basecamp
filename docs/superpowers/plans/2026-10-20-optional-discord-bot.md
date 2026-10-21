@@ -18,8 +18,7 @@
 - Admission must reject a known nonmember and fail closed on an uncertain Discord result before issuing a session or adding a season membership.
 - A bot connection failure must never stop the HTTP API. The token must never appear in read responses, logs, errors, or rendered page data.
 - Use the existing effective `team_admin` season permission, not Better Auth's global `user.role`. Protect API routes server-side; UI hiding is supplementary.
-- Keep the bot in the API deployment for this stack. Do not give the API a Docker socket or add a separate bot sidecar.
-- Do not add production Compose files, Dockerfiles, or other container packaging in this stack.
+- Keep the bot in the existing API process. This work does not add containers or change deployment setup.
 - Use existing shadcn primitives for the portal. Install missing primitives with the repository's configured shadcn CLI; do not hand-build a switch, input, label, or other primitive.
 - Node.js is `>=20.19`, pnpm is `12.10.0`. Run `pnpm test` and `pnpm check-types` from the repository root. No migrations or database resets in worktree setup.
 
@@ -43,7 +42,7 @@
 | 2: runtime | `apps/api/src/bot/discord-commands.module.ts`, `apps/api/src/bot/bot-context.module.ts`, `apps/api/src/bot/bot-context.factory.ts`, `apps/api/src/bot/bot-runtime.service.ts`, `apps/api/src/bot/bot.module.ts`, `apps/api/src/app.module.ts`, `apps/api/src/attendance/attendance.module.ts`, `apps/api/src/lifecycle/lifecycle.module.ts` | Keep Necord and command providers in an independently closable Nest context; reconcile saved state. |
 | 2: access | `apps/api/src/access/session.guard.ts`, `apps/api/src/access/team-admin.guard.ts`, `apps/api/src/bot/bot.controller.ts`, `apps/api/src/bot/bot.dto.ts`, module/test files | Authenticate with Better Auth, authorize with the effective Team Admin role, validate requests, and expose safe status/mutations. |
 | 3: portal | `apps/dashboard/app/settings/bot/page.tsx`, `apps/dashboard/app/settings/bot/BotSettings.tsx`, `apps/dashboard/lib/bot-settings.ts`, `apps/dashboard/components/ui/{switch,input,label}.tsx`, `apps/dashboard/next.config.js`, dashboard navigation/tests | Give Team Admins the token and switch controls with observed status, using shadcn primitives. |
-| 3: operating docs | `apps/api/.env.example`, `apps/api/README.md`, `docs/development/worktrees.md`, root `README.md` | Document local bot-free setup, VPS settings, and encryption-key backup. |
+| 3: configuration docs | `apps/api/.env.example`, `apps/api/README.md`, root `README.md` | Explain bot-free startup, required settings, and encryption-key backup alongside the portal controls. |
 
 Use one `codex/` branch per PR, stacked in that order. PR 1 targets current main; PR 2 targets PR 1; PR 3 targets PR 2. Include the approved spec and this plan in PR 1. Do not commit copied `.env` files. Each task below ends with a focused commit; PR boundaries are review gates.
 
@@ -113,11 +112,11 @@ For the new HTTP surface, follow Nest's documented guard pattern: DI-provided `C
 - [ ] **Step 4: Verify PR 2.** Run `pnpm test` and `pnpm check-types` from the repo root; both pass. Review the migration SQL and test that the API starts without Discord.
 - [ ] **Step 5: Commit and open PR 2.** Commit `feat(bot): guard admin bot settings API` and open PR 2 against PR 1.
 
-## PR 3 — Portal and operating guidance
+## PR 3 — Team Admin portal
 
 ### Task 6: Build the Team Admin portal control
 
-**Files:** Create `apps/dashboard/app/settings/bot/page.tsx`, `apps/dashboard/app/settings/bot/BotSettings.tsx`, `apps/dashboard/lib/bot-settings.ts`, component tests; install shadcn `apps/dashboard/components/ui/switch.tsx`, `input.tsx`, and `label.tsx`; modify `apps/dashboard/next.config.js` and dashboard navigation.
+**Files:** Create `apps/dashboard/app/settings/bot/page.tsx`, `apps/dashboard/app/settings/bot/BotSettings.tsx`, `apps/dashboard/lib/bot-settings.ts`, component tests; install shadcn `apps/dashboard/components/ui/switch.tsx`, `input.tsx`, and `label.tsx`; modify `apps/dashboard/next.config.js`, dashboard navigation, `apps/api/.env.example`, `apps/api/README.md`, and root `README.md` as needed.
 
 **Interfaces:** `getBotStatus():Promise<BotStatus|null>` forwards the session cookie server-side with `cache:'no-store'`. The client calls same-origin `/api/settings/bot/token` and `/api/settings/bot/enabled`; Next rewrites those paths to the private API. The page requires a session and an API-authorized status response; a 403 gets a neutral no-access view. The token input is write-only and clears after save. Render desired on/off separately from observed connection and poll while connecting/failed, stopping when the page unmounts.
 
@@ -125,17 +124,9 @@ For the new HTTP surface, follow Nest's documented guard pattern: DI-provided `C
 - [ ] **Step 2: Run the focused tests to see the failure.** Run `pnpm --filter web test -- BotSettings.test.tsx`; expect the new tests to fail.
 - [ ] **Step 3: Install the missing primitives.** Run `pnpm --filter web exec shadcn add switch input label` using `apps/dashboard/components.json`; check that the generated components land under `apps/dashboard/components/ui/`.
 - [ ] **Step 4: Implement the page.** Reuse the installed Button, Card, Alert, Switch, Input, and Label components. Add the client control, server fetch, navigation, and rewrite. Keep permission enforcement in the API guards from Task 5. Present a failed connection with a retry action that reapplies the saved enabled setting; never display raw Discord error text.
-- [ ] **Step 5: Rerun focused tests and type checks.** Focused tests and `pnpm check-types` pass.
-- [ ] **Step 6: Commit.** Stage only Task 6 files and commit `feat(portal): manage interactive Discord bot`.
-
-### Task 7: Document local and VPS settings
-
-**Files:** Modify `apps/api/.env.example`, `apps/api/README.md`, `docs/development/worktrees.md`, and root `README.md` as needed.
-
-- [ ] **Step 1: Update the configuration examples and operating docs.** Remove obsolete interactive `DISCORD_TOKEN` startup configuration and docs. Explain local `pnpm dev` without `DISCORD_TOKEN` or `DISCORD_ADMISSION_BOT_TOKEN`, the VPS environment settings for the existing API/portal deployment, encrypted-token key backup/rotation consequences, first-admin bootstrap, production command registration without a development guild ID, the default-off state, last-setting restoration, and how a failed bot connection leaves the portal usable.
-- [ ] **Step 2: Check the documented bot-free startup.** Run `pnpm dev` without the two bot tokens and confirm the API and dashboard start while the bot stays off. Do not stop another worktree's servers or run destructive DB commands.
-- [ ] **Step 3: Verify PR 3.** Run `pnpm test` and `pnpm check-types` from the repo root; both pass. Check the docs against the final environment validation and settings UI.
-- [ ] **Step 4: Commit and open PR 3.** Commit `docs: explain optional bot operation` and open PR 3 against PR 2. Review each PR's diff separately; rebase and retest descendants if a lower PR changes.
+- [ ] **Step 5: Update configuration docs.** Explain bot-free `pnpm dev`, the encryption key and backup consequence, default-off and restart behavior, and how a failed Discord connection leaves the API usable. Remove obsolete interactive `DISCORD_TOKEN` documentation.
+- [ ] **Step 6: Verify PR 3.** Run focused tests, `pnpm test`, and `pnpm check-types` from the repo root; all pass. Check the documented environment variables against final validation.
+- [ ] **Step 7: Commit and open PR 3.** Commit `feat(portal): manage interactive Discord bot` and open PR 3 against PR 2. Review each PR's diff separately; rebase and retest descendants if a lower PR changes.
 
 ## Final handoff
 
