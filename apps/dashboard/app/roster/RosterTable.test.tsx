@@ -86,7 +86,7 @@ it('filters by partial member name ignoring capitalization and surrounding white
     target: { value: '  oRgAn  ' },
   });
   expect(screen.getByText('Morgan Mentor')).toBeInTheDocument();
-  expect(screen.queryByText('Alex Member')).not.toBeInTheDocument();
+  expect(screen.getByText('Alex Member')).not.toBeVisible();
   expect(screen.queryByRole('button', { name: 'Save assignment' })).not.toBeInTheDocument();
   expect(global.fetch).not.toHaveBeenCalled();
 });
@@ -126,7 +126,7 @@ it.each(['', '   '])('shows all members for an empty or whitespace-only search (
   );
   const input = screen.getByRole('searchbox', { name: 'Search members' });
   fireEvent.change(input, { target: { value: 'Alex' } });
-  expect(screen.queryByText('Morgan Mentor')).not.toBeInTheDocument();
+  expect(screen.getByText('Morgan Mentor')).not.toBeVisible();
   fireEvent.change(input, { target: { value } });
   expect(screen.getByText('Alex Member')).toBeInTheDocument();
   expect(screen.getByText('Morgan Mentor')).toBeInTheDocument();
@@ -147,8 +147,8 @@ it.each([false, true])('shows no matches and recovers when cleared (canManage=%s
     'colspan',
     canManage ? '5' : '4',
   );
-  expect(screen.queryByText('Alex Member')).not.toBeInTheDocument();
-  expect(screen.queryByText('Morgan Mentor')).not.toBeInTheDocument();
+  expect(screen.getByText('Alex Member')).not.toBeVisible();
+  expect(screen.getByText('Morgan Mentor')).not.toBeVisible();
   expect(screen.queryByText('No one has joined this season yet.')).not.toBeInTheDocument();
   fireEvent.change(input, { target: { value: '' } });
   expect(screen.getByText('Alex Member')).toBeInTheDocument();
@@ -168,6 +168,53 @@ it('preserves administrator member actions after filtering', async () => {
     expect(global.fetch).toHaveBeenCalledWith(
       '/api/roster/members/2',
       expect.objectContaining({ method: 'PATCH' }),
+    ),
+  );
+});
+
+it('keeps unsaved role, experience, and reason when search hides a member', async () => {
+  render(<RosterTable season={season} members={searchableMembers} ownMember={null} canManage />);
+  fireEvent.change(screen.getByLabelText('Role for Alex Member'), {
+    target: { value: 'student_leader' },
+  });
+  fireEvent.change(screen.getByLabelText('Experience for Alex Member'), {
+    target: { value: 'veteran' },
+  });
+  fireEvent.click(screen.getAllByText('Access actions')[0]!);
+  fireEvent.change(screen.getByLabelText('Reason for Alex Member'), {
+    target: { value: 'Left the team' },
+  });
+
+  const search = screen.getByRole('searchbox', { name: 'Search members' });
+  fireEvent.change(search, { target: { value: 'Morgan' } });
+  expect(screen.getByText('Alex Member')).not.toBeVisible();
+  expect(screen.queryByRole('combobox', { name: 'Role for Alex Member' })).not.toBeInTheDocument();
+  fireEvent.change(search, { target: { value: 'Nobody' } });
+  expect(screen.getByText('No members match your search')).toBeVisible();
+  expect(global.fetch).not.toHaveBeenCalled();
+  fireEvent.change(search, { target: { value: 'Alex' } });
+
+  expect(screen.getByLabelText('Role for Alex Member')).toHaveValue('student_leader');
+  expect(screen.getByLabelText('Experience for Alex Member')).toHaveValue('veteran');
+  expect(screen.getByLabelText('Reason for Alex Member')).toHaveValue('Left the team');
+  fireEvent.click(screen.getByRole('button', { name: 'Save assignment' }));
+  await waitFor(() =>
+    expect(global.fetch).toHaveBeenCalledWith(
+      '/api/roster/members/1',
+      expect.objectContaining({
+        method: 'PATCH',
+        body: JSON.stringify({ role: 'student_leader', studentExperience: 'veteran' }),
+      }),
+    ),
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Remove from season' }));
+  await waitFor(() =>
+    expect(global.fetch).toHaveBeenCalledWith(
+      '/api/roster/members/1/remove',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ reason: 'Left the team' }),
+      }),
     ),
   );
 });

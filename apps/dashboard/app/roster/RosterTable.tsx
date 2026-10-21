@@ -44,11 +44,13 @@ function MemberRow({
   canManage,
   readOnly,
   seasonId,
+  hidden,
 }: {
   member: RosterMember;
   canManage: boolean;
   readOnly: boolean;
   seasonId: number;
+  hidden: boolean;
 }) {
   const router = useRouter();
   const [role, setRole] = useState<RosterMember['role']>(member.role);
@@ -91,7 +93,7 @@ function MemberRow({
   const canEditAssignment = canManage && member.state === 'active';
 
   return (
-    <tr>
+    <tr hidden={hidden}>
       <td className="px-4 py-3 font-medium">{member.name}</td>
       <td className="px-4 py-3">{roleLabels[member.role]}</td>
       <td className="px-4 py-3 text-zinc-400">
@@ -308,9 +310,10 @@ export function RosterTable({
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-800">
-                {filteredMembers.map((member) => (
+                {members.map((member) => (
                   <MemberRow
                     key={member.id}
+                    hidden={!filteredMembers.includes(member)}
                     member={member}
                     canManage={canManage}
                     readOnly={Boolean(season.readOnly)}
