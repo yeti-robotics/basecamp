@@ -47,10 +47,6 @@ type MembershipRequirementFields = Pick<
 export function getRequirementStatus(
   membership: MembershipRequirementFields,
 ): AttendanceRequirementSummary["status"] | null {
-  if (membership.legacy_status) {
-    return membership.legacy_status;
-  }
-
   if (membership.role === "mentor" || membership.role === "team_admin") {
     return "mentor";
   }
