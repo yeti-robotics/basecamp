@@ -7,7 +7,7 @@ const database = {
   select: vi.fn(),
   transaction: vi.fn(),
 };
-const admission = { verify: vi.fn() };
+const admission = { verifyLinked: vi.fn() };
 
 function query(rows: unknown[]) {
   const builder = {
@@ -29,7 +29,7 @@ function makeService(ids = discordId) {
 describe('BootstrapService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    admission.verify.mockResolvedValue('allowed');
+    admission.verifyLinked.mockResolvedValue('allowed');
   });
 
   it('allows a configured, admitted Discord identity only while no Team Admin exists', async () => {
@@ -38,7 +38,7 @@ describe('BootstrapService', () => {
       .mockReturnValueOnce(query([]));
 
     await expect(makeService().mayCreateFirstSeason('user-1', discordId)).resolves.toBe(true);
-    expect(admission.verify).toHaveBeenCalledWith(discordId);
+    expect(admission.verifyLinked).toHaveBeenCalledWith('user-1', discordId);
     expect(database.select).toHaveBeenCalledTimes(2);
   });
 
@@ -47,11 +47,11 @@ describe('BootstrapService', () => {
       false,
     );
     expect(database.select).not.toHaveBeenCalled();
-    expect(admission.verify).not.toHaveBeenCalled();
+    expect(admission.verifyLinked).not.toHaveBeenCalled();
   });
 
   it('rejects a configured identity that fails guild admission', async () => {
-    admission.verify.mockResolvedValue('denied');
+    admission.verifyLinked.mockResolvedValue('denied');
     await expect(makeService().mayCreateFirstSeason('user-1', discordId)).resolves.toBe(false);
     expect(database.select).not.toHaveBeenCalled();
   });

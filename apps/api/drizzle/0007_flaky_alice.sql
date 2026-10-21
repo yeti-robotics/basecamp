@@ -1,0 +1,1 @@
+ALTER TABLE "bot_settings" ADD COLUMN "status_message" text DEFAULT 'YETI ARE YOU READY?' NOT NULL;

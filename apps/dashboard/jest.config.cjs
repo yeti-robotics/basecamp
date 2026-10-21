@@ -15,6 +15,7 @@ module.exports = createJestConfig({
   testMatch: [
     '<rootDir>/src/**/*.(test|spec).{js,jsx,ts,tsx}',
     '<rootDir>/app/**/*.(test|spec).{ts,tsx}',
+    '<rootDir>/lib/**/*.(test|spec).{ts,tsx}',
   ],
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
 });

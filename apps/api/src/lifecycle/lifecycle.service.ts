@@ -1,8 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ActivityType } from 'discord.js';
-import { sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { Context, type ContextOf, Once } from 'necord';
 import { DatabaseService } from '../database/database.service.js';
+import { bot_settings, DEFAULT_BOT_STATUS_MESSAGE } from '../database/schema/bot-settings.js';
 
 @Injectable()
 export class LifecycleService {
@@ -14,7 +15,13 @@ export class LifecycleService {
   public async onReady(@Context() [client]: ContextOf<'clientReady'>): Promise<void> {
     this.logger.log(`Bot logged in as ${client.user.username}`);
 
-    client.user.setActivity('YETI ARE YOU READY?', { type: ActivityType.Custom });
+    const rows = await this.database.db
+      .select({ statusMessage: bot_settings.status_message })
+      .from(bot_settings)
+      .where(eq(bot_settings.id, 1))
+      .limit(1);
+    const statusMessage = rows[0]?.statusMessage?.trim() || DEFAULT_BOT_STATUS_MESSAGE;
+    client.user.setActivity(statusMessage, { type: ActivityType.Custom });
   }
 
   public async checkConnection(): Promise<boolean> {

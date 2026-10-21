@@ -17,7 +17,6 @@ const valid = {
   DISCORD_CLIENT_ID: 'client-id',
   DISCORD_CLIENT_SECRET: 'client-secret',
   DISCORD_GUILD_ID: '408711970305474560',
-  DISCORD_ADMISSION_BOT_TOKEN: 'admission-bot-token',
   BASECAMP_BOOTSTRAP_ADMIN_DISCORD_IDS: '123456789012345678, 234567890123456789',
   BASECAMP_TIME_ZONE: 'America/New_York',
 };
@@ -28,26 +27,26 @@ describe('API environment schema', () => {
     expect(envSchema.parse({ ...valid, PORT: '3001' }).PORT).toBe(3001);
   });
 
-  it('accepts Discord bot configuration when both settings are present or absent', () => {
+  it('does not require an admission bot token', () => {
     expect(envSchema.safeParse(valid).success).toBe(true);
     expect(
-      envSchema.safeParse({
-        ...valid,
-        DISCORD_TOKEN: 'bot-token',
-        DISCORD_DEVELOPMENT_GUILD_ID: 'guild-id',
-      }).success,
+      envSchema.safeParse({ ...valid, DISCORD_ADMISSION_BOT_TOKEN: 'obsolete-token' }).success,
     ).toBe(true);
+  });
+
+  it('allows bot-free startup without an encryption key and accepts a 32-byte key', () => {
+    const key = Buffer.alloc(32, 1).toString('base64');
+    expect(envSchema.parse(valid).BOT_SETTINGS_ENCRYPTION_KEY).toBeUndefined();
     expect(
-      envSchema.safeParse({
-        ...valid,
-        DISCORD_TOKEN: '',
-        DISCORD_DEVELOPMENT_GUILD_ID: '',
-      }).success,
+      envSchema.parse({ ...valid, BOT_SETTINGS_ENCRYPTION_KEY: key }).BOT_SETTINGS_ENCRYPTION_KEY,
+    ).toBe(key);
+  });
+
+  it('allows a development guild setting without configuring a Discord bot token', () => {
+    expect(envSchema.safeParse(valid).success).toBe(true);
+    expect(
+      envSchema.safeParse({ ...valid, DISCORD_DEVELOPMENT_GUILD_ID: '123456789012345678' }).success,
     ).toBe(true);
-    expect(
-      envSchema.safeParse({ ...valid, DISCORD_TOKEN: '', DISCORD_DEVELOPMENT_GUILD_ID: 'guild-id' })
-        .success,
-    ).toBe(false);
   });
 
   it.each([
@@ -62,14 +61,14 @@ describe('API environment schema', () => {
     ['DISCORD_CLIENT_SECRET', ''],
     ['DISCORD_GUILD_ID', 'guild-id'],
     ['DISCORD_GUILD_ID', '12345678901234567x'],
-    ['DISCORD_ADMISSION_BOT_TOKEN', ' '],
+    ['BOT_SETTINGS_ENCRYPTION_KEY', 'not-base64'],
+    ['BOT_SETTINGS_ENCRYPTION_KEY', Buffer.alloc(16, 1).toString('base64')],
     ['BASECAMP_BOOTSTRAP_ADMIN_DISCORD_IDS', 'not-a-snowflake'],
     ['BASECAMP_TIME_ZONE', 'Mars/Olympus'],
     ['PORT', '0'],
     ['PORT', '65536'],
     ['PORT', '3.5'],
     ['PORT', 'abc'],
-    ['DISCORD_TOKEN', 'bot-token'],
     ['DISCORD_DEVELOPMENT_GUILD_ID', 'guild-id'],
   ])('rejects invalid %s configuration', (key, value) => {
     const result = envSchema.safeParse({ ...valid, [key]: value });
@@ -92,10 +91,9 @@ describe('ConfigModule environment validation', () => {
     'DISCORD_CLIENT_ID',
     'DISCORD_CLIENT_SECRET',
     'DISCORD_GUILD_ID',
-    'DISCORD_ADMISSION_BOT_TOKEN',
+    'BOT_SETTINGS_ENCRYPTION_KEY',
     'BASECAMP_BOOTSTRAP_ADMIN_DISCORD_IDS',
     'BASECAMP_TIME_ZONE',
-    'DISCORD_TOKEN',
     'DISCORD_DEVELOPMENT_GUILD_ID',
     'PORT',
   ];
@@ -114,7 +112,7 @@ describe('ConfigModule environment validation', () => {
       DISCORD_CLIENT_ID: 'client-id',
       DISCORD_CLIENT_SECRET: 'client-secret',
       DISCORD_GUILD_ID: '408711970305474560',
-      DISCORD_ADMISSION_BOT_TOKEN: 'admission-bot-token',
+      BOT_SETTINGS_ENCRYPTION_KEY: Buffer.alloc(32, 1).toString('base64'),
       BASECAMP_BOOTSTRAP_ADMIN_DISCORD_IDS: '123456789012345678',
       BASECAMP_TIME_ZONE: 'America/New_York',
     });

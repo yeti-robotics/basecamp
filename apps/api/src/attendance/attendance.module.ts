@@ -4,7 +4,6 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { AuthModule } from '../auth/auth.module.js';
 import { DatabaseModule } from '../database/database.module.js';
 import { RosterModule } from '../roster/roster.module.js';
-import { AttendanceCommands } from './attendance.commands.js';
 import { AttendanceController } from './attendance.controller.js';
 import { AttendanceRepository } from './attendance.repository.js';
 import { AttendanceService } from './attendance.service.js';
@@ -24,7 +23,6 @@ import { DisplaySessionService } from './display-session.service.js';
   ],
   controllers: [AttendanceController, DisplayController],
   providers: [
-    AttendanceCommands,
     AttendanceService,
     AttendanceCodeService,
     AttendanceRepository,
@@ -32,5 +30,6 @@ import { DisplaySessionService } from './display-session.service.js';
     AttendanceInteractionFilter,
     DisplaySessionService,
   ],
+  exports: [AttendanceService, AttendanceThrottlerGuard, AttendanceInteractionFilter],
 })
 export class AttendanceModule {}

@@ -1,5 +1,5 @@
 {
-  "id": "7848bc55-e16f-4407-822c-be09e4d4f84e",
+  "id": "58834d03-14ea-48e2-a830-76f44400c809",
   "prevId": "cd82f342-1531-4469-9523-71d6d41b2179",
   "version": "7",
   "dialect": "postgresql",
@@ -95,7 +95,7 @@
           "name": "season_id",
           "type": "integer",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "status": {
           "name": "status",
@@ -124,41 +124,7 @@
           "notNull": true
         }
       },
-      "indexes": {
-        "hour_requirements_season_status_leader_category_uidx": {
-          "name": "hour_requirements_season_status_leader_category_uidx",
-          "columns": [
-            {
-              "expression": "season_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "status",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "is_leader",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "category",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
+      "indexes": {},
       "foreignKeys": {
         "hour_requirements_season_id_seasons_id_fk": {
           "name": "hour_requirements_season_id_seasons_id_fk",
@@ -177,10 +143,43 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.bot_settings": {
+      "name": "bot_settings",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "default": 1
+        },
+        "enabled": {
+          "name": "enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "token_ciphertext": {
+          "name": "token_ciphertext",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
       "checkConstraints": {
-        "hour_requirements_required_hours_nonnegative": {
-          "name": "hour_requirements_required_hours_nonnegative",
-          "value": "\"hour_requirements\".\"required_hours\" >= 0"
+        "bot_settings_singleton_check": {
+          "name": "bot_settings_singleton_check",
+          "value": "\"bot_settings\".\"id\" = 1"
         }
       },
       "isRLSEnabled": false

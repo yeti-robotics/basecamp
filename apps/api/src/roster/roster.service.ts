@@ -2,7 +2,6 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
-  Inject,
   Injectable,
   NotFoundException,
   ServiceUnavailableException,
@@ -10,8 +9,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { and, desc, eq, gte, lt, lte, sql } from 'drizzle-orm';
 import { AccessService } from '../access/access.service.js';
-import { DISCORD_ADMISSION } from '../auth/auth.module.js';
-import type { DiscordAdmissionService } from '../auth/discord-admission.service.js';
+import { LinkedDiscordAdmissionService } from '../auth/linked-discord-admission.service.js';
 import { type AppDatabase, DatabaseService } from '../database/database.service.js';
 import { account, user } from '../database/schema/auth.js';
 import type { SeasonRole, StudentExperience } from '../database/schema/enums.js';
@@ -52,7 +50,7 @@ export class RosterService {
   constructor(
     private readonly database: DatabaseService,
     private readonly config: ConfigService,
-    @Inject(DISCORD_ADMISSION) private readonly admission: DiscordAdmissionService,
+    private readonly admission: LinkedDiscordAdmissionService,
     private readonly access: AccessService,
   ) {}
 
@@ -96,7 +94,7 @@ export class RosterService {
       if (!discordId)
         throw new ForbiddenException('A linked Discord identity is required to join the roster');
 
-      const admission = await this.admission.verify(discordId);
+      const admission = await this.admission.verifyLinked(userId, discordId);
       if (admission === 'denied') {
         throw new ForbiddenException(
           'Discord server membership is required to join the current roster',
@@ -104,7 +102,7 @@ export class RosterService {
       }
       if (admission === 'unavailable') {
         throw new ServiceUnavailableException(
-          'Discord membership could not be verified; try again later',
+          'Discord membership could not be verified. Reconnect Discord and grant membership access, then try again',
         );
       }
 

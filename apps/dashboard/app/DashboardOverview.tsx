@@ -191,6 +191,12 @@ export function DashboardOverview({ user, attendance }: DashboardOverviewProps) 
           >
             Roster
           </a>
+          <a
+            href="/settings/bot"
+            className="py-3 text-muted-foreground transition-colors hover:text-foreground"
+          >
+            Settings
+          </a>
         </nav>
       </header>
       <main id="main-content" className="mx-auto max-w-7xl scroll-mt-6 px-5 py-9 sm:px-8 sm:py-12">
