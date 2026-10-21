@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 import { EventEmitter } from 'node:events';
+import { Logger } from '@nestjs/common';
 import { MODULE_METADATA } from '@nestjs/common/constants';
 import { NestFactory } from '@nestjs/core';
 import { Client } from 'discord.js';
@@ -33,7 +34,7 @@ describe('BotContextFactory', () => {
 
     expect(NestFactory.createApplicationContext).toHaveBeenCalledWith(
       expect.objectContaining({ module: expect.any(Function) }),
-      { abortOnError: false, logger: false },
+      { abortOnError: false },
     );
     expect(context.get).toHaveBeenCalledWith(Client, { strict: false });
     expect(login).toHaveBeenCalledWith('bot-token');
@@ -65,10 +66,12 @@ describe('BotContextFactory', () => {
 
   it('contains client errors and reports them to the runtime', async () => {
     const onError = vi.fn();
+    const errorLog = vi.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
     await factory.start('bot-token', undefined, undefined, onError);
 
     client.emit('error', new Error('command registration failed'));
 
+    expect(errorLog).toHaveBeenCalledWith(expect.stringContaining('command registration failed'));
     expect(onError).toHaveBeenCalledOnce();
   });
 
