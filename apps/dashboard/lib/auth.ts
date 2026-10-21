@@ -42,7 +42,8 @@ export async function getSession(): Promise<AuthSession | null> {
   let lastFailure: unknown;
 
   for (let attempt = 0; attempt < attempts; attempt++) {
-    if (attempt > 0) await sleep(retryDelaysMs[attempt - 1]);
+    const delayMs = retryDelaysMs[attempt - 1];
+    if (delayMs !== undefined) await sleep(delayMs);
     try {
       const response = await fetch(url, {
         headers: { cookie },
@@ -54,7 +55,9 @@ export async function getSession(): Promise<AuthSession | null> {
       if (!transientStatuses.has(failure.status)) throw failure;
       lastFailure = failure;
     } catch (error) {
-      if (error instanceof SessionResponseError && !transientStatuses.has(error.status)) throw error;
+      if (error instanceof SessionResponseError && !transientStatuses.has(error.status)) {
+        throw error;
+      }
       lastFailure = error;
     }
   }
