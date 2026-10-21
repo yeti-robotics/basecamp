@@ -1,7 +1,6 @@
 import { Test, type TestingModule } from '@nestjs/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DatabaseService } from '../database/database.service.js';
-import { LifecycleCommands } from './lifecycle.commands.js';
 import { LifecycleModule } from './lifecycle.module.js';
 import { LifecycleService } from './lifecycle.service.js';
 
@@ -25,11 +24,5 @@ describe('LifecycleModule', () => {
     const service = module.get(LifecycleService);
     expect(service).toBeDefined();
     expect(service).toBeInstanceOf(LifecycleService);
-  });
-
-  it('should provide LifecycleCommands', () => {
-    const commands = module.get(LifecycleCommands);
-    expect(commands).toBeDefined();
-    expect(commands).toBeInstanceOf(LifecycleCommands);
   });
 });

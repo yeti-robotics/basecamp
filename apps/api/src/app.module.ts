@@ -1,11 +1,10 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { IntentsBitField } from 'discord.js';
-import { NecordModule } from 'necord';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { AttendanceModule } from './attendance/attendance.module.js';
 import { AuthModule } from './auth/auth.module.js';
+import { BotModule } from './bot/bot.module.js';
 import { configOptions } from './config.options.js';
 import { HandbookModule } from './handbook/handbook.module.js';
 import { HealthModule } from './health/health.module.js';
@@ -14,21 +13,10 @@ import { OutreachModule } from './outreach/outreach.module.js';
 import { RosterModule } from './roster/roster.module.js';
 import { SeasonsModule } from './seasons/seasons.module.js';
 
-const discordToken = process.env.DISCORD_TOKEN?.trim();
-const discordDevelopmentGuildId = process.env.DISCORD_DEVELOPMENT_GUILD_ID?.trim();
-
 @Module({
   imports: [
-    ...(discordToken && discordDevelopmentGuildId
-      ? [
-          NecordModule.forRoot({
-            token: discordToken,
-            intents: [IntentsBitField.Flags.Guilds],
-            development: [discordDevelopmentGuildId],
-          }),
-        ]
-      : []),
     ConfigModule.forRoot(configOptions),
+    BotModule,
     AttendanceModule,
     AuthModule,
     LifecycleModule,

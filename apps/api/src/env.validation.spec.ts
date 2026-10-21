@@ -42,26 +42,11 @@ describe('API environment schema', () => {
     ).toBe(key);
   });
 
-  it('accepts Discord bot configuration when both settings are present or absent', () => {
+  it('allows a development guild setting without configuring a Discord bot token', () => {
     expect(envSchema.safeParse(valid).success).toBe(true);
     expect(
-      envSchema.safeParse({
-        ...valid,
-        DISCORD_TOKEN: 'bot-token',
-        DISCORD_DEVELOPMENT_GUILD_ID: 'guild-id',
-      }).success,
+      envSchema.safeParse({ ...valid, DISCORD_DEVELOPMENT_GUILD_ID: '123456789012345678' }).success,
     ).toBe(true);
-    expect(
-      envSchema.safeParse({
-        ...valid,
-        DISCORD_TOKEN: '',
-        DISCORD_DEVELOPMENT_GUILD_ID: '',
-      }).success,
-    ).toBe(true);
-    expect(
-      envSchema.safeParse({ ...valid, DISCORD_TOKEN: '', DISCORD_DEVELOPMENT_GUILD_ID: 'guild-id' })
-        .success,
-    ).toBe(false);
   });
 
   it.each([
@@ -84,7 +69,6 @@ describe('API environment schema', () => {
     ['PORT', '65536'],
     ['PORT', '3.5'],
     ['PORT', 'abc'],
-    ['DISCORD_TOKEN', 'bot-token'],
     ['DISCORD_DEVELOPMENT_GUILD_ID', 'guild-id'],
   ])('rejects invalid %s configuration', (key, value) => {
     const result = envSchema.safeParse({ ...valid, [key]: value });
@@ -110,7 +94,6 @@ describe('ConfigModule environment validation', () => {
     'BOT_SETTINGS_ENCRYPTION_KEY',
     'BASECAMP_BOOTSTRAP_ADMIN_DISCORD_IDS',
     'BASECAMP_TIME_ZONE',
-    'DISCORD_TOKEN',
     'DISCORD_DEVELOPMENT_GUILD_ID',
     'PORT',
   ];

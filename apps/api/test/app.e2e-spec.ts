@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { App } from 'supertest/types';
+import { BotSettingsStore } from '../src/bot/bot-settings.store.js';
 
 describe('AppController (e2e)', () => {
   let app: INestApplication<App>;
@@ -15,7 +16,8 @@ describe('AppController (e2e)', () => {
     'ATTENDANCE_DISPLAY_SESSION_SECRET',
     'DISCORD_CLIENT_ID',
     'DISCORD_CLIENT_SECRET',
-    'DISCORD_TOKEN',
+    'DISCORD_GUILD_ID',
+    'BASECAMP_TIME_ZONE',
     'DISCORD_DEVELOPMENT_GUILD_ID',
     'PORT',
   ];
@@ -23,7 +25,6 @@ describe('AppController (e2e)', () => {
 
   beforeEach(async () => {
     previousEnv = new Map(envKeys.map((key) => [key, process.env[key]]));
-    process.env.DISCORD_TOKEN = '';
     process.env.DISCORD_DEVELOPMENT_GUILD_ID = '';
     process.env.PORT = '8000';
     Object.assign(process.env, {
@@ -35,11 +36,15 @@ describe('AppController (e2e)', () => {
       ATTENDANCE_DISPLAY_SESSION_SECRET: 'a-display-session-secret-longer-than-32-chars',
       DISCORD_CLIENT_ID: 'test-client-id',
       DISCORD_CLIENT_SECRET: 'test-client-secret',
+      DISCORD_GUILD_ID: '408711970305474560',
+      BASECAMP_TIME_ZONE: 'America/New_York',
     });
     const { AppModule } = await import('../src/app.module.js');
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     })
+      .overrideProvider(BotSettingsStore)
+      .useValue({ load: async () => ({ enabled: false, tokenCiphertext: null }) })
       .overrideProvider(ConfigService)
       .useValue(
         new ConfigService({
