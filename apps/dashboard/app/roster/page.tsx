@@ -1,4 +1,7 @@
 import { redirect } from 'next/navigation';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { typographyVariants } from '@/components/ui/typography';
 import { getSession } from '@/lib/auth';
 import { getRosterView } from '@/lib/roster';
 import { RosterTable } from './RosterTable';
@@ -18,9 +21,20 @@ export default async function RosterPage({
 
   if (!view) {
     return (
-      <main className="mx-auto min-h-screen max-w-5xl px-6 py-12 text-white">
-        <h1 className="text-3xl font-semibold">Roster</h1>
-        <p className="mt-4 text-zinc-400">The roster could not be loaded. Reload to try again.</p>
+      <main className="mx-auto min-h-svh max-w-7xl px-5 py-12 sm:px-8">
+        <h1 className={typographyVariants({ variant: 'h2' })}>Roster</h1>
+        <Alert className="mt-6">
+          <AlertTitle>The roster could not be loaded</AlertTitle>
+          <AlertDescription>Reload to try again.</AlertDescription>
+        </Alert>
+        <div className="mt-4 flex gap-3">
+          <Button asChild>
+            <a href="/roster">Reload roster</a>
+          </Button>
+          <Button asChild variant="outline">
+            <a href="/">Dashboard</a>
+          </Button>
+        </div>
       </main>
     );
   }

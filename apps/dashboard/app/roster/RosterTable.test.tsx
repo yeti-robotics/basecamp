@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { RosterMember } from '@/lib/roster';
 import { RosterTable } from './RosterTable';
 
@@ -76,6 +76,56 @@ it('shows an explicit empty state for a new season roster', () => {
   expect(screen.getByText('No one has joined this season yet.')).toBeInTheDocument();
   expect(screen.queryByRole('searchbox')).not.toBeInTheDocument();
   expect(screen.queryByText('No members match your search')).not.toBeInTheDocument();
+});
+
+it('updates the season, member names, and result count from new API props', () => {
+  const { rerender } = render(
+    <RosterTable season={season} members={searchableMembers} ownMember={null} canManage={false} />,
+  );
+  expect(screen.getByRole('status')).toHaveTextContent('Showing 2 of 2 members');
+  rerender(
+    <RosterTable
+      season={{ id: 9, name: 'Updated season', startsOn: '2029-01-01', endsOn: '2029-12-31' }}
+      members={[{ ...searchableMembers[0]!, name: 'New database name' }]}
+      ownMember={null}
+      canManage={false}
+    />,
+  );
+  expect(screen.getByRole('heading', { name: 'Updated season' })).toBeVisible();
+  expect(screen.getByText('New database name')).toBeVisible();
+  expect(screen.queryByText('Morgan Mentor')).not.toBeInTheDocument();
+  expect(screen.getByRole('status')).toHaveTextContent('Showing 1 of 1 members');
+  expect(screen.getByText('Jan 1, 2029')).toHaveAttribute('datetime', '2029-01-01');
+});
+
+it('clears search without losing an open member editor or its draft', () => {
+  render(<RosterTable season={season} members={searchableMembers} ownMember={null} canManage />);
+  const edit = screen.getByRole('button', { name: 'Edit member Alex Member' });
+  expect(edit).toHaveAttribute('aria-expanded', 'false');
+  expect(screen.queryByRole('combobox', { name: 'Role for Alex Member' })).not.toBeInTheDocument();
+  fireEvent.click(edit);
+  fireEvent.change(screen.getByLabelText('Role for Alex Member'), {
+    target: { value: 'student_leader' },
+  });
+  fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'Morgan' } });
+  expect(screen.getByRole('status')).toHaveTextContent('Showing 1 of 2 members');
+  fireEvent.click(screen.getByRole('button', { name: 'Clear search' }));
+  expect(screen.getByLabelText('Role for Alex Member')).toBeVisible();
+  expect(screen.getByLabelText('Role for Alex Member')).toHaveValue('student_leader');
+  expect(edit).toHaveAttribute('aria-expanded', 'true');
+  expect(screen.getByRole('status')).toHaveTextContent('Showing 2 of 2 members');
+});
+
+it('shows a recoverable error when saving cannot reach the API', async () => {
+  global.fetch = jest.fn().mockRejectedValue(new TypeError('fetch failed'));
+  render(<RosterTable season={season} members={searchableMembers} ownMember={null} canManage />);
+  fireEvent.click(screen.getByRole('button', { name: 'Edit member Alex Member' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Save assignment' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    'Check your connection and try again.',
+  );
+  expect(screen.getByRole('button', { name: 'Save assignment' })).toBeEnabled();
+  expect(mockRefresh).not.toHaveBeenCalled();
 });
 
 it('filters by partial member name ignoring capitalization and surrounding whitespace', () => {
@@ -161,6 +211,10 @@ it('preserves administrator member actions after filtering', async () => {
   fireEvent.change(screen.getByRole('searchbox', { name: 'Search members' }), {
     target: { value: 'Morgan' },
   });
+  fireEvent.click(screen.getByRole('button', { name: 'Edit member Morgan Mentor' }));
+  fireEvent.click(
+    within(screen.getByText('Morgan Mentor').closest('tr')!).getByText('Access actions'),
+  );
   expect(screen.getByRole('button', { name: 'Remove from season' })).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Suspend account access' })).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Save assignment' }));
@@ -174,6 +228,7 @@ it('preserves administrator member actions after filtering', async () => {
 
 it('keeps unsaved role, experience, and reason when search hides a member', async () => {
   render(<RosterTable season={season} members={searchableMembers} ownMember={null} canManage />);
+  fireEvent.click(screen.getByRole('button', { name: 'Edit member Alex Member' }));
   fireEvent.change(screen.getByLabelText('Role for Alex Member'), {
     target: { value: 'student_leader' },
   });
@@ -293,6 +348,7 @@ it('sends explicit historical assignment corrections to the selected season rout
       canManage
     />,
   );
+  fireEvent.click(screen.getByRole('button', { name: 'Edit member Jordan Member' }));
   fireEvent.change(screen.getByLabelText('Role for Jordan Member'), {
     target: { value: 'student_leader' },
   });
@@ -329,6 +385,7 @@ it('saves role corrections with student experience for student roles', async () 
       canManage
     />,
   );
+  fireEvent.click(screen.getByRole('button', { name: 'Edit member Riley Member' }));
   fireEvent.change(screen.getByLabelText('Role for Riley Member'), {
     target: { value: 'student' },
   });
@@ -365,6 +422,7 @@ it('keeps season removal and account suspension as distinct actions', async () =
       canManage
     />,
   );
+  fireEvent.click(screen.getByRole('button', { name: 'Edit member Casey Member' }));
   fireEvent.click(screen.getByText('Access actions'));
   fireEvent.change(screen.getByLabelText('Reason for Casey Member'), {
     target: { value: 'Left the team' },
@@ -412,6 +470,7 @@ it('offers account restoration for a suspended member', async () => {
       canManage
     />,
   );
+  fireEvent.click(screen.getByRole('button', { name: 'Edit member Taylor Member' }));
   fireEvent.click(screen.getByText('Access actions'));
   fireEvent.click(screen.getByRole('button', { name: 'Restore account access' }));
   await waitFor(() =>

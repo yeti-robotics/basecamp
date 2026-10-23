@@ -69,4 +69,14 @@ pnpm --filter api db:migrate
 
 To delete and recreate the local `basecamp` database, then apply all migrations, run `pnpm --filter api db:nuke`. This command only accepts a loopback PostgreSQL URL whose database name is `basecamp`. All data in that database is deleted.
 
+To add fake roster members to an already migrated local database, run:
+
+```bash
+pnpm --filter api db:seed
+```
+
+This uses Drizzle ORM to add 24 fictional users and memberships to the current season, including mentors, student leaders, rookies, veterans, two removed memberships, and one suspended account. If there is no current season, it creates a May 15–May 14 season using `BASECAMP_TIME_ZONE` (default `America/New_York`), provided it does not overlap existing seasons. Refresh `/roster` while signed in with roster access to test search and admin actions. The fake users have no login credentials or Discord accounts.
+
+The seed reads `apps/api/.env.local`, then `.env`, and only accepts loopback PostgreSQL URLs outside production. It inserts missing seed records in one transaction; rerunning it preserves existing users and assignments. It does not reset data or apply migrations. Worktrees pointing to the same local database will see these fake members too.
+
 Commit the generated SQL, migration journal, and snapshot. Deployment applies pending migrations once, before rolling out API instances. The API does not migrate the database during application startup.
