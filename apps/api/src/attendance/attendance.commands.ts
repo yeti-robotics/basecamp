@@ -5,9 +5,10 @@ import {
   UseGuards,
   ValidationPipe,
 } from "@nestjs/common";
-import { MessageFlags } from "discord.js";
+import { MessageFlags, type User, type ChatInputCommandInteraction } from "discord.js";
+import type { Result } from "neverthrow";
 import type { SlashCommandContext } from "necord";
-import { Context, Options, SlashCommand } from "necord";
+import { Context, Options, SlashCommand, UserOption } from "necord";
 import { AttendanceService } from "./attendance.service.js";
 import { AttendanceInteractionFilter } from "./attendance-interaction.filter.js";
 import { AttendanceCodeOptions } from "./attendance-options.dto.js";
@@ -16,6 +17,15 @@ import {
   getSeasonDataStartForDate,
   getTotalSeasonHours,
 } from "./schedule.util.js";
+
+class MentorAttendanceOptions {
+  @UserOption({
+    name: "user",
+    description: "The member to sign in or out",
+    required: true,
+  })
+  user!: User;
+}
 
 function formatAttendanceError(error: Error): string {
   switch (error.message) {
@@ -27,6 +37,8 @@ function formatAttendanceError(error: Error): string {
       return "You're already signed out.";
     case "User was not signed out because they have not signed in yet":
       return "You need to sign in before signing out.";
+    case "Not authorized to manage attendance":
+      return "Only active mentors and Team Admins can use this command.";
     default:
       return "Attendance could not be updated. Please try again or ask a mentor.";
   }
@@ -37,6 +49,37 @@ export class AttendanceCommands {
   private readonly logger = new Logger(AttendanceCommands.name);
 
   constructor(private readonly attendanceService: AttendanceService) {}
+
+  private async handleMentorAttendanceResult(
+    interaction: ChatInputCommandInteraction,
+    target: User,
+    action: "sign in" | "sign out",
+    result: Result<void, Error>,
+  ) {
+    if (result.isErr()) {
+      this.logger.error(
+        `Mentor ${action} failed for target ${target.id}: ${result.error.message}`,
+      );
+      return interaction.editReply(formatAttendanceError(result.error));
+    }
+
+    const pastTense = action === "sign in" ? "signed in" : "signed out";
+    const channel = interaction.channel;
+
+    if (channel?.isSendable()) {
+      await channel
+        .send(`<@${target.id}> has been ${pastTense} by <@${interaction.user.id}>.`)
+        .catch((error: unknown) => {
+          this.logger.warn(
+            `Could not announce mentor ${action} for ${target.id}: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          );
+        });
+    }
+
+    return interaction.editReply(`Successfully ${pastTense} ${target.username}.`);
+  }
 
   @SlashCommand({
     name: "attendance",
@@ -170,18 +213,44 @@ export class AttendanceCommands {
   }
 
   @SlashCommand({
-    name: "admin-signin",
-    description: "Sign in another user (admin only)",
+    name: "mentor-signin",
+    description: "Sign in a member (mentor or Team Admin only)",
   })
-  async AdminSigninCommand(@Context() [interaction]: SlashCommandContext) {
-    await interaction.reply("Admin signin command");
+  async MentorSigninCommand(
+    @Context() [interaction]: SlashCommandContext,
+    @Options() options: MentorAttendanceOptions,
+  ) {
+    await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
+    const result = await this.attendanceService.signInForMember(
+      interaction.user.id,
+      options.user.id,
+    );
+    return this.handleMentorAttendanceResult(
+      interaction,
+      options.user,
+      "sign in",
+      result,
+    );
   }
 
   @SlashCommand({
-    name: "admin-signout",
-    description: "Sign out another user (admin only)",
+    name: "mentor-signout",
+    description: "Sign out a member (mentor or Team Admin only)",
   })
-  async AdminSignoutCommand(@Context() [interaction]: SlashCommandContext) {
-    await interaction.reply("Admin signout command");
+  async MentorSignoutCommand(
+    @Context() [interaction]: SlashCommandContext,
+    @Options() options: MentorAttendanceOptions,
+  ) {
+    await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
+    const result = await this.attendanceService.signOutForMember(
+      interaction.user.id,
+      options.user.id,
+    );
+    return this.handleMentorAttendanceResult(
+      interaction,
+      options.user,
+      "sign out",
+      result,
+    );
   }
 }
