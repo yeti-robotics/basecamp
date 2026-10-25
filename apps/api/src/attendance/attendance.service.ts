@@ -10,6 +10,7 @@ import {
   ResultAsync,
 } from "neverthrow";
 
+import { AccessService } from "../access/access.service.js";
 import { DatabaseService } from "../database/database.service.js";
 import {
   attendance,
@@ -17,6 +18,7 @@ import {
 } from "../database/schema/attendance.js";
 import { events } from "../database/schema/events.js";
 import { season_memberships, seasons } from "../database/schema/seasons.js";
+import { SeasonAuthorizationService } from "../seasons/season-authorization.service.js";
 import {
   AttendanceRepository,
   getRequirementStatus,
@@ -65,6 +67,8 @@ export class AttendanceService {
     private readonly attendanceRepository: AttendanceRepository,
     private readonly database: DatabaseService,
     private readonly codeService: AttendanceCodeService,
+    private readonly access: AccessService,
+    private readonly seasonAuthorization: SeasonAuthorizationService,
   ) {}
 
   public signInWithCode(
@@ -93,6 +97,44 @@ export class AttendanceService {
         ? this.updateAttendance(discordId, { checkedOutAt: new Date() })
         : errAsync(new Error("Invalid attendance code")),
     );
+  }
+
+  public signInForMember(
+    actorDiscordId: string,
+    targetDiscordId: string,
+  ): ResultAsync<void, Error> {
+    return this.authorizeAttendanceManager(actorDiscordId).andThen(() =>
+      this.recordAttendance(targetDiscordId, "meeting", null),
+    );
+  }
+
+  public signOutForMember(
+    actorDiscordId: string,
+    targetDiscordId: string,
+  ): ResultAsync<void, Error> {
+    return this.authorizeAttendanceManager(actorDiscordId).andThen(() =>
+      this.updateAttendance(targetDiscordId, { checkedOutAt: new Date() }),
+    );
+  }
+
+  private authorizeAttendanceManager(
+    actorDiscordId: string,
+  ): ResultAsync<void, Error> {
+    return this.attendanceRepository
+      .getUserIdByDiscordId(actorDiscordId)
+      .andThen((actorUserId) =>
+        ResultAsync.fromPromise(
+          Promise.all([
+            this.access.isSuspended(actorUserId),
+            this.seasonAuthorization.canManageAttendance(actorUserId),
+          ]).then(([isSuspended, canManageAttendance]) => {
+            if (isSuspended || !canManageAttendance) {
+              throw new Error("Not authorized to manage attendance");
+            }
+          }),
+          (error) => (error instanceof Error ? error : new Error(String(error))),
+        ),
+      );
   }
 
   public recordAttendance(

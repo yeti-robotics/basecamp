@@ -89,6 +89,11 @@ export class SeasonAuthorizationService {
     };
   }
 
+  async canManageAttendance(userId: string): Promise<boolean> {
+    const access = await this.accessFor(userId);
+    return access.canManageAttendance;
+  }
+
   async current(now: Date, timeZone: string) {
     const localToday = localDateInTimeZone(now, timeZone);
     const rows = await this.database.db
