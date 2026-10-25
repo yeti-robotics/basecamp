@@ -95,18 +95,31 @@ describe('member attendance commands', () => {
     expect(interaction.editReply).toHaveBeenCalledWith('Successfully signed out Member.');
   });
 
-  it('does not announce a failed mentor action', async () => {
+  it.each([
+    {
+      error: 'User is already signed in',
+      expected: `<@${targetId}> is already signed in.`,
+    },
+    {
+      error: 'User is already signed out',
+      expected: `<@${targetId}> is already signed out.`,
+    },
+    {
+      error: 'User was not signed out because they have not signed in yet',
+      expected: `<@${targetId}> has not signed in yet.`,
+    },
+    {
+      error: 'Not authorized to manage attendance',
+      expected: 'Only active mentors and Team Admins can use this command.',
+    },
+  ])('formats mentor sign-in error "$error" for the target', async ({ error, expected }) => {
     const interaction = makeInteraction();
     const target = { id: targetId, username: 'Member' };
-    service.signInForMember.mockReturnValue(
-      errAsync(new Error('Not authorized to manage attendance')),
-    );
+    service.signInForMember.mockReturnValue(errAsync(new Error(error)));
 
     await commands.MentorSigninCommand([interaction] as never, { user: target } as never);
 
     expect(interaction.channel.send).not.toHaveBeenCalled();
-    expect(interaction.editReply).toHaveBeenCalledWith(
-      'Only active mentors and Team Admins can use this command.',
-    );
+    expect(interaction.editReply).toHaveBeenCalledWith(expected);
   });
 });

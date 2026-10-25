@@ -44,6 +44,23 @@ function formatAttendanceError(error: Error): string {
   }
 }
 
+function formatMentorAttendanceError(error: Error, target: User): string {
+  const member = `<@${target.id}>`;
+
+  switch (error.message) {
+    case "User is already signed in":
+      return `${member} is already signed in.`;
+    case "User is already signed out":
+      return `${member} is already signed out.`;
+    case "User was not signed out because they have not signed in yet":
+      return `${member} has not signed in yet.`;
+    case "Not authorized to manage attendance":
+      return "Only active mentors and Team Admins can use this command.";
+    default:
+      return `Could not update attendance for ${member}. Please try again or ask a mentor.`;
+  }
+}
+
 @Injectable()
 export class AttendanceCommands {
   private readonly logger = new Logger(AttendanceCommands.name);
@@ -60,7 +77,7 @@ export class AttendanceCommands {
       this.logger.error(
         `Mentor ${action} failed for target ${target.id}: ${result.error.message}`,
       );
-      return interaction.editReply(formatAttendanceError(result.error));
+      return interaction.editReply(formatMentorAttendanceError(result.error, target));
     }
 
     const pastTense = action === "sign in" ? "signed in" : "signed out";
