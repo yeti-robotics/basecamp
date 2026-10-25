@@ -71,7 +71,9 @@ describe('SeasonAuthorizationService', () => {
 
   it('does not give bootstrap-only users permission to manage attendance', async () => {
     bootstrap.bootstrapDiscordIdForUser.mockResolvedValue('123456789012345678');
-    select.mockReturnValueOnce(query([]));
+    select
+      .mockReturnValueOnce(query([]))
+      .mockReturnValueOnce(query([]));
     const service = makeService();
 
     await expect(service.accessFor('user-1')).resolves.toEqual({
