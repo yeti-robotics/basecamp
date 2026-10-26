@@ -39,6 +39,7 @@ describe('SeasonAuthorizationService', () => {
     await expect(makeService().accessFor('user-1')).resolves.toEqual({
       canView: true,
       canManage: true,
+      canManageAttendance: true,
       canBootstrap: false,
     });
   });
@@ -50,19 +51,37 @@ describe('SeasonAuthorizationService', () => {
     await expect(makeService().accessFor('user-1')).resolves.toEqual({
       canView: false,
       canManage: false,
+      canManageAttendance: false,
       canBootstrap: false,
     });
     expect(select).toHaveBeenCalledTimes(2);
   });
 
-  it('allows mentors to view season history without managing seasons', async () => {
+  it('allows mentors to view season history and manage attendance without managing seasons', async () => {
     select
       .mockReturnValueOnce(query([previous]))
       .mockReturnValueOnce(query([{ role: 'mentor', state: 'active' }]));
     await expect(makeService().accessFor('user-1')).resolves.toEqual({
       canView: true,
       canManage: false,
+      canManageAttendance: true,
       canBootstrap: false,
     });
+  });
+
+  it('does not give bootstrap-only users permission to manage attendance', async () => {
+    bootstrap.bootstrapDiscordIdForUser.mockResolvedValue('123456789012345678');
+    select
+      .mockReturnValueOnce(query([]))
+      .mockReturnValueOnce(query([]));
+    const service = makeService();
+
+    await expect(service.accessFor('user-1')).resolves.toEqual({
+      canView: true,
+      canManage: false,
+      canManageAttendance: false,
+      canBootstrap: true,
+    });
+    await expect(service.canManageAttendance('user-1')).resolves.toBe(false);
   });
 });

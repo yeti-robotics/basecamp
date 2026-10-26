@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { AccessModule } from '../access/access.module.js';
 import { AuthModule } from '../auth/auth.module.js';
 import { DatabaseModule } from '../database/database.module.js';
 import { RosterModule } from '../roster/roster.module.js';
@@ -15,6 +16,7 @@ import { DisplaySessionService } from './display-session.service.js';
 
 @Module({
   imports: [
+    AccessModule,
     AuthModule,
     DatabaseModule,
     RosterModule,

@@ -14,6 +14,7 @@ import { localDateInTimeZone } from './season-timezone.js';
 export interface SeasonAccess {
   canView: boolean;
   canManage: boolean;
+  canManageAttendance: boolean;
   canBootstrap: boolean;
 }
 
@@ -75,13 +76,22 @@ export class SeasonAuthorizationService {
     const active = membership?.state === 'active';
     const canManage = active && membership?.role === 'team_admin';
     const canView = canManage || (active && membership?.role === 'mentor');
+    const canManageAttendance =
+      active &&
+      (membership?.role === 'mentor' || membership?.role === 'team_admin');
     const canBootstrap =
       !canManage && !canView && (await this.bootstrap.bootstrapDiscordIdForUser(userId)) !== null;
     return {
       canView: Boolean(canView || canBootstrap),
       canManage: Boolean(canManage),
+      canManageAttendance: Boolean(canManageAttendance),
       canBootstrap,
     };
+  }
+
+  async canManageAttendance(userId: string): Promise<boolean> {
+    const access = await this.accessFor(userId);
+    return access.canManageAttendance;
   }
 
   async current(now: Date, timeZone: string) {
