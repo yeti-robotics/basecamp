@@ -29,6 +29,7 @@ export interface RosterMember {
   id: number;
   userId: string;
   name: string;
+  preferredName: string | null;
   image: string | null;
   role: string;
   studentExperience: string | null;
@@ -53,6 +54,29 @@ export class RosterService {
     private readonly admission: LinkedDiscordAdmissionService,
     private readonly access: AccessService,
   ) {}
+
+  async profile(userId: string) {
+    const [profile] = await this.database.db
+      .select({ name: user.name, preferredName: user.preferredName })
+      .from(user)
+      .where(eq(user.id, userId))
+      .limit(1);
+    return profile ?? null;
+  }
+
+  async setPreferredName(userId: string, preferredName: string) {
+    const normalized =
+      typeof preferredName === 'string' ? preferredName.trim().replace(/\s+/g, ' ') : '';
+    if (!normalized || normalized.length > 80) {
+      throw new BadRequestException('Enter a name between 1 and 80 characters');
+    }
+    const [updated] = await this.database.db
+      .update(user)
+      .set({ preferredName: normalized })
+      .where(eq(user.id, userId))
+      .returning({ name: user.name, preferredName: user.preferredName });
+    return updated ?? null;
+  }
 
   async ensureCurrentMembership(userId: string, now: Date) {
     const localToday = localDateInTimeZone(now, this.timeZone());
@@ -470,6 +494,7 @@ export class RosterService {
         id: season_memberships.id,
         userId: season_memberships.user_id,
         name: user.name,
+        preferredName: user.preferredName,
         image: user.image,
         role: season_memberships.role,
         studentExperience: season_memberships.student_experience,

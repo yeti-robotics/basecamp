@@ -161,7 +161,14 @@ function MemberRow({
                 .toUpperCase()}
             </AvatarFallback>
           </Avatar>
-          <span className="min-w-32 break-words">{member.name}</span>
+          <span className="min-w-32 break-words">
+            {member.preferredName || member.name}
+            {member.preferredName && member.preferredName !== member.name && (
+              <span className="mt-1 block font-normal text-xs text-muted-foreground">
+                Discord: {member.name}
+              </span>
+            )}
+          </span>
         </div>
       </td>
       <td className="px-4 py-4">
