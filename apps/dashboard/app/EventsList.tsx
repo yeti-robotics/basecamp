@@ -82,12 +82,14 @@ function localDateTime(value: string) {
 function EventCard({
   event,
   canManage,
+  isPast,
   pending,
   onEdit,
   onCancel,
 }: {
   event: TeamEvent;
   canManage: boolean;
+  isPast: boolean;
   pending: boolean;
   onEdit: () => void;
   onCancel: () => void;
@@ -129,7 +131,7 @@ function EventCard({
             <Button variant="outline" size="sm" disabled={pending} onClick={onEdit}>
               <Pencil aria-hidden="true" /> Edit
             </Button>
-            {event.status !== 'cancelled' && (
+            {event.status !== 'cancelled' && !isPast && (
               <Button variant="outline" size="sm" disabled={pending} onClick={onCancel}>
                 <X aria-hidden="true" /> Cancel event
               </Button>
@@ -257,6 +259,7 @@ export function EventsList({
         key={event.id}
         event={event}
         canManage={canManage}
+        isPast={new Date(event.startsAt).getTime() < currentTime}
         pending={pending}
         onEdit={() => startEdit(event)}
         onCancel={() => void cancelEvent(event)}
