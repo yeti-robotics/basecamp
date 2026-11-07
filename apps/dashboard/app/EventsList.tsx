@@ -272,7 +272,9 @@ export function EventsList({
       {canManage && (
         <section className="space-y-4" aria-label="Event management">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm text-muted-foreground">Only Team Admins can manage events.</p>
+            <p className="text-sm text-muted-foreground">
+              As a Team Admin, you can add, edit, and cancel events.
+            </p>
             <Button onClick={startCreate} disabled={pending || seasons.length === 0}>
               <Plus aria-hidden="true" /> Add event
             </Button>
