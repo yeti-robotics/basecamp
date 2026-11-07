@@ -2,15 +2,17 @@ import { redirect } from 'next/navigation';
 import { Brand } from '@/components/Brand';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { getSession } from '@/lib/auth';
 import { getEvents } from '@/lib/events';
+import { getSession } from '@/lib/auth';
+import { getSeasons } from '@/lib/seasons';
 import { EventsList } from '../EventsList';
 
 export default async function EventsPage() {
   const session = await getSession();
   if (!session?.user) redirect('/auth');
 
-  const events = await getEvents();
+  const now = new Date().toISOString();
+  const [events, seasonView] = await Promise.all([getEvents(), getSeasons()]);
 
   return (
     <div className="min-h-svh bg-background text-foreground">
@@ -33,7 +35,12 @@ export default async function EventsPage() {
           </p>
         </header>
         {events ? (
-          <EventsList events={events} />
+          <EventsList
+            events={events}
+            now={now}
+            canManage={seasonView?.canManage ?? false}
+            seasons={seasonView?.seasons ?? []}
+          />
         ) : (
           <Alert className="mt-8">
             <AlertTitle>Events could not be loaded</AlertTitle>
