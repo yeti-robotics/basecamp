@@ -268,7 +268,7 @@ export function EventsList({
   }
 
   return (
-    <div className="mt-8 space-y-8">
+    <div className="mt-8 max-w-3xl space-y-8">
       {canManage && (
         <section className="space-y-4" aria-label="Event management">
           <div className="flex flex-wrap items-center justify-between gap-3">
