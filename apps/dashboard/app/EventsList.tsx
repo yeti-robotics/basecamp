@@ -305,7 +305,7 @@ export function EventsList({
                     <Label htmlFor="event-season">Season</Label>
                     <select
                       id="event-season"
-                      className="h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm"
+                      className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
                       required
                       value={form.seasonId}
                       onChange={(event) => updateField('seasonId', event.target.value)}
@@ -322,7 +322,7 @@ export function EventsList({
                     <Label htmlFor="event-type">Type</Label>
                     <select
                       id="event-type"
-                      className="h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm"
+                      className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
                       value={form.eventType}
                       onChange={(event) =>
                         updateField('eventType', event.target.value as TeamEvent['eventType'])
@@ -337,7 +337,7 @@ export function EventsList({
                     <Label htmlFor="event-hour-category">Hour contribution</Label>
                     <select
                       id="event-hour-category"
-                      className="h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm"
+                      className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
                       value={form.hourCategory}
                       onChange={(event) =>
                         updateField('hourCategory', event.target.value as TeamEvent['hourCategory'])
@@ -383,7 +383,7 @@ export function EventsList({
                       id="event-description"
                       value={form.description}
                       onChange={(event) => updateField('description', event.target.value)}
-                      className="min-h-20 w-full rounded-lg border border-input bg-background px-2.5 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                      className="min-h-20 w-full rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
                     />
                   </div>
                   {error && (
