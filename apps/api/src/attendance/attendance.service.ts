@@ -62,6 +62,8 @@ export function completedHours(
   return Math.max(0, milliseconds / 3_600_000);
 }
 
+export type AttendanceOverview = Awaited<ReturnType<AttendanceService["overview"]>>;
+
 @Injectable()
 export class AttendanceService {
   constructor(
@@ -326,6 +328,20 @@ export class AttendanceService {
       discordId,
       asOfDate,
     );
+  }
+
+  /** The same season overview the dashboard shows, looked up by Discord account. */
+  public getOverviewForDiscordUser(
+    discordId: string,
+    now: Date = new Date(),
+  ): ResultAsync<AttendanceOverview, Error> {
+    return this.attendanceRepository
+      .getUserIdByDiscordId(discordId)
+      .andThen((userId) =>
+        ResultAsync.fromPromise(this.overview(userId, now), (error) =>
+          error instanceof Error ? error : new Error(String(error)),
+        ),
+      );
   }
 
   public getTotalPossibleHoursToDate(asOfDate: Date = new Date()): number {

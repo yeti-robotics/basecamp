@@ -10,6 +10,7 @@ const service = {
   signOutWithCode: vi.fn(),
   signInForMember: vi.fn(),
   signOutForMember: vi.fn(),
+  getOverviewForDiscordUser: vi.fn(),
 };
 
 function makeInteraction() {
@@ -121,5 +122,95 @@ describe('member attendance commands', () => {
 
     expect(interaction.channel.send).not.toHaveBeenCalled();
     expect(interaction.editReply).toHaveBeenCalledWith(expected);
+  });
+});
+
+describe('/attendance command', () => {
+  const commands = new AttendanceCommands(service as never);
+
+  function overview(meetingHours: number) {
+    return {
+      season: { id: 1, name: '2026–27' },
+      hours: { meeting: meetingHours, outreach: 0, total: meetingHours },
+      requirements: { meeting: 26, outreach: 5, track: 'member' },
+      progress: {
+        completedMeetings: 5,
+        attendedMeetings: 3,
+        excusedMeetings: 1,
+        missedMeetings: 1,
+        completedMeetingHours: 16,
+        scheduledMeetingHours: 40,
+        expectedHours: { member: 10.4, leadership: 15.6 },
+      },
+      recentActivity: [],
+    };
+  }
+
+  beforeEach(() => vi.clearAllMocks());
+
+  it.each([
+    [
+      'above the leadership target',
+      16,
+      "You're currently above the minimum hours for leadership (16.00 hours, 100.0% of 16 possible hours to date)! :tada:",
+    ],
+    [
+      'above the member target only',
+      12,
+      "You're currently above the minimum hours for members (12.00 hours, 75.0% of 16 possible hours to date)! If you're on leadership, you are currently 4 hour(s) behind the leadership requirement.",
+    ],
+    [
+      'behind the member target',
+      6.5,
+      "You've got 6.50 hours (40.6% of 16 possible hours to date). You are currently 4 hour(s) behind the minimum hours goal. :rocket:",
+    ],
+  ])('compares hours with what is expected so far when %s', async (_case, hours, message) => {
+    const interaction = makeInteraction();
+    service.getOverviewForDiscordUser.mockReturnValue(okAsync(overview(hours)));
+
+    await commands.AttendanceCommand([interaction] as never);
+
+    expect(service.getOverviewForDiscordUser).toHaveBeenCalledWith(discordId);
+    expect(interaction.editReply).toHaveBeenCalledWith(
+      `${message}\nMeetings so far: 3 attended, 1 excused, 1 missed (of 5).`,
+    );
+  });
+
+  it('shows an infinite percentage before any meetings have finished', async () => {
+    const interaction = makeInteraction();
+    const empty = overview(0);
+    empty.progress = {
+      ...empty.progress,
+      completedMeetings: 0,
+      attendedMeetings: 0,
+      excusedMeetings: 0,
+      missedMeetings: 0,
+      completedMeetingHours: 0,
+      expectedHours: { member: 0, leadership: null as never },
+    };
+    service.getOverviewForDiscordUser.mockReturnValue(okAsync(empty));
+
+    await commands.AttendanceCommand([interaction] as never);
+
+    expect(interaction.editReply).toHaveBeenCalledWith(
+      expect.stringContaining('(0.00 hours, ∞% of 0 possible hours to date)! :tada:'),
+    );
+  });
+
+  it.each([
+    ['the lookup fails', errAsync(new Error('User not found'))],
+    [
+      'the member has no requirement this season',
+      okAsync({ ...overview(0), requirements: null, progress: null }),
+    ],
+  ])('asks the member to tell a mentor when %s', async (_case, result) => {
+    const interaction = makeInteraction();
+    service.getOverviewForDiscordUser.mockReturnValue(result);
+
+    await commands.AttendanceCommand([interaction] as never);
+
+    expect(interaction.editReply).toHaveBeenCalledWith(
+      'There was an error getting your attendance or hour requirements. Please let a mentor know.',
+    );
   });
 });

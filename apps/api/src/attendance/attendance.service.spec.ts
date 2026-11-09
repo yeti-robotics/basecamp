@@ -248,6 +248,36 @@ describe("AttendanceService", () => {
     });
   });
 
+  describe("getOverviewForDiscordUser", () => {
+    it("looks up the Basecamp user and returns their season overview", async () => {
+      const overview = { season: null, progress: null };
+      repository.getUserIdByDiscordId.mockReturnValue(okAsync(userId));
+      const spy = vi.spyOn(service, "overview").mockResolvedValue(overview as never);
+      const now = new Date("2026-11-09T23:00:00.000Z");
+
+      const result = await service.getOverviewForDiscordUser(discordId, now);
+
+      expect(result._unsafeUnwrap()).toBe(overview);
+      expect(repository.getUserIdByDiscordId).toHaveBeenCalledWith(discordId);
+      expect(spy).toHaveBeenCalledWith(userId, now);
+    });
+
+    it("returns lookup and overview failures as errors", async () => {
+      repository.getUserIdByDiscordId.mockReturnValueOnce(
+        errAsync(new Error("User not found")),
+      );
+      expect(
+        (await service.getOverviewForDiscordUser(discordId))._unsafeUnwrapErr().message,
+      ).toBe("User not found");
+
+      repository.getUserIdByDiscordId.mockReturnValueOnce(okAsync(userId));
+      vi.spyOn(service, "overview").mockRejectedValueOnce("database offline");
+      expect(
+        (await service.getOverviewForDiscordUser(discordId))._unsafeUnwrapErr().message,
+      ).toBe("database offline");
+    });
+  });
+
   describe("signInWithCode", () => {
     it("rejects an invalid code without recording attendance", async () => {
       codeService.verify.mockResolvedValue(false);
