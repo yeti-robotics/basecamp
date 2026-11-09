@@ -7,6 +7,8 @@ import { AttendanceController } from './attendance.controller.js';
 import { AttendanceModule } from './attendance.module.js';
 import { AttendanceRepository } from './attendance.repository.js';
 import { AttendanceService } from './attendance.service.js';
+import { AttendanceRecordsController } from './attendance-records.controller.js';
+import { AttendanceRecordsService } from './attendance-records.service.js';
 
 describe('AttendanceModule', () => {
   let module: TestingModule;
@@ -46,6 +48,11 @@ describe('AttendanceModule', () => {
     const service = module.get(AttendanceService);
     expect(service).toBeDefined();
     expect(service).toBeInstanceOf(AttendanceService);
+  });
+
+  it('should provide the mentor attendance records controller and service', () => {
+    expect(module.get(AttendanceRecordsController)).toBeInstanceOf(AttendanceRecordsController);
+    expect(module.get(AttendanceRecordsService)).toBeInstanceOf(AttendanceRecordsService);
   });
 
   it('should provide AttendanceRepository', () => {

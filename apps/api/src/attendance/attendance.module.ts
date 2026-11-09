@@ -10,6 +10,8 @@ import { AttendanceRepository } from './attendance.repository.js';
 import { AttendanceService } from './attendance.service.js';
 import { AttendanceCodeService } from './attendance-code.service.js';
 import { AttendanceInteractionFilter } from './attendance-interaction.filter.js';
+import { AttendanceRecordsController } from './attendance-records.controller.js';
+import { AttendanceRecordsService } from './attendance-records.service.js';
 import { AttendanceThrottlerGuard } from './attendance-throttler.guard.js';
 import { DisplayController } from './display.controller.js';
 import { DisplaySessionService } from './display-session.service.js';
@@ -23,9 +25,10 @@ import { DisplaySessionService } from './display-session.service.js';
     ConfigModule,
     ThrottlerModule.forRoot([{ name: 'attendance', ttl: 60_000, limit: 5 }]),
   ],
-  controllers: [AttendanceController, DisplayController],
+  controllers: [AttendanceController, AttendanceRecordsController, DisplayController],
   providers: [
     AttendanceService,
+    AttendanceRecordsService,
     AttendanceCodeService,
     AttendanceRepository,
     AttendanceThrottlerGuard,
