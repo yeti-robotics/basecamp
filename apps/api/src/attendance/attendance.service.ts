@@ -22,8 +22,6 @@ import { SeasonAuthorizationService } from "../seasons/season-authorization.serv
 import {
   AttendanceRepository,
   getRequirementStatus,
-  type AttendanceRequirementSummary,
-  type AttendanceSumFilter,
   type AttendanceUpdate,
 } from "./attendance.repository.js";
 import { AttendanceCodeService } from "./attendance-code.service.js";
@@ -306,25 +304,6 @@ export class AttendanceService {
             });
         }),
       );
-  }
-
-  public getAttendanceSum(
-    discordId: string,
-    filter?: AttendanceSumFilter,
-  ): ResultAsync<number, Error> {
-    return this.attendanceRepository
-      .getUserIdByDiscordId(discordId)
-      .andThen((userId) => this.attendanceRepository.getSum(userId, filter));
-  }
-
-  public getCurrentHourRequirements(
-    discordId: string,
-    asOfDate: Date = new Date(),
-  ): ResultAsync<AttendanceRequirementSummary, Error> {
-    return this.attendanceRepository.getCurrentHourRequirements(
-      discordId,
-      asOfDate,
-    );
   }
 
   /** The same season overview the dashboard shows, looked up by Discord account. */

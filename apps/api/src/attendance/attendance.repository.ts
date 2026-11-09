@@ -1,5 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { and, desc, eq, gt, gte, isNull, lte, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, isNull, lte, sql } from "drizzle-orm";
 import { err, ok, Result, ResultAsync } from "neverthrow";
 
 import { DatabaseService } from "../database/database.service.js";
@@ -26,19 +26,6 @@ export type AttendanceUpdate = {
   eventId?: number | null;
 };
 
-export type AttendanceSumFilter = {
-  category?: "meeting" | "outreach";
-  eventId?: number | null;
-  checkedInFrom?: Date;
-  checkedInThrough?: Date;
-};
-
-export type AttendanceRequirementSummary = {
-  status: typeof hour_requirements.$inferSelect.status;
-  member: number;
-  leadership: number;
-};
-
 type MembershipRequirementFields = Pick<
   typeof season_memberships.$inferSelect,
   "role" | "student_experience" | "legacy_status"
@@ -46,7 +33,7 @@ type MembershipRequirementFields = Pick<
 
 export function getRequirementStatus(
   membership: MembershipRequirementFields,
-): AttendanceRequirementSummary["status"] | null {
+): typeof hour_requirements.$inferSelect.status | null {
   if (membership.role === "mentor" || membership.role === "team_admin") {
     return "mentor";
   }
@@ -70,147 +57,6 @@ export class AttendanceRepository {
         .limit(1),
       (error) => (error instanceof Error ? error : new Error(String(error))),
     ).andThen((result) => this.parseRow(result[0]));
-  }
-
-  getSum(
-    userId: string,
-    filter?: AttendanceSumFilter,
-  ): ResultAsync<number, Error> {
-    return ResultAsync.fromPromise(
-      this.database.db
-        .select({
-          totalSeconds: sql<number>`COALESCE(
-            SUM(
-              EXTRACT(
-                EPOCH FROM (
-                  ${attendance.checked_out_at} -
-                  ${attendance.checked_in_at}
-                )
-              )
-            ),
-            0
-          )`,
-        })
-        .from(attendance)
-        .where(
-          and(
-            eq(attendance.user_id, userId),
-            filter?.category !== undefined
-              ? eq(attendance.category, filter.category)
-              : undefined,
-            filter?.eventId !== undefined
-              ? filter.eventId === null
-                ? isNull(attendance.event_id)
-                : eq(attendance.event_id, filter.eventId)
-              : undefined,
-            filter?.checkedInFrom !== undefined
-              ? gte(attendance.checked_in_at, filter.checkedInFrom)
-              : undefined,
-            filter?.checkedInThrough !== undefined
-              ? lte(attendance.checked_in_at, filter.checkedInThrough)
-              : undefined,
-          ),
-        ),
-      (error) => (error instanceof Error ? error : new Error(String(error))),
-    ).andThen((result) => {
-      const totalSeconds = Number(result[0]?.totalSeconds ?? 0);
-      const hours = Math.round((totalSeconds / 3600) * 100) / 100;
-
-      return ok(hours);
-    });
-  }
-
-  /**
-   * Retrieves the active season's meeting requirements for the user's status.
-   */
-  getCurrentHourRequirements(
-    discordId: string,
-    asOfDate: Date = new Date(),
-  ): ResultAsync<AttendanceRequirementSummary, Error> {
-    return this.getUserIdByDiscordId(discordId).andThen((userId) =>
-      ResultAsync.fromPromise(
-        this.database.db
-          .select({
-            seasonId: seasons.id,
-            role: season_memberships.role,
-            student_experience: season_memberships.student_experience,
-            legacy_status: season_memberships.legacy_status,
-          })
-          .from(season_memberships)
-          .innerJoin(seasons, eq(season_memberships.season_id, seasons.id))
-          .where(
-            and(
-              eq(season_memberships.user_id, userId),
-              eq(season_memberships.state, "active"),
-              lte(seasons.started_at, asOfDate),
-              gte(seasons.ended_at, asOfDate),
-              lte(season_memberships.started_at, asOfDate),
-              or(
-                isNull(season_memberships.ended_at),
-                gte(season_memberships.ended_at, asOfDate),
-              ),
-              lte(season_memberships.joined_at, asOfDate),
-              or(
-                isNull(season_memberships.removed_at),
-                gt(season_memberships.removed_at, asOfDate),
-              ),
-            ),
-          )
-          .orderBy(desc(seasons.started_at))
-          .limit(1),
-        (error) => (error instanceof Error ? error : new Error(String(error))),
-      ).andThen((memberships) => {
-        const membership = memberships[0];
-
-        if (!membership) {
-          return err(new Error("No active season membership found"));
-        }
-
-        const status = getRequirementStatus(membership);
-
-        if (!status) {
-          return err(
-            new Error(
-              `No attendance requirement status is configured for membership role "${membership.role}"`,
-            ),
-          );
-        }
-
-        return ResultAsync.fromPromise(
-          this.database.db
-            .select({
-              isLeader: hour_requirements.is_leader,
-              requiredHours: hour_requirements.required_hours,
-            })
-            .from(hour_requirements)
-            .where(
-              and(
-                eq(hour_requirements.status, status),
-                eq(hour_requirements.season_id, membership.seasonId),
-                eq(hour_requirements.category, "meeting"),
-              ),
-            ),
-          (error) => (error instanceof Error ? error : new Error(String(error))),
-        ).andThen((rows) => {
-          const memberRequirement = rows.find((row) => !row.isLeader);
-          const leadershipRequirement = rows.find((row) => row.isLeader);
-
-          if (!memberRequirement || !leadershipRequirement) {
-            return err(
-              new Error(
-                `Meeting requirements are not configured for status "${status}" in season ${membership.seasonId}`,
-              ),
-            );
-          }
-
-          return ok({
-            status,
-            member: memberRequirement.requiredHours,
-            leadership: leadershipRequirement.requiredHours,
-          });
-        });
-      }),
-    );
   }
 
   ensureCurrentSeasonMembership(

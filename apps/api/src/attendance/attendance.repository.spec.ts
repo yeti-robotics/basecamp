@@ -335,12 +335,6 @@ describe("AttendanceRepository", () => {
       expect(result._unsafeUnwrapErr()).toBeInstanceOf(Error);
     });
   });
-
-  describe("getCurrentHourRequirements", () => {
-    it("is exposed by the repository", () => {
-      expect(repository.getCurrentHourRequirements).toBeTypeOf("function");
-    });
-  });
 });
 
 describe("getRequirementStatus", () => {
