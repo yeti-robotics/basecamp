@@ -180,6 +180,12 @@ export function DashboardOverview({ user, attendance }: DashboardOverviewProps) 
             Activity
           </a>
           <a
+            href="/events"
+            className="py-3 text-muted-foreground transition-colors hover:text-foreground"
+          >
+            Events
+          </a>
+          <a
             href="/seasons"
             className="py-3 text-muted-foreground transition-colors hover:text-foreground"
           >

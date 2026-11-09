@@ -6,6 +6,7 @@ import { AttendanceModule } from './attendance/attendance.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { BotModule } from './bot/bot.module.js';
 import { configOptions } from './config.options.js';
+import { EventsModule } from './events/events.module.js';
 import { HandbookModule } from './handbook/handbook.module.js';
 import { HealthModule } from './health/health.module.js';
 import { LifecycleModule } from './lifecycle/lifecycle.module.js';
@@ -18,6 +19,7 @@ import { SeasonsModule } from './seasons/seasons.module.js';
     ConfigModule.forRoot(configOptions),
     BotModule,
     AttendanceModule,
+    EventsModule,
     AuthModule,
     LifecycleModule,
     HandbookModule,
