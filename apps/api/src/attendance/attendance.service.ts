@@ -33,9 +33,6 @@ import {
 } from "./attendance.constants.js";
 import type { Attendance } from "./attendance.schema.js";
 import { calculateMeetingProgress } from "./attendance-progress.js";
-import {
-  getTotalPossibleHoursToDate as calculateTotalPossibleHoursToDate,
-} from "./schedule.util.js";
 
 type AttendanceRecord = {
   id: number;
@@ -342,10 +339,6 @@ export class AttendanceService {
           error instanceof Error ? error : new Error(String(error)),
         ),
       );
-  }
-
-  public getTotalPossibleHoursToDate(asOfDate: Date = new Date()): number {
-    return calculateTotalPossibleHoursToDate(asOfDate);
   }
 
   async overview(userId: string, now = new Date()) {
