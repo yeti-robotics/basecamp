@@ -15,7 +15,9 @@ export const eventCategory = pgEnum('event_category', ['meeting', 'outreach']);
 export const eventType = pgEnum('event_type', ['meeting', 'extra_meeting', 'outreach', 'other']);
 export const eventHourCategory = pgEnum('event_hour_category', ['meeting', 'outreach', 'none']);
 export const eventStatus = pgEnum('event_status', ['scheduled', 'cancelled']);
+export const attendanceStatus = pgEnum('attendance_status', ['normal', 'manual', 'excused']);
 
 export type SeasonRole = (typeof seasonRole.enumValues)[number];
 export type StudentExperience = (typeof studentExperience.enumValues)[number];
 export type MembershipState = (typeof membershipState.enumValues)[number];
+export type AttendanceStatus = (typeof attendanceStatus.enumValues)[number];

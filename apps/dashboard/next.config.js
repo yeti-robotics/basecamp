@@ -22,6 +22,10 @@ const nextConfig = {
         destination: `${apiInternalUrl}/api/attendance-display/:path*`,
       },
       {
+        source: '/api/attendance/records/:path*',
+        destination: `${apiInternalUrl}/api/attendance/records/:path*`,
+      },
+      {
         source: '/api/events/:path*',
         destination: `${apiInternalUrl}/api/events/:path*`,
       },
