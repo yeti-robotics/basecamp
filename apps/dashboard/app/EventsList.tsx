@@ -1,18 +1,12 @@
 'use client';
 
-import { type FormEvent, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { CalendarDays, Pencil, Plus, X } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { type FormEvent, useState } from 'react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Empty,
   EmptyDescription,
@@ -122,9 +116,7 @@ function EventCard({
           </p>
           <p className="text-muted-foreground">{event.location}</p>
           {event.description && <p className="text-muted-foreground">{event.description}</p>}
-          <p className="text-xs text-muted-foreground">
-            {hourCategoryLabels[event.hourCategory]}
-          </p>
+          <p className="text-xs text-muted-foreground">{hourCategoryLabels[event.hourCategory]}</p>
         </div>
         {canManage && (
           <div className="flex flex-wrap gap-2 border-t pt-3">
@@ -158,20 +150,27 @@ export function EventsList({
   const [editingId, setEditingId] = useState<number | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<EventForm>(() =>
-    emptyForm(String(seasons.find((season) => season.period === 'current')?.id ?? seasons[0]?.id ?? '')),
+    emptyForm(
+      String(seasons.find((season) => season.period === 'current')?.id ?? seasons[0]?.id ?? ''),
+    ),
   );
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
   const currentTime = new Date(now).getTime();
   const upcoming = events
-    .filter((event) => event.status === 'scheduled' && new Date(event.startsAt).getTime() >= currentTime)
+    .filter(
+      (event) => event.status === 'scheduled' && new Date(event.startsAt).getTime() >= currentTime,
+    )
     .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
   const previous = events
-    .filter((event) => event.status === 'cancelled' || new Date(event.startsAt).getTime() < currentTime)
+    .filter(
+      (event) => event.status === 'cancelled' || new Date(event.startsAt).getTime() < currentTime,
+    )
     .sort((a, b) => b.startsAt.localeCompare(a.startsAt));
 
   function startCreate() {
-    const currentSeasonId = seasons.find((season) => season.period === 'current')?.id ?? seasons[0]?.id;
+    const currentSeasonId =
+      seasons.find((season) => season.period === 'current')?.id ?? seasons[0]?.id;
     setEditingId(null);
     setForm(emptyForm(String(currentSeasonId ?? '')));
     setError('');
@@ -205,20 +204,25 @@ export function EventsList({
     setPending(true);
     setError('');
     try {
-      const response = await fetch(editingId === null ? '/api/events' : `/api/events/${editingId}`, {
-        method: editingId === null ? 'POST' : 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...form,
-          seasonId: Number(form.seasonId),
-          description: form.description.trim() || null,
-          startsAt: new Date(form.startsAt).toISOString(),
-          endsAt: new Date(form.endsAt).toISOString(),
-        }),
-      });
+      const response = await fetch(
+        editingId === null ? '/api/events' : `/api/events/${editingId}`,
+        {
+          method: editingId === null ? 'POST' : 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...form,
+            seasonId: Number(form.seasonId),
+            description: form.description.trim() || null,
+            startsAt: new Date(form.startsAt).toISOString(),
+            endsAt: new Date(form.endsAt).toISOString(),
+          }),
+        },
+      );
       if (!response.ok) {
         const result = await response.json().catch(() => ({}));
-        setError(typeof result.message === 'string' ? result.message : 'The event could not be saved.');
+        setError(
+          typeof result.message === 'string' ? result.message : 'The event could not be saved.',
+        );
         return;
       }
       closeForm();
@@ -238,7 +242,9 @@ export function EventsList({
       const response = await fetch(`/api/events/${event.id}/cancel`, { method: 'POST' });
       if (!response.ok) {
         const result = await response.json().catch(() => ({}));
-        setError(typeof result.message === 'string' ? result.message : 'The event could not be cancelled.');
+        setError(
+          typeof result.message === 'string' ? result.message : 'The event could not be cancelled.',
+        );
         return;
       }
       router.refresh();
@@ -312,7 +318,9 @@ export function EventsList({
                       value={form.seasonId}
                       onChange={(event) => updateField('seasonId', event.target.value)}
                     >
-                      <option value="" disabled>Select a season</option>
+                      <option value="" disabled>
+                        Select a season
+                      </option>
                       {seasons.map((season) => (
                         <option key={season.id} value={season.id}>
                           {season.name}
@@ -331,7 +339,9 @@ export function EventsList({
                       }
                     >
                       {Object.entries(eventTypeLabels).map(([value, label]) => (
-                        <option key={value} value={value}>{label}</option>
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
                       ))}
                     </select>
                   </div>
@@ -346,7 +356,9 @@ export function EventsList({
                       }
                     >
                       {Object.entries(hourCategoryLabels).map(([value, label]) => (
-                        <option key={value} value={value}>{label}</option>
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
                       ))}
                     </select>
                   </div>
@@ -426,7 +438,9 @@ export function EventsList({
         <>
           {upcoming.length > 0 && (
             <section aria-labelledby="upcoming-events-heading" className="space-y-3">
-              <h2 id="upcoming-events-heading" className="text-lg font-medium">Upcoming events</h2>
+              <h2 id="upcoming-events-heading" className="text-lg font-medium">
+                Upcoming events
+              </h2>
               {renderEvents(upcoming)}
             </section>
           )}

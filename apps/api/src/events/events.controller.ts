@@ -12,8 +12,8 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import type { Request } from 'express';
-import { SessionGuard, type AuthenticatedRequest } from '../access/session.guard.js';
-import { type EventInput, type EventUpdate, EventsService } from './events.service.js';
+import { type AuthenticatedRequest, SessionGuard } from '../access/session.guard.js';
+import { type EventInput, EventsService, type EventUpdate } from './events.service.js';
 
 @Controller('api/events')
 @UseGuards(SessionGuard)

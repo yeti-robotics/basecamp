@@ -1,4 +1,9 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { asc, eq } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service.js';
 import { eventHourCategory, eventType } from '../database/schema/enums.js';
@@ -151,11 +156,7 @@ export class EventsService {
   }
 
   private async findRawById(id: number) {
-    const [event] = await this.database.db
-      .select()
-      .from(events)
-      .where(eq(events.id, id))
-      .limit(1);
+    const [event] = await this.database.db.select().from(events).where(eq(events.id, id)).limit(1);
     if (!event) throw new NotFoundException('Event not found');
     return event;
   }
@@ -201,8 +202,10 @@ export class EventsService {
     const update: Partial<typeof events.$inferInsert> = {};
     if (input.seasonId !== undefined) update.season_id = this.validateSeasonId(input.seasonId);
     if (input.name !== undefined) update.name = this.requiredText(input.name, 'Name');
-    if (input.description !== undefined) update.description = this.optionalDescription(input.description);
-    if (input.location !== undefined) update.location = this.requiredText(input.location, 'Location');
+    if (input.description !== undefined)
+      update.description = this.optionalDescription(input.description);
+    if (input.location !== undefined)
+      update.location = this.requiredText(input.location, 'Location');
     if (input.eventType !== undefined) {
       if (!eventType.enumValues.includes(input.eventType)) {
         throw new BadRequestException('Choose a valid event type');
@@ -216,14 +219,19 @@ export class EventsService {
       update.hour_category = input.hourCategory;
     }
 
-    const startsAt = input.startsAt === undefined ? before.starts_at : this.timestamp(input.startsAt, 'Start time');
-    const endsAt = input.endsAt === undefined ? before.ends_at : this.timestamp(input.endsAt, 'End time');
+    const startsAt =
+      input.startsAt === undefined
+        ? before.starts_at
+        : this.timestamp(input.startsAt, 'Start time');
+    const endsAt =
+      input.endsAt === undefined ? before.ends_at : this.timestamp(input.endsAt, 'End time');
     if (endsAt <= startsAt) {
       throw new BadRequestException('End time must be after start time');
     }
     if (input.startsAt !== undefined) update.starts_at = startsAt;
     if (input.endsAt !== undefined) update.ends_at = endsAt;
-    if (Object.keys(update).length === 0) throw new BadRequestException('Event changes are required');
+    if (Object.keys(update).length === 0)
+      throw new BadRequestException('Event changes are required');
     return update;
   }
 

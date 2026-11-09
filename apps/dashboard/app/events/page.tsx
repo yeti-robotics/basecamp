@@ -2,8 +2,8 @@ import { redirect } from 'next/navigation';
 import { Brand } from '@/components/Brand';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { getEvents } from '@/lib/events';
 import { getSession } from '@/lib/auth';
+import { getEvents } from '@/lib/events';
 import { getSeasons } from '@/lib/seasons';
 import { EventsList } from '../EventsList';
 
