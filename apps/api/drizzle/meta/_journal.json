@@ -71,6 +71,13 @@
       "when": 1793920765473,
       "tag": "0009_bright_blizzard",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1794266878117,
+      "tag": "0010_fine_spectrum",
+      "breakpoints": true
     }
   ]
 }
