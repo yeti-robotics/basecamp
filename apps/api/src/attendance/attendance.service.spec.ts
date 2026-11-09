@@ -315,3 +315,156 @@ describe("completedHours", () => {
     ).toBe(0);
   });
 });
+describe("AttendanceService.overview", () => {
+  // Each query resolves to its rows whichever builder method ends the chain.
+  function query(rows: unknown[]) {
+    const builder = Object.assign(Promise.resolve(rows), {
+      from: vi.fn(() => builder),
+      leftJoin: vi.fn(() => builder),
+      where: vi.fn(() => builder),
+      orderBy: vi.fn(() => builder),
+      limit: vi.fn(() => builder),
+    });
+    return builder;
+  }
+
+  const db = { select: vi.fn() };
+  const now = new Date("2026-11-09T23:00:00.000Z");
+  const season = {
+    id: 1,
+    name: "2026–27",
+    started_at: new Date("2026-05-15T04:00:00.000Z"),
+    ended_at: new Date("2027-05-15T03:59:59.000Z"),
+  };
+  const membership = {
+    role: "student",
+    student_experience: "rookie",
+    legacy_status: null,
+  };
+  const requirementRows = [
+    { category: "meeting", is_leader: false, required_hours: 26 },
+    { category: "meeting", is_leader: true, required_hours: 39 },
+    { category: "outreach", is_leader: false, required_hours: 5 },
+  ];
+  const meetings = [
+    {
+      id: 1,
+      startsAt: new Date("2026-11-03T21:30:00.000Z"),
+      endsAt: new Date("2026-11-04T00:30:00.000Z"),
+    },
+    {
+      id: 2,
+      startsAt: new Date("2026-11-07T14:00:00.000Z"),
+      endsAt: new Date("2026-11-07T18:00:00.000Z"),
+    },
+    {
+      id: 3,
+      startsAt: new Date("2026-11-10T21:30:00.000Z"),
+      endsAt: new Date("2026-11-11T00:30:00.000Z"),
+    },
+  ];
+  const records = [
+    {
+      id: 11,
+      category: "meeting",
+      status: "excused",
+      eventId: 2,
+      name: "Saturday build",
+      checkedInAt: new Date("2026-11-07T14:00:00.000Z"),
+      checkedOutAt: new Date("2026-11-07T18:00:00.000Z"),
+    },
+    {
+      id: 10,
+      category: "outreach",
+      status: "normal",
+      eventId: null,
+      name: null,
+      checkedInAt: new Date("2026-11-01T16:00:00.000Z"),
+      checkedOutAt: new Date("2026-11-01T18:00:00.000Z"),
+    },
+  ];
+
+  function makeService() {
+    return new AttendanceService(
+      {} as never,
+      { db } as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+  }
+
+  function mockQueries(memberships: unknown[], requirements = requirementRows) {
+    db.select
+      .mockReturnValueOnce(query([season]))
+      .mockReturnValueOnce(query(records))
+      .mockReturnValueOnce(query(memberships))
+      .mockReturnValueOnce(query(meetings))
+      .mockReturnValueOnce(query(requirements));
+  }
+
+  beforeEach(() => {
+    db.select.mockReset();
+  });
+
+  it("returns empty progress when no season is active", async () => {
+    db.select.mockReturnValueOnce(query([]));
+
+    await expect(makeService().overview("user-1", now)).resolves.toEqual({
+      season: null,
+      hours: { meeting: 0, outreach: 0, total: 0 },
+      requirements: null,
+      progress: null,
+      recentActivity: [],
+    });
+  });
+
+  it("compares a member's hours and meetings with what is expected so far", async () => {
+    mockQueries([membership]);
+
+    const overview = await makeService().overview("user-1", now);
+
+    expect(overview.hours).toEqual({ meeting: 4, outreach: 2, total: 6 });
+    expect(overview.requirements).toEqual({ meeting: 26, outreach: 5, track: "member" });
+    expect(overview.progress).toEqual({
+      completedMeetings: 2,
+      attendedMeetings: 0,
+      excusedMeetings: 1,
+      missedMeetings: 1,
+      completedMeetingHours: 7,
+      scheduledMeetingHours: 10,
+      expectedHours: { member: 18.2, leadership: 27.3 },
+    });
+    expect(overview.recentActivity[0]).toMatchObject({
+      name: "Saturday build",
+      status: "excused",
+      hours: 4,
+    });
+    expect(overview.recentActivity[1]).toMatchObject({ name: "Outreach event" });
+  });
+
+  it("measures Student Leaders against the leadership meeting target", async () => {
+    mockQueries([{ ...membership, role: "student_leader" }]);
+
+    const overview = await makeService().overview("user-1", now);
+
+    expect(overview.requirements).toEqual({ meeting: 39, outreach: 5, track: "leadership" });
+  });
+
+  it("still counts meetings for someone without an active membership", async () => {
+    db.select
+      .mockReturnValueOnce(query([season]))
+      .mockReturnValueOnce(query(records))
+      .mockReturnValueOnce(query([]))
+      .mockReturnValueOnce(query(meetings));
+
+    const overview = await makeService().overview("user-1", now);
+
+    expect(overview.requirements).toBeNull();
+    expect(overview.progress).toMatchObject({
+      completedMeetings: 2,
+      expectedHours: { member: null, leadership: null },
+    });
+    expect(db.select).toHaveBeenCalledTimes(4);
+  });
+});

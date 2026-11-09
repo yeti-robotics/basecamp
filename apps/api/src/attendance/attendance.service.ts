@@ -32,6 +32,7 @@ import {
   STALE_SIGNIN_MIN_HOURS_MS,
 } from "./attendance.constants.js";
 import type { Attendance } from "./attendance.schema.js";
+import { calculateMeetingProgress } from "./attendance-progress.js";
 import {
   getTotalPossibleHoursToDate as calculateTotalPossibleHoursToDate,
 } from "./schedule.util.js";
@@ -345,17 +346,20 @@ export class AttendanceService {
         season: null,
         hours: { meeting: 0, outreach: 0, total: 0 },
         requirements: null,
+        progress: null,
         recentActivity: [],
       };
     }
 
-    const [records, memberships] = await Promise.all([
+    const [records, memberships, meetings] = await Promise.all([
       db
         .select({
           id: attendance.id,
           category: attendance.category,
           checkedInAt: attendance.checked_in_at,
           checkedOutAt: attendance.checked_out_at,
+          eventId: attendance.event_id,
+          status: attendance.status,
           name: events.name,
         })
         .from(attendance)
@@ -397,6 +401,17 @@ export class AttendanceService {
         )
         .orderBy(desc(season_memberships.started_at))
         .limit(1),
+      // Meetings that count toward hours; cancelled meetings never do.
+      db
+        .select({ id: events.id, startsAt: events.starts_at, endsAt: events.ends_at })
+        .from(events)
+        .where(
+          and(
+            eq(events.season_id, season.id),
+            eq(events.hour_category, "meeting"),
+            eq(events.status, "scheduled"),
+          ),
+        ),
     ]);
 
     const membership = memberships[0];
@@ -412,10 +427,20 @@ export class AttendanceService {
             and(
               eq(hour_requirements.season_id, season.id),
               eq(hour_requirements.status, requirementStatus),
-              eq(hour_requirements.is_leader, false),
             ),
           )
       : [];
+    const requiredHours = (category: "meeting" | "outreach", isLeader: boolean) =>
+      requirements.find(
+        (row) => row.category === category && row.is_leader === isLeader,
+      )?.required_hours ?? null;
+    const meetingRequirements = {
+      member: requiredHours("meeting", false),
+      leadership: requiredHours("meeting", true),
+    };
+    // Student Leaders are measured against the leadership meeting target.
+    const track =
+      membership?.role === "student_leader" ? "leadership" : "member";
 
     const hours = { meeting: 0, outreach: 0, total: 0 };
 
@@ -434,17 +459,21 @@ export class AttendanceService {
       hours,
       requirements: membership
         ? {
-            meeting:
-              requirements.find((row) => row.category === "meeting")
-                ?.required_hours ?? null,
-            outreach:
-              requirements.find((row) => row.category === "outreach")
-                ?.required_hours ?? null,
+            meeting: meetingRequirements[track],
+            outreach: requiredHours("outreach", false),
+            track,
           }
         : null,
+      progress: calculateMeetingProgress(
+        meetings,
+        records,
+        membership ? meetingRequirements : { member: null, leadership: null },
+        now,
+      ),
       recentActivity: records.slice(0, 5).map((record) => ({
         id: record.id,
         category: record.category,
+        status: record.status,
         name:
           record.name ??
           (record.category === "meeting" ? "Team meeting" : "Outreach event"),
