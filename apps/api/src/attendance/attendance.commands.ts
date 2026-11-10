@@ -13,10 +13,6 @@ import { AttendanceService } from "./attendance.service.js";
 import { AttendanceInteractionFilter } from "./attendance-interaction.filter.js";
 import { AttendanceCodeOptions } from "./attendance-options.dto.js";
 import { AttendanceThrottlerGuard } from "./attendance-throttler.guard.js";
-import {
-  getSeasonDataStartForDate,
-  getTotalSeasonHours,
-} from "./schedule.util.js";
 
 class MentorAttendanceOptions {
   @UserOption({
@@ -105,28 +101,19 @@ export class AttendanceCommands {
   async AttendanceCommand(@Context() [interaction]: SlashCommandContext) {
     await interaction.deferReply();
 
-    const asOfDate = new Date();
-    const [hoursResult, requirementsResult] = await Promise.all([
-      this.attendanceService.getAttendanceSum(interaction.user.id, {
-        category: "meeting",
-        checkedInFrom: getSeasonDataStartForDate(asOfDate),
-        checkedInThrough: asOfDate,
-      }),
-      this.attendanceService.getCurrentHourRequirements(
-        interaction.user.id,
-        asOfDate,
-      ),
-    ]);
+    const result = await this.attendanceService.getOverviewForDiscordUser(
+      interaction.user.id,
+    );
+    const overview = result.isOk() ? result.value : null;
+    const expected = overview?.progress?.expectedHours;
 
-    if (hoursResult.isErr() || requirementsResult.isErr()) {
-      const error = hoursResult.isErr()
-        ? hoursResult.error
-        : requirementsResult.isErr()
-          ? requirementsResult.error
-          : new Error("Unknown attendance lookup error");
-
+    if (!overview?.progress || !expected || expected.member === null) {
       this.logger.error(
-        `Error getting attendance for user ${interaction.user.id}: ${error.message}`,
+        `Error getting attendance for user ${interaction.user.id}: ${
+          result.isErr()
+            ? result.error.message
+            : "No active season membership or hour requirement"
+        }`,
       );
 
       await interaction.editReply(
@@ -135,30 +122,19 @@ export class AttendanceCommands {
       return;
     }
 
-    const hours = hoursResult.value;
-    const requirements = requirementsResult.value;
-    const totalPossibleHours =
-      this.attendanceService.getTotalPossibleHoursToDate(asOfDate);
-    const totalSeasonHours = getTotalSeasonHours(asOfDate);
-
-    const memberRequiredHours =
-      totalSeasonHours > 0
-        ? totalPossibleHours * (requirements.member / totalSeasonHours)
-        : 0;
-    const leadershipRequiredHours =
-      totalSeasonHours > 0
-        ? totalPossibleHours * (requirements.leadership / totalSeasonHours)
-        : 0;
-
+    const progress = overview.progress;
+    const hours = overview.hours.meeting;
+    const memberRequiredHours = expected.member;
+    const leadershipRequiredHours = expected.leadership ?? memberRequiredHours;
+    const possibleHours = progress.completedMeetingHours;
     const hoursPercentage =
-      totalPossibleHours > 0
-        ? `${((hours / totalPossibleHours) * 100).toFixed(1)}`
-        : "∞";
-    const totalPossibleHoursDisplay = Math.floor(totalPossibleHours);
+      possibleHours > 0 ? `${((hours / possibleHours) * 100).toFixed(1)}` : "∞";
+    const possibleHoursDisplay = Math.floor(possibleHours);
+    const meetings = `\nMeetings so far: ${progress.attendedMeetings} attended, ${progress.excusedMeetings} excused, ${progress.missedMeetings} missed (of ${progress.completedMeetings}).`;
 
     if (hours >= leadershipRequiredHours) {
       await interaction.editReply(
-        `You're currently above the minimum hours for leadership (${hours.toFixed(2)} hours, ${hoursPercentage}% of ${totalPossibleHoursDisplay} possible hours to date)! :tada:`,
+        `You're currently above the minimum hours for leadership (${hours.toFixed(2)} hours, ${hoursPercentage}% of ${possibleHoursDisplay} possible hours to date)! :tada:${meetings}`,
       );
       return;
     }
@@ -167,7 +143,7 @@ export class AttendanceCommands {
       const remainingHours = Math.ceil(leadershipRequiredHours - hours);
 
       await interaction.editReply(
-        `You're currently above the minimum hours for members (${hours.toFixed(2)} hours, ${hoursPercentage}% of ${totalPossibleHoursDisplay} possible hours to date)! If you're on leadership, you are currently ${remainingHours} hour(s) behind the leadership requirement.`,
+        `You're currently above the minimum hours for members (${hours.toFixed(2)} hours, ${hoursPercentage}% of ${possibleHoursDisplay} possible hours to date)! If you're on leadership, you are currently ${remainingHours} hour(s) behind the leadership requirement.${meetings}`,
       );
       return;
     }
@@ -175,7 +151,7 @@ export class AttendanceCommands {
     const remainingHours = Math.ceil(memberRequiredHours - hours);
 
     await interaction.editReply(
-      `You've got ${hours.toFixed(2)} hours (${hoursPercentage}% of ${totalPossibleHoursDisplay} possible hours to date). You are currently ${remainingHours} hour(s) behind the minimum hours goal. :rocket:`,
+      `You've got ${hours.toFixed(2)} hours (${hoursPercentage}% of ${possibleHoursDisplay} possible hours to date). You are currently ${remainingHours} hour(s) behind the minimum hours goal. :rocket:${meetings}`,
     );
   }
 

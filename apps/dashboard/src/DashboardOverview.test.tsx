@@ -107,3 +107,102 @@ it('shows completed attendance hours and a missing-season notice', () => {
   expect(screen.getByText('2.0 hrs')).toBeInTheDocument();
   expect(screen.queryByText('In progress')).not.toBeInTheDocument();
 });
+
+const progress = {
+  completedMeetings: 5,
+  attendedMeetings: 3,
+  excusedMeetings: 1,
+  missedMeetings: 1,
+  completedMeetingHours: 16,
+  scheduledMeetingHours: 40,
+  expectedHours: { member: 10.4, leadership: 15.6 },
+};
+
+it('compares meeting hours with what is expected so far and counts meetings', () => {
+  render(
+    <DashboardOverview
+      user={user}
+      attendance={{
+        ...attendance,
+        requirements: { meeting: 26, outreach: 5, track: 'member' },
+        progress,
+      }}
+    />,
+  );
+
+  expect(screen.getByRole('heading', { name: 'Meetings so far' })).toBeInTheDocument();
+  expect(screen.getByText('5 finished · 16.0 hrs')).toBeInTheDocument();
+  expect(screen.getByText('2.1 hrs ahead')).toBeInTheDocument();
+  expect(screen.getByText('Expected by now: 10.4 hrs. You have 12.5.')).toBeInTheDocument();
+  const counts = Object.fromEntries(
+    ['Attended', 'Excused', 'Missed'].map((label) => [
+      label,
+      screen.getByText(label).nextElementSibling?.textContent,
+    ]),
+  );
+  expect(counts).toEqual({ Attended: '3', Excused: '1', Missed: '1' });
+});
+
+it('uses the leadership target for Student Leaders and shows when they are behind', () => {
+  render(
+    <DashboardOverview
+      user={user}
+      attendance={{
+        ...attendance,
+        requirements: { meeting: 39, outreach: 5, track: 'leadership' },
+        progress,
+      }}
+    />,
+  );
+
+  expect(screen.getByText('3.1 hrs behind')).toBeInTheDocument();
+  expect(
+    screen.getByText('Expected by now: 15.6 hrs for the leadership target. You have 12.5.'),
+  ).toBeInTheDocument();
+});
+
+it('explains when no meetings have finished and hides the pace without a requirement', () => {
+  render(
+    <DashboardOverview
+      user={user}
+      attendance={{
+        ...attendance,
+        requirements: null,
+        progress: {
+          ...progress,
+          completedMeetings: 0,
+          attendedMeetings: 0,
+          excusedMeetings: 0,
+          missedMeetings: 0,
+          completedMeetingHours: 0,
+          expectedHours: { member: null, leadership: null },
+        },
+      }}
+    />,
+  );
+
+  expect(screen.getByText('No meetings have finished yet this season.')).toBeInTheDocument();
+  expect(screen.queryByText(/hrs (ahead|behind)/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/Expected by now/)).not.toBeInTheDocument();
+});
+
+it('labels excused time in recent activity', () => {
+  render(
+    <DashboardOverview
+      user={user}
+      attendance={{
+        ...attendance,
+        recentActivity: [
+          {
+            ...attendance.recentActivity[0]!,
+            status: 'excused',
+            checkedOutAt: '2026-10-12T19:00:00Z',
+            hours: 4,
+          },
+        ],
+      }}
+    />,
+  );
+
+  expect(screen.getByText(/Excused/)).toBeInTheDocument();
+});

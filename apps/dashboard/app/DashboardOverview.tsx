@@ -1,6 +1,7 @@
 import {
   ArrowDownLeft,
   ArrowUpRight,
+  CalendarCheck,
   Check,
   Clock3,
   HandHeart,
@@ -99,6 +100,65 @@ function ProgressRow({
   );
 }
 
+type MeetingProgress = NonNullable<AttendanceOverview['progress']>;
+
+function MeetingPace({
+  progress,
+  hours,
+  expected,
+  leadership,
+}: {
+  progress: MeetingProgress;
+  hours: number;
+  expected: number | null;
+  leadership: boolean;
+}) {
+  const difference = expected === null ? null : hours - expected;
+  const counts = [
+    { label: 'Attended', value: progress.attendedMeetings },
+    { label: 'Excused', value: progress.excusedMeetings },
+    { label: 'Missed', value: progress.missedMeetings },
+  ];
+  return (
+    <div className="py-6 first:pt-0 last:pb-0">
+      <div className="flex items-center gap-3">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border bg-muted/40 text-muted-foreground">
+          <CalendarCheck aria-hidden="true" className="size-4" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <h3 className="text-sm font-medium">Meetings so far</h3>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {progress.completedMeetings === 0
+              ? 'No meetings have finished yet this season.'
+              : `${progress.completedMeetings} finished · ${progress.completedMeetingHours.toFixed(1)} hrs`}
+          </p>
+        </div>
+        {difference !== null && progress.completedMeetings > 0 ? (
+          <Badge variant={difference >= 0 ? 'secondary' : 'outline'}>
+            {difference >= 0
+              ? `${difference.toFixed(1)} hrs ahead`
+              : `${Math.abs(difference).toFixed(1)} hrs behind`}
+          </Badge>
+        ) : null}
+      </div>
+      <dl className="mt-4 grid grid-cols-3 gap-2 text-center">
+        {counts.map(({ label, value }) => (
+          <div key={label} className="rounded-lg border px-2 py-2.5">
+            <dt className="text-[11px] text-muted-foreground">{label}</dt>
+            <dd className="mt-1 font-mono text-base tabular-nums">{value}</dd>
+          </div>
+        ))}
+      </dl>
+      {expected !== null ? (
+        <p className="mt-2.5 text-xs text-muted-foreground">
+          Expected by now: {expected.toFixed(1)} hrs
+          {leadership ? ' for the leadership target' : ''}. You have {hours.toFixed(1)}.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 export function DashboardOverview({ user, attendance }: DashboardOverviewProps) {
   const metrics = [
     {
@@ -159,7 +219,10 @@ export function DashboardOverview({ user, attendance }: DashboardOverviewProps) 
             <SignOutButton className="mt-0" />
           </div>
         </div>
-        <nav aria-label="Dashboard" className="mx-auto flex max-w-7xl gap-6 px-5 text-sm sm:px-8">
+        <nav
+          aria-label="Dashboard"
+          className="mx-auto flex max-w-7xl gap-6 overflow-x-auto whitespace-nowrap px-5 text-sm sm:px-8"
+        >
           <a
             href="#main-content"
             aria-current="page"
@@ -287,6 +350,20 @@ export function DashboardOverview({ user, attendance }: DashboardOverviewProps) 
             <CardContent className="divide-y py-6">
               {attendance ? (
                 <>
+                  {attendance.progress ? (
+                    <MeetingPace
+                      progress={attendance.progress}
+                      hours={attendance.hours.meeting}
+                      expected={
+                        attendance.requirements
+                          ? attendance.progress.expectedHours[
+                              attendance.requirements.track ?? 'member'
+                            ]
+                          : null
+                      }
+                      leadership={attendance.requirements?.track === 'leadership'}
+                    />
+                  ) : null}
                   <ProgressRow
                     label="Meeting attendance"
                     hours={attendance.hours.meeting}
@@ -356,6 +433,12 @@ export function DashboardOverview({ user, attendance }: DashboardOverviewProps) 
                             </time>
                             <span aria-hidden="true"> · </span>
                             {activity.category === 'meeting' ? 'Meeting' : 'Outreach'}
+                            {activity.status === 'excused' ? (
+                              <>
+                                <span aria-hidden="true"> · </span>
+                                Excused
+                              </>
+                            ) : null}
                           </p>
                         </div>
                         {open ? (
