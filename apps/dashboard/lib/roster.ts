@@ -14,6 +14,7 @@ export interface RosterMember {
   id: number;
   userId: string;
   name: string;
+  preferredName?: string | null;
   image: string | null;
   role: 'team_admin' | 'mentor' | 'student_leader' | 'student';
   studentExperience: 'rookie' | 'veteran' | null;
@@ -32,11 +33,27 @@ export interface RosterView {
   selectedSeasonId?: number;
 }
 
+export interface MemberProfile {
+  name: string;
+  preferredName: string | null;
+}
+
 async function apiRequest(path: string, cookie: string) {
   return fetch(`${apiInternalUrl}/api/roster${path}`, {
     headers: { cookie },
     cache: 'no-store',
   });
+}
+
+export async function getMemberProfile(): Promise<MemberProfile | null> {
+  const cookie = (await headers()).get('cookie');
+  if (!cookie) return null;
+  try {
+    const response = await apiRequest('/profile', cookie);
+    return response.ok ? ((await response.json()) as MemberProfile | null) : null;
+  } catch {
+    return null;
+  }
 }
 
 export async function getRosterView(selectedSeasonId?: number): Promise<RosterView | null> {
