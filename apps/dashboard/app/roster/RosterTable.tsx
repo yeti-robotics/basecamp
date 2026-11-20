@@ -342,7 +342,9 @@ export function RosterTable({
   const [search, setSearch] = useState('');
   const searchWords = search.trim().toLowerCase().split(/\s+/);
   const filteredMembers = members.filter((member) =>
-    searchWords.every((word) => member.name.toLowerCase().includes(word)),
+    searchWords.every((word) =>
+      `${member.name} ${member.preferredName ?? ''}`.toLowerCase().includes(word),
+    ),
   );
   const pastSeasons = seasons.filter((item) => item.readOnly);
   const matchingMemberIds = new Set(filteredMembers.map((member) => member.id));
