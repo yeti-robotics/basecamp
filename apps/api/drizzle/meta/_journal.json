@@ -68,7 +68,6 @@
     {
       "idx": 9,
       "version": "7",
-<<<<<<< HEAD
       "when": 1793920765473,
       "tag": "0009_bright_blizzard",
       "breakpoints": true
@@ -78,10 +77,13 @@
       "version": "7",
       "when": 1794266878117,
       "tag": "0010_fine_spectrum",
-=======
-      "when": 1793329506125,
-      "tag": "0009_lazy_calypso",
->>>>>>> 5c3339c (Add member preferred name onboarding)
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1795201358186,
+      "tag": "0011_sad_millenium_guard",
       "breakpoints": true
     }
   ]
