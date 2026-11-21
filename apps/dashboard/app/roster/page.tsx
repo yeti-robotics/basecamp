@@ -3,7 +3,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { typographyVariants } from '@/components/ui/typography';
 import { getSession } from '@/lib/auth';
-import { getRosterView } from '@/lib/roster';
+import { getMemberProfile, getRosterView } from '@/lib/roster';
 import { RosterTable } from './RosterTable';
 
 export default async function RosterPage({
@@ -39,8 +39,14 @@ export default async function RosterPage({
     );
   }
 
+  const profile = view.ownMember ? await getMemberProfile() : null;
   const ownMember = view.ownMember
-    ? { ...view.ownMember, name: session.user.name, image: session.user.image ?? null }
+    ? {
+        ...view.ownMember,
+        name: session.user.name,
+        preferredName: profile?.preferredName,
+        image: session.user.image ?? null,
+      }
     : null;
   return <RosterTable {...view} ownMember={ownMember} />;
 }

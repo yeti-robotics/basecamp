@@ -152,7 +152,7 @@ function MemberRow({
           <Avatar aria-hidden="true">
             {member.image && <AvatarImage src={member.image} alt="" />}
             <AvatarFallback className="font-mono text-xs">
-              {member.name
+              {(member.preferredName || member.name)
                 .trim()
                 .split(/\s+/)
                 .slice(0, 2)

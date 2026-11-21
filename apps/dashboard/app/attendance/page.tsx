@@ -30,7 +30,13 @@ export default async function AttendancePage({
       : [null, null];
   const members = (roster?.members ?? [])
     .filter((member) => member.state === 'active')
-    .map((member) => ({ userId: member.userId, name: member.name }))
+    .map((member) => ({
+      userId: member.userId,
+      name:
+        member.preferredName && member.preferredName !== member.name
+          ? `${member.preferredName} (Discord: ${member.name})`
+          : member.name,
+    }))
     .sort((a, b) => a.name.localeCompare(b.name));
 
   return (

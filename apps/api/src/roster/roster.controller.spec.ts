@@ -9,6 +9,8 @@ const roster = {
   listSeasons: vi.fn(),
   seasonRoster: vi.fn(),
   getOwnCurrent: vi.fn(),
+  profile: vi.fn(),
+  setPreferredName: vi.fn(),
   updateCurrentMember: vi.fn(),
   updateSeasonMember: vi.fn(),
   removeCurrentMember: vi.fn(),
@@ -105,6 +107,21 @@ describe('RosterController', () => {
       removedAt: null,
     });
     expect(roster.getOwnCurrent).toHaveBeenCalledWith('member-1', expect.any(Date));
+  });
+
+  it('reads and updates only the authenticated member profile', async () => {
+    const profile = { name: 'Alex Member', preferredName: 'Sam Rivers' };
+    roster.profile.mockResolvedValue(profile);
+    roster.setPreferredName.mockResolvedValue(profile);
+
+    await expect(makeController().profile(request)).resolves.toEqual(profile);
+    await expect(
+      makeController().updateProfile(request, { preferredName: 'Sam Rivers' }),
+    ).resolves.toEqual(profile);
+    expect(memberContext.authenticate).toHaveBeenCalledWith(request.headers);
+    expect(roster.profile).toHaveBeenCalledWith('member-1');
+    expect(roster.setPreferredName).toHaveBeenCalledWith('member-1', 'Sam Rivers');
+    expect(authorization.accessFor).not.toHaveBeenCalled();
   });
 
   it('does not include removed members unless a Team Admin explicitly requests them', async () => {

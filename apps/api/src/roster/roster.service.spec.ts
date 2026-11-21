@@ -13,7 +13,7 @@ const userId = 'member-1';
 const discordId = '123456789012345678';
 const admission = { verifyLinked: vi.fn() };
 const access = { assertEffectiveAdminRemains: vi.fn(), assertTeamAdmin: vi.fn() };
-const database = { transaction: vi.fn(), select: vi.fn() };
+const database = { transaction: vi.fn(), select: vi.fn(), update: vi.fn() };
 
 function builder(rows: unknown[]) {
   const query = {
@@ -95,6 +95,40 @@ describe('RosterService', () => {
     admission.verifyLinked.mockResolvedValue('allowed');
     access.assertEffectiveAdminRemains.mockResolvedValue(undefined);
     access.assertTeamAdmin.mockResolvedValue(undefined);
+  });
+
+  it('returns the authenticated member profile', async () => {
+    database.select.mockReturnValue(builder([{ name: 'Alex Member', preferredName: null }]));
+    await expect(makeService().profile(userId)).resolves.toEqual({
+      name: 'Alex Member',
+      preferredName: null,
+    });
+  });
+
+  it('normalizes and saves a preferred name for the authenticated member', async () => {
+    const returning = vi
+      .fn()
+      .mockResolvedValue([{ name: 'Alex Member', preferredName: 'Sam Rivers' }]);
+    const where = vi.fn().mockReturnValue({ returning });
+    const set = vi.fn().mockReturnValue({ where });
+    database.update.mockReturnValue({ set });
+
+    await expect(makeService().setPreferredName(userId, '  Sam   Rivers  ')).resolves.toEqual({
+      name: 'Alex Member',
+      preferredName: 'Sam Rivers',
+    });
+    expect(set).toHaveBeenCalledWith({ preferredName: 'Sam Rivers' });
+    expect(where).toHaveBeenCalledOnce();
+  });
+
+  it('rejects blank and overly long preferred names before writing', async () => {
+    await expect(makeService().setPreferredName(userId, '  ')).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    await expect(makeService().setPreferredName(userId, 'a'.repeat(81))).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    expect(database.update).not.toHaveBeenCalled();
   });
 
   it('returns null without a current season and does not check Discord or write', async () => {

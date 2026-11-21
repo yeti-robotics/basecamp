@@ -48,12 +48,9 @@ async function apiRequest(path: string, cookie: string) {
 export async function getMemberProfile(): Promise<MemberProfile | null> {
   const cookie = (await headers()).get('cookie');
   if (!cookie) return null;
-  try {
-    const response = await apiRequest('/profile', cookie);
-    return response.ok ? ((await response.json()) as MemberProfile | null) : null;
-  } catch {
-    return null;
-  }
+  const response = await apiRequest('/profile', cookie);
+  if (!response.ok) throw new Error(`Could not load member profile (${response.status})`);
+  return (await response.json()) as MemberProfile | null;
 }
 
 export async function getRosterView(selectedSeasonId?: number): Promise<RosterView | null> {

@@ -95,6 +95,19 @@ it('loads records for the search filters and offers active members to add', asyn
   expect(memberOptions).toEqual(['Select a member', 'Ada Lovelace', 'Grace Hopper']);
 });
 
+it('identifies members by preferred and Discord names when adding a record', async () => {
+  (getRosterView as jest.Mock).mockResolvedValue({
+    members: [{ ...member('student-1', 'Ada Lovelace'), preferredName: 'Sam Rivers' }],
+  });
+
+  render(await AttendancePage({ searchParams: searchParams() }));
+  fireEvent.click(screen.getByRole('button', { name: 'Add record' }));
+
+  expect(
+    screen.getByRole('option', { name: 'Sam Rivers (Discord: Ada Lovelace)' }),
+  ).toBeInTheDocument();
+});
+
 it('tells members without mentor access where their own hours are', async () => {
   (getAttendanceRecords as jest.Mock).mockResolvedValue('forbidden');
 

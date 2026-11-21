@@ -44,7 +44,9 @@ export function ProfileSetup({ initialName }: { initialName: string }) {
         <Brand />
         <Card className="mt-8">
           <CardHeader>
-            <CardTitle>What should we call you?</CardTitle>
+            <CardTitle>
+              {initialName ? 'Your preferred name' : 'What should we call you?'}
+            </CardTitle>
             <CardDescription>
               Share the name you use with the team so admins can identify you on the roster.
             </CardDescription>
@@ -68,8 +70,13 @@ export function ProfileSetup({ initialName }: { initialName: string }) {
                 </p>
               )}
               <Button type="submit" disabled={pending}>
-                {pending ? 'Saving…' : 'Save and continue'}
+                {pending ? 'Saving…' : initialName ? 'Save changes' : 'Save and continue'}
               </Button>
+              {initialName && (
+                <a href="/" className="text-center text-sm text-muted-foreground underline">
+                  Back to dashboard
+                </a>
+              )}
             </form>
           </CardContent>
         </Card>
