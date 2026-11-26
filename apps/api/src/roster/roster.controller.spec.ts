@@ -1,4 +1,4 @@
-import { ForbiddenException } from '@nestjs/common';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { RosterController } from './roster.controller.js';
 
@@ -122,6 +122,14 @@ describe('RosterController', () => {
     expect(roster.profile).toHaveBeenCalledWith('member-1');
     expect(roster.setPreferredName).toHaveBeenCalledWith('member-1', 'Sam Rivers');
     expect(authorization.accessFor).not.toHaveBeenCalled();
+  });
+
+  it('reports a profile update that does not match a member', async () => {
+    roster.setPreferredName.mockResolvedValue(null);
+
+    await expect(
+      makeController().updateProfile(request, { preferredName: 'Sam Rivers' }),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('does not include removed members unless a Team Admin explicitly requests them', async () => {

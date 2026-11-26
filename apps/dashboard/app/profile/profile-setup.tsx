@@ -29,6 +29,11 @@ export function ProfileSetup({ initialName }: { initialName: string }) {
         setError(typeof result.message === 'string' ? result.message : 'Could not save your name.');
         return;
       }
+      const saved = (await response.json().catch(() => null)) as { preferredName?: string } | null;
+      if (!saved?.preferredName) {
+        setError('Could not save your name.');
+        return;
+      }
       router.replace('/');
       router.refresh();
     } catch {

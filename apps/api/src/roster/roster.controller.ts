@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Get,
   Header,
+  NotFoundException,
   Param,
   ParseIntPipe,
   Patch,
@@ -82,7 +83,9 @@ export class RosterController {
   @Header('Cache-Control', 'private, no-store')
   async updateProfile(@Req() request: Request, @Body() input: { preferredName?: string }) {
     const userId = await this.memberContext.authenticate(request.headers);
-    return this.roster.setPreferredName(userId, input?.preferredName ?? '');
+    const updated = await this.roster.setPreferredName(userId, input?.preferredName ?? '');
+    if (!updated) throw new NotFoundException('Member profile could not be updated');
+    return updated;
   }
 
   @Patch('members/:id')

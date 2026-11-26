@@ -1,13 +1,11 @@
-import { redirect } from 'next/navigation';
 import { Brand } from '@/components/Brand';
-import { getSession } from '@/lib/auth';
 import { getBotStatus } from '@/lib/bot-settings';
+import { requireMember } from '@/lib/require-member';
 import { SignOutButton } from '../../SignOutButton';
 import { BotSettings } from './BotSettings';
 
 export default async function BotSettingsPage() {
-  const session = await getSession();
-  if (!session?.user) redirect('/auth');
+  await requireMember();
 
   const status = await getBotStatus();
   return (

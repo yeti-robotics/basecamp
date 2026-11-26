@@ -10,7 +10,10 @@ jest.mock('next/navigation', () => ({
 
 beforeEach(() => {
   jest.clearAllMocks();
-  global.fetch = jest.fn().mockResolvedValue({ ok: true }) as jest.Mock;
+  global.fetch = jest.fn().mockResolvedValue({
+    ok: true,
+    json: async () => ({ name: 'Alex Member', preferredName: 'Sam Rivers' }),
+  }) as jest.Mock;
 });
 
 it('saves a new preferred name and returns to the dashboard', async () => {
@@ -42,6 +45,35 @@ it('lets members edit their name and reports save errors', async () => {
 
   expect(await screen.findByRole('alert')).toHaveTextContent(
     'Enter a name between 1 and 80 characters',
+  );
+  expect(replace).not.toHaveBeenCalled();
+});
+
+it('explains a profile response that does not confirm the saved name', async () => {
+  global.fetch = jest.fn().mockResolvedValue({
+    ok: true,
+    json: async () => null,
+  }) as jest.Mock;
+  render(<ProfileSetup initialName="" />);
+  fireEvent.change(screen.getByRole('textbox', { name: 'Preferred name' }), {
+    target: { value: 'Sam Rivers' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Save and continue' }));
+
+  expect(await screen.findByRole('alert')).toHaveTextContent('Could not save your name.');
+  expect(replace).not.toHaveBeenCalled();
+});
+
+it('explains when the profile API cannot be reached', async () => {
+  global.fetch = jest.fn().mockRejectedValue(new Error('offline')) as jest.Mock;
+  render(<ProfileSetup initialName="" />);
+  fireEvent.change(screen.getByRole('textbox', { name: 'Preferred name' }), {
+    target: { value: 'Sam Rivers' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Save and continue' }));
+
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    'Could not save your name. Check your connection and try again.',
   );
   expect(replace).not.toHaveBeenCalled();
 });

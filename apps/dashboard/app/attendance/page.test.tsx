@@ -3,13 +3,16 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { getAttendanceRecords } from '../../lib/attendance-records';
 import { getSession } from '../../lib/auth';
 import { getEvents } from '../../lib/events';
-import { getRosterView } from '../../lib/roster';
+import { getMemberProfile, getRosterView } from '../../lib/roster';
 import AttendancePage from './page';
 
 jest.mock('../../lib/auth', () => ({ getSession: jest.fn() }));
 jest.mock('../../lib/attendance-records', () => ({ getAttendanceRecords: jest.fn() }));
 jest.mock('../../lib/events', () => ({ getEvents: jest.fn() }));
-jest.mock('../../lib/roster', () => ({ getRosterView: jest.fn() }));
+jest.mock('../../lib/roster', () => ({
+  getRosterView: jest.fn(),
+  getMemberProfile: jest.fn(),
+}));
 jest.mock('next/navigation', () => ({
   redirect: jest.fn(() => {
     throw new Error('NEXT_REDIRECT');
@@ -54,6 +57,10 @@ function searchParams(params: Record<string, string | string[]> = {}) {
 beforeEach(() => {
   jest.clearAllMocks();
   (getSession as jest.Mock).mockResolvedValue(session);
+  (getMemberProfile as jest.Mock).mockResolvedValue({
+    name: 'Mia Mentor',
+    preferredName: 'Mia',
+  });
   (getAttendanceRecords as jest.Mock).mockResolvedValue({ records: [record], truncated: false });
   (getEvents as jest.Mock).mockResolvedValue([]);
   (getRosterView as jest.Mock).mockResolvedValue({
@@ -70,6 +77,15 @@ it('redirects to sign-in without a session', async () => {
 
   await expect(AttendancePage({ searchParams: searchParams() })).rejects.toThrow('NEXT_REDIRECT');
   expect(redirect).toHaveBeenCalledWith('/auth');
+  expect(getMemberProfile).not.toHaveBeenCalled();
+  expect(getAttendanceRecords).not.toHaveBeenCalled();
+});
+
+it('sends members without a preferred name to onboarding', async () => {
+  (getMemberProfile as jest.Mock).mockResolvedValue({ name: 'Mia Mentor', preferredName: null });
+
+  await expect(AttendancePage({ searchParams: searchParams() })).rejects.toThrow('NEXT_REDIRECT');
+  expect(redirect).toHaveBeenCalledWith('/profile');
   expect(getAttendanceRecords).not.toHaveBeenCalled();
 });
 

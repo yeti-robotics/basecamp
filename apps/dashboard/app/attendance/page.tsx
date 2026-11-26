@@ -1,10 +1,9 @@
-import { redirect } from 'next/navigation';
 import { Brand } from '@/components/Brand';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { type AttendanceRecordSearch, getAttendanceRecords } from '@/lib/attendance-records';
-import { getSession } from '@/lib/auth';
 import { getEvents } from '@/lib/events';
+import { requireMember } from '@/lib/require-member';
 import { getRosterView } from '@/lib/roster';
 import { AttendanceManager } from './AttendanceManager';
 
@@ -13,8 +12,7 @@ export default async function AttendancePage({
 }: {
   searchParams: Promise<AttendanceRecordSearch>;
 }) {
-  const session = await getSession();
-  if (!session?.user) redirect('/auth');
+  await requireMember();
 
   const params = await searchParams;
   const search: AttendanceRecordSearch = {
