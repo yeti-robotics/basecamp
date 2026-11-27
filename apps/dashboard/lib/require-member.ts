@@ -12,5 +12,6 @@ export async function requireMember(): Promise<{
   const profile = await getMemberProfile();
   if (!profile?.preferredName) redirect('/profile');
 
-  return { session, profile };
+  return { session, profile: { ...profile, preferredName: profile.preferredName ?? '' } }; // fix the build error here 
+  
 }
