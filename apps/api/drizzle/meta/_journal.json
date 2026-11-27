@@ -78,6 +78,13 @@
       "when": 1794266878117,
       "tag": "0010_fine_spectrum",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1795201358186,
+      "tag": "0011_sad_millenium_guard",
+      "breakpoints": true
     }
   ]
 }

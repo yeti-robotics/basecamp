@@ -1,15 +1,13 @@
-import { redirect } from 'next/navigation';
 import { Brand } from '@/components/Brand';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { getSession } from '@/lib/auth';
 import { getEvents } from '@/lib/events';
+import { requireMember } from '@/lib/require-member';
 import { getSeasons } from '@/lib/seasons';
 import { EventsList } from '../EventsList';
 
 export default async function EventsPage() {
-  const session = await getSession();
-  if (!session?.user) redirect('/auth');
+  await requireMember();
 
   const now = new Date().toISOString();
   const [events, seasonView] = await Promise.all([getEvents(), getSeasons()]);

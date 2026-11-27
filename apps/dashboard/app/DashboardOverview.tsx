@@ -267,6 +267,12 @@ export function DashboardOverview({ user, attendance }: DashboardOverviewProps) 
             Roster
           </a>
           <a
+            href="/profile"
+            className="py-3 text-muted-foreground transition-colors hover:text-foreground"
+          >
+            My name
+          </a>
+          <a
             href="/settings/bot"
             className="py-3 text-muted-foreground transition-colors hover:text-foreground"
           >

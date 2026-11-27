@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
 import { getTableConfig } from 'drizzle-orm/pg-core';
-import { seasons, season_memberships } from './seasons.js';
+import { describe, expect, it } from 'vitest';
+import { season_memberships, seasons } from './seasons.js';
 
 describe('season schema', () => {
   it('stores inclusive calendar dates for seasons', () => {

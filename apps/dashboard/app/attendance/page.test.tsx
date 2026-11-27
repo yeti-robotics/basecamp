@@ -3,13 +3,16 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { getAttendanceRecords } from '../../lib/attendance-records';
 import { getSession } from '../../lib/auth';
 import { getEvents } from '../../lib/events';
-import { getRosterView } from '../../lib/roster';
+import { getMemberProfile, getRosterView } from '../../lib/roster';
 import AttendancePage from './page';
 
 jest.mock('../../lib/auth', () => ({ getSession: jest.fn() }));
 jest.mock('../../lib/attendance-records', () => ({ getAttendanceRecords: jest.fn() }));
 jest.mock('../../lib/events', () => ({ getEvents: jest.fn() }));
-jest.mock('../../lib/roster', () => ({ getRosterView: jest.fn() }));
+jest.mock('../../lib/roster', () => ({
+  getRosterView: jest.fn(),
+  getMemberProfile: jest.fn(),
+}));
 jest.mock('next/navigation', () => ({
   redirect: jest.fn(() => {
     throw new Error('NEXT_REDIRECT');
@@ -54,6 +57,10 @@ function searchParams(params: Record<string, string | string[]> = {}) {
 beforeEach(() => {
   jest.clearAllMocks();
   (getSession as jest.Mock).mockResolvedValue(session);
+  (getMemberProfile as jest.Mock).mockResolvedValue({
+    name: 'Mia Mentor',
+    preferredName: 'Mia',
+  });
   (getAttendanceRecords as jest.Mock).mockResolvedValue({ records: [record], truncated: false });
   (getEvents as jest.Mock).mockResolvedValue([]);
   (getRosterView as jest.Mock).mockResolvedValue({
@@ -70,6 +77,15 @@ it('redirects to sign-in without a session', async () => {
 
   await expect(AttendancePage({ searchParams: searchParams() })).rejects.toThrow('NEXT_REDIRECT');
   expect(redirect).toHaveBeenCalledWith('/auth');
+  expect(getMemberProfile).not.toHaveBeenCalled();
+  expect(getAttendanceRecords).not.toHaveBeenCalled();
+});
+
+it('sends members without a preferred name to onboarding', async () => {
+  (getMemberProfile as jest.Mock).mockResolvedValue({ name: 'Mia Mentor', preferredName: null });
+
+  await expect(AttendancePage({ searchParams: searchParams() })).rejects.toThrow('NEXT_REDIRECT');
+  expect(redirect).toHaveBeenCalledWith('/profile');
   expect(getAttendanceRecords).not.toHaveBeenCalled();
 });
 
@@ -93,6 +109,19 @@ it('loads records for the search filters and offers active members to add', asyn
     (option) => option.textContent,
   );
   expect(memberOptions).toEqual(['Select a member', 'Ada Lovelace', 'Grace Hopper']);
+});
+
+it('identifies members by preferred and Discord names when adding a record', async () => {
+  (getRosterView as jest.Mock).mockResolvedValue({
+    members: [{ ...member('student-1', 'Ada Lovelace'), preferredName: 'Sam Rivers' }],
+  });
+
+  render(await AttendancePage({ searchParams: searchParams() }));
+  fireEvent.click(screen.getByRole('button', { name: 'Add record' }));
+
+  expect(
+    screen.getByRole('option', { name: 'Sam Rivers (Discord: Ada Lovelace)' }),
+  ).toBeInTheDocument();
 });
 
 it('tells members without mentor access where their own hours are', async () => {

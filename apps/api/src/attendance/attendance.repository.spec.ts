@@ -1,14 +1,14 @@
-import { Test, type TestingModule } from "@nestjs/testing";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { DatabaseService } from "../database/database.service.js";
+import { Test, type TestingModule } from '@nestjs/testing';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { DatabaseService } from '../database/database.service.js';
 import {
   AttendanceCreate,
-  AttendanceUpdate,
   AttendanceRepository,
+  AttendanceUpdate,
   getRequirementStatus,
-} from "./attendance.repository.js";
+} from './attendance.repository.js';
 
-describe("AttendanceRepository", () => {
+describe('AttendanceRepository', () => {
   let repository: AttendanceRepository;
   let mockDb: any;
   let mockTx: any;
@@ -38,9 +38,7 @@ describe("AttendanceRepository", () => {
       leftJoin: vi.fn().mockReturnThis(),
       orderBy: vi.fn().mockReturnThis(),
       limit: vi.fn(),
-      transaction: vi.fn(
-        async (callback: (tx: any) => Promise<unknown>) => callback(mockTx),
-      ),
+      transaction: vi.fn(async (callback: (tx: any) => Promise<unknown>) => callback(mockTx)),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -56,75 +54,69 @@ describe("AttendanceRepository", () => {
     repository = module.get<AttendanceRepository>(AttendanceRepository);
   });
 
-  it("should be defined", () => {
+  it('should be defined', () => {
     expect(repository).toBeDefined();
   });
 
-  describe("getLast", () => {
-    it("returns the last attendance record for a user", async () => {
+  describe('getLast', () => {
+    it('returns the last attendance record for a user', async () => {
       const mockAttendance = {
         id: 1,
-        user_id: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-        checked_in_at: new Date("2026-10-31T14:00:00Z"),
-        checked_out_at: new Date("2026-10-31T17:00:00Z"),
-        category: "meeting",
+        user_id: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+        checked_in_at: new Date('2026-10-31T14:00:00Z'),
+        checked_out_at: new Date('2026-10-31T17:00:00Z'),
+        category: 'meeting',
         event_id: null,
       };
 
       mockDb.limit.mockResolvedValueOnce([mockAttendance]);
 
-      const result = await repository.getLast(
-        "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-      );
+      const result = await repository.getLast('AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA');
 
       expect(result.isOk()).toBe(true);
       expect(result._unsafeUnwrap()).toEqual({
         id: 1,
-        userId: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-        checkedInAt: "2026-10-31T14:00:00.000Z",
-        checkedOutAt: "2026-10-31T17:00:00.000Z",
-        category: "meeting",
+        userId: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+        checkedInAt: '2026-10-31T14:00:00.000Z',
+        checkedOutAt: '2026-10-31T17:00:00.000Z',
+        category: 'meeting',
         eventId: null,
       });
     });
 
-    it("returns null when there are no rows for the user", async () => {
+    it('returns null when there are no rows for the user', async () => {
       mockDb.limit.mockResolvedValueOnce([]);
 
-      const result = await repository.getLast(
-        "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-      );
+      const result = await repository.getLast('AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA');
 
       expect(result.isOk()).toBe(true);
       expect(result._unsafeUnwrap()).toEqual(null);
     });
 
-    it("returns an error when the row fails schema validation", async () => {
+    it('returns an error when the row fails schema validation', async () => {
       mockDb.limit.mockResolvedValueOnce([
         {
           id: 1,
-          user_id: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-          checked_in_at: new Date("2026-10-31T14:00:00Z"),
+          user_id: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+          checked_in_at: new Date('2026-10-31T14:00:00Z'),
           checked_out_at: null,
-          category: "invalid-category",
+          category: 'invalid-category',
           event_id: null,
         },
       ]);
 
-      const result = await repository.getLast(
-        "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-      );
+      const result = await repository.getLast('AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA');
 
       expect(result.isErr()).toBe(true);
     });
   });
 
-  describe("createRecord", () => {
-    it("creates and returns a record when no open session exists", async () => {
+  describe('createRecord', () => {
+    it('creates and returns a record when no open session exists', async () => {
       const record: AttendanceCreate = {
-        userId: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-        checkedInAt: new Date("2026-10-31T14:00:00Z"),
-        category: "meeting",
+        userId: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+        checkedInAt: new Date('2026-10-31T14:00:00Z'),
+        category: 'meeting',
         eventId: null,
       };
 
@@ -146,18 +138,18 @@ describe("AttendanceRepository", () => {
       expect(result._unsafeUnwrap()).toEqual({
         id: 1,
         userId: record.userId,
-        checkedInAt: "2026-10-31T14:00:00.000Z",
+        checkedInAt: '2026-10-31T14:00:00.000Z',
         checkedOutAt: null,
-        category: "meeting",
+        category: 'meeting',
         eventId: null,
       });
     });
 
-    it("errors when an open session already exists", async () => {
+    it('errors when an open session already exists', async () => {
       const record: AttendanceCreate = {
-        userId: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-        checkedInAt: new Date("2026-10-31T14:00:00Z"),
-        category: "meeting",
+        userId: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+        checkedInAt: new Date('2026-10-31T14:00:00Z'),
+        category: 'meeting',
         eventId: null,
       };
 
@@ -168,11 +160,11 @@ describe("AttendanceRepository", () => {
       expect(result.isErr()).toBe(true);
     });
 
-    it("errors when no row is returned from the insert", async () => {
+    it('errors when no row is returned from the insert', async () => {
       const record: AttendanceCreate = {
-        userId: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-        checkedInAt: new Date("2026-10-31T14:00:00Z"),
-        category: "meeting",
+        userId: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+        checkedInAt: new Date('2026-10-31T14:00:00Z'),
+        category: 'meeting',
         eventId: null,
       };
 
@@ -185,11 +177,11 @@ describe("AttendanceRepository", () => {
       expect(result._unsafeUnwrapErr()).toBeInstanceOf(Error);
     });
 
-    it("inserts using snake_case column names", async () => {
+    it('inserts using snake_case column names', async () => {
       const record: AttendanceCreate = {
-        userId: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-        checkedInAt: new Date("2026-10-31T14:00:00Z"),
-        category: "meeting",
+        userId: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+        checkedInAt: new Date('2026-10-31T14:00:00Z'),
+        category: 'meeting',
         eventId: null,
       };
 
@@ -211,17 +203,17 @@ describe("AttendanceRepository", () => {
         user_id: record.userId,
         checked_in_at: record.checkedInAt,
         checked_out_at: null,
-        category: "meeting",
+        category: 'meeting',
         event_id: null,
       });
     });
   });
 
-  describe("updateLast", () => {
-    it("updates the last attendance record for a user", async () => {
+  describe('updateLast', () => {
+    it('updates the last attendance record for a user', async () => {
       const updates: AttendanceUpdate = {
-        checkedOutAt: new Date("2026-10-31T17:00:00Z"),
-        category: "outreach",
+        checkedOutAt: new Date('2026-10-31T17:00:00Z'),
+        category: 'outreach',
         eventId: 123,
       };
 
@@ -229,57 +221,51 @@ describe("AttendanceRepository", () => {
       mockTx.returning.mockResolvedValueOnce([
         {
           id: 1,
-          user_id: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-          checked_in_at: new Date("2026-10-31T14:00:00Z"),
-          checked_out_at: new Date("2026-10-31T17:00:00Z"),
-          category: "outreach",
+          user_id: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+          checked_in_at: new Date('2026-10-31T14:00:00Z'),
+          checked_out_at: new Date('2026-10-31T17:00:00Z'),
+          category: 'outreach',
           event_id: 123,
         },
       ]);
 
-      const result = await repository.updateLast(
-        "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-        updates,
-      );
+      const result = await repository.updateLast('AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', updates);
 
       expect(mockTx.set).toHaveBeenCalledWith({
         checked_out_at: updates.checkedOutAt,
-        category: "outreach",
+        category: 'outreach',
         event_id: 123,
       });
 
       expect(result.isOk()).toBe(true);
       expect(result._unsafeUnwrap()).toEqual({
         id: 1,
-        userId: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-        checkedInAt: "2026-10-31T14:00:00.000Z",
-        checkedOutAt: "2026-10-31T17:00:00.000Z",
-        category: "outreach",
+        userId: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+        checkedInAt: '2026-10-31T14:00:00.000Z',
+        checkedOutAt: '2026-10-31T17:00:00.000Z',
+        category: 'outreach',
         eventId: 123,
       });
     });
 
-    it("only sets fields included in the update", async () => {
+    it('only sets fields included in the update', async () => {
       const updates: AttendanceUpdate = {
-        checkedOutAt: new Date("2026-10-31T17:00:00Z"),
+        checkedOutAt: new Date('2026-10-31T17:00:00Z'),
       };
 
       mockTx.limit.mockResolvedValueOnce([{ id: 1 }]);
       mockTx.returning.mockResolvedValueOnce([
         {
           id: 1,
-          user_id: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-          checked_in_at: new Date("2026-10-31T14:00:00Z"),
-          checked_out_at: new Date("2026-10-31T17:00:00Z"),
-          category: "meeting",
+          user_id: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+          checked_in_at: new Date('2026-10-31T14:00:00Z'),
+          checked_out_at: new Date('2026-10-31T17:00:00Z'),
+          category: 'meeting',
           event_id: null,
         },
       ]);
 
-      const result = await repository.updateLast(
-        "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-        updates,
-      );
+      const result = await repository.updateLast('AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', updates);
 
       expect(mockTx.set).toHaveBeenCalledWith({
         checked_out_at: updates.checkedOutAt,
@@ -287,49 +273,43 @@ describe("AttendanceRepository", () => {
       expect(result.isOk()).toBe(true);
     });
 
-    it("errors when no row ID is found", async () => {
+    it('errors when no row ID is found', async () => {
       mockTx.limit.mockResolvedValueOnce([]);
 
-      const result = await repository.updateLast(
-        "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-        { checkedOutAt: new Date("2026-10-31T17:00:00Z") },
-      );
+      const result = await repository.updateLast('AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', {
+        checkedOutAt: new Date('2026-10-31T17:00:00Z'),
+      });
 
       expect(result.isErr()).toBe(true);
     });
 
-    it("errors when no row is returned from the update", async () => {
+    it('errors when no row is returned from the update', async () => {
       mockTx.limit.mockResolvedValueOnce([{ id: 1 }]);
       mockTx.returning.mockResolvedValueOnce([]);
 
-      const result = await repository.updateLast(
-        "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-        { checkedOutAt: new Date("2026-10-31T17:00:00Z") },
-      );
+      const result = await repository.updateLast('AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', {
+        checkedOutAt: new Date('2026-10-31T17:00:00Z'),
+      });
 
       expect(result.isErr()).toBe(true);
     });
   });
 
-  describe("getUserIdByDiscordId", () => {
-    it("returns the user ID for a Discord ID", async () => {
-      const userId = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+  describe('getUserIdByDiscordId', () => {
+    it('returns the user ID for a Discord ID', async () => {
+      const userId = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
       mockDb.limit.mockResolvedValueOnce([{ userId }]);
 
-      const result = await repository.getUserIdByDiscordId(
-        "123456789012345678",
-      );
+      const result = await repository.getUserIdByDiscordId('123456789012345678');
 
       expect(result.isOk()).toBe(true);
       expect(result._unsafeUnwrap()).toBe(userId);
     });
 
-    it("errors when no linked account is found", async () => {
+    it('errors when no linked account is found', async () => {
       mockDb.limit.mockResolvedValueOnce([]);
 
-      const result = await repository.getUserIdByDiscordId(
-        "123456789012345678",
-      );
+      const result = await repository.getUserIdByDiscordId('123456789012345678');
 
       expect(result.isErr()).toBe(true);
       expect(result._unsafeUnwrapErr()).toBeInstanceOf(Error);
@@ -337,44 +317,44 @@ describe("AttendanceRepository", () => {
   });
 });
 
-describe("getRequirementStatus", () => {
-  it("uses rookie experience even when legacy status says veteran", () => {
+describe('getRequirementStatus', () => {
+  it('uses rookie experience even when legacy status says veteran', () => {
     expect(
       getRequirementStatus({
-        role: "student",
-        student_experience: "rookie",
-        legacy_status: "veteran",
+        role: 'student',
+        student_experience: 'rookie',
+        legacy_status: 'veteran',
       }),
-    ).toBe("rookie");
+    ).toBe('rookie');
   });
 
-  it("uses veteran experience even when legacy status says rookie", () => {
+  it('uses veteran experience even when legacy status says rookie', () => {
     expect(
       getRequirementStatus({
-        role: "student_leader",
-        student_experience: "veteran",
-        legacy_status: "rookie",
+        role: 'student_leader',
+        student_experience: 'veteran',
+        legacy_status: 'rookie',
       }),
-    ).toBe("veteran");
+    ).toBe('veteran');
   });
 
-  it("uses mentor status for mentors despite a legacy student status", () => {
+  it('uses mentor status for mentors despite a legacy student status', () => {
     expect(
       getRequirementStatus({
-        role: "mentor",
+        role: 'mentor',
         student_experience: null,
-        legacy_status: "rookie",
+        legacy_status: 'rookie',
       }),
-    ).toBe("mentor");
+    ).toBe('mentor');
   });
 
-  it("uses mentor status for team admins despite a legacy student status", () => {
+  it('uses mentor status for team admins despite a legacy student status', () => {
     expect(
       getRequirementStatus({
-        role: "team_admin",
+        role: 'team_admin',
         student_experience: null,
-        legacy_status: "veteran",
+        legacy_status: 'veteran',
       }),
-    ).toBe("mentor");
+    ).toBe('mentor');
   });
 });

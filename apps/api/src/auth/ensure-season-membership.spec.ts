@@ -19,12 +19,11 @@ function createDatabase(selectResults: Array<Array<{ id: number }>>) {
   const values = vi.fn(() => ({ onConflictDoNothing }));
   const insert = vi.fn(() => ({ values }));
 
-  const transaction = vi.fn(
-    async (callback: (tx: unknown) => Promise<unknown>) =>
-      callback({
-        select: vi.fn(() => query),
-        insert,
-      }),
+  const transaction = vi.fn(async (callback: (tx: unknown) => Promise<unknown>) =>
+    callback({
+      select: vi.fn(() => query),
+      insert,
+    }),
   );
 
   return {
@@ -42,9 +41,7 @@ describe('ensureSeasonMembership', () => {
   it('creates a rookie student membership when the user has no membership history', async () => {
     const db = createDatabase([[{ id: 5 }], [], []]);
 
-    await expect(
-      ensureSeasonMembership(db.database, userId, asOfDate),
-    ).resolves.toBe(true);
+    await expect(ensureSeasonMembership(db.database, userId, asOfDate)).resolves.toBe(true);
 
     expect(db.values).toHaveBeenCalledWith({
       season_id: 5,
@@ -58,9 +55,7 @@ describe('ensureSeasonMembership', () => {
   it('creates a veteran student membership when the user has previous membership history', async () => {
     const db = createDatabase([[{ id: 5 }], [], [{ id: 2 }]]);
 
-    await expect(
-      ensureSeasonMembership(db.database, userId, asOfDate),
-    ).resolves.toBe(true);
+    await expect(ensureSeasonMembership(db.database, userId, asOfDate)).resolves.toBe(true);
 
     expect(db.values).toHaveBeenCalledWith({
       season_id: 5,
@@ -73,9 +68,7 @@ describe('ensureSeasonMembership', () => {
   it('does not change an existing membership for the active season', async () => {
     const db = createDatabase([[{ id: 5 }], [{ id: 10 }]]);
 
-    await expect(
-      ensureSeasonMembership(db.database, userId, asOfDate),
-    ).resolves.toBe(true);
+    await expect(ensureSeasonMembership(db.database, userId, asOfDate)).resolves.toBe(true);
 
     expect(db.insert).not.toHaveBeenCalled();
   });
@@ -83,9 +76,7 @@ describe('ensureSeasonMembership', () => {
   it('returns false when there is no active season', async () => {
     const db = createDatabase([[]]);
 
-    await expect(
-      ensureSeasonMembership(db.database, userId, asOfDate),
-    ).resolves.toBe(false);
+    await expect(ensureSeasonMembership(db.database, userId, asOfDate)).resolves.toBe(false);
 
     expect(db.insert).not.toHaveBeenCalled();
   });

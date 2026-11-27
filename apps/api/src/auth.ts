@@ -1,5 +1,5 @@
-import { Logger } from '@nestjs/common';
 import { drizzleAdapter } from '@better-auth/drizzle-adapter';
+import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { type Auth as BetterAuthInstance, type BetterAuthOptions, betterAuth } from 'better-auth';
 import { admin } from 'better-auth/plugins';
@@ -9,9 +9,9 @@ import type {
   DiscordAdmissionResult,
   DiscordAdmissionService,
 } from './auth/discord-admission.service.js';
+import { ensureSeasonMembership } from './auth/ensure-season-membership.js';
 import type { AppDatabase } from './database/database.service.js';
 import * as schema from './database/schema/auth.js';
-import { ensureSeasonMembership } from './auth/ensure-season-membership.js';
 
 function requiredSetting(config: ConfigService, key: string): string {
   const value = config.get<string>(key);
@@ -71,10 +71,7 @@ export function createAuth(
         create: {
           after: async (session) => {
             try {
-              const hasActiveSeason = await ensureSeasonMembership(
-                database,
-                session.userId,
-              );
+              const hasActiveSeason = await ensureSeasonMembership(database, session.userId);
 
               if (!hasActiveSeason) {
                 logger.warn(
@@ -82,8 +79,7 @@ export function createAuth(
                 );
               }
             } catch (error) {
-              const message =
-                error instanceof Error ? error.message : String(error);
+              const message = error instanceof Error ? error.message : String(error);
               logger.error(
                 `Could not create a season membership for user ${session.userId}: ${message}`,
               );

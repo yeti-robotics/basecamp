@@ -71,6 +71,26 @@ it('shows the current season and roster roles with student experience', () => {
   expect(screen.getByText('Mentor')).toBeInTheDocument();
 });
 
+it('shows preferred names with Discord identity and searches either name', () => {
+  render(
+    <RosterTable
+      season={season}
+      members={[{ ...searchableMembers[0]!, preferredName: 'Sam Rivers' }]}
+      ownMember={null}
+      seasons={[]}
+      canManage={false}
+    />,
+  );
+
+  expect(screen.getByText('Sam Rivers')).toBeInTheDocument();
+  expect(screen.getByText('Discord: Alex Member')).toBeInTheDocument();
+  expect(screen.getByText('SR')).toBeInTheDocument();
+  fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'Sam' } });
+  expect(screen.getByRole('status')).toHaveTextContent('Showing 1 of 1 members');
+  fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'Alex' } });
+  expect(screen.getByRole('status')).toHaveTextContent('Showing 1 of 1 members');
+});
+
 it('shows an explicit empty state for a new season roster', () => {
   render(<RosterTable season={season} members={[]} ownMember={null} seasons={[]} canManage />);
   expect(screen.getByText('No one has joined this season yet.')).toBeInTheDocument();

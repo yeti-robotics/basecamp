@@ -2,11 +2,13 @@ import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/react';
 import { getSession } from '../../lib/auth';
 import { getEvents } from '../../lib/events';
+import { getMemberProfile } from '../../lib/roster';
 import { getSeasons } from '../../lib/seasons';
 import EventsPage from './page';
 
 jest.mock('../../lib/auth', () => ({ getSession: jest.fn() }));
 jest.mock('../../lib/events', () => ({ getEvents: jest.fn() }));
+jest.mock('../../lib/roster', () => ({ getMemberProfile: jest.fn() }));
 jest.mock('../../lib/seasons', () => ({ getSeasons: jest.fn() }));
 jest.mock('next/navigation', () => ({
   redirect: jest.fn(() => {
@@ -48,6 +50,7 @@ const seasonView = {
 beforeEach(() => {
   jest.clearAllMocks();
   (getSession as jest.Mock).mockResolvedValue(session);
+  (getMemberProfile as jest.Mock).mockResolvedValue({ name: 'Ada', preferredName: 'Ada' });
   (getEvents as jest.Mock).mockResolvedValue([event]);
   (getSeasons as jest.Mock).mockResolvedValue(seasonView);
 });
@@ -57,6 +60,15 @@ it('redirects to sign-in without a session', async () => {
 
   await expect(EventsPage()).rejects.toThrow('NEXT_REDIRECT');
   expect(redirect).toHaveBeenCalledWith('/auth');
+  expect(getMemberProfile).not.toHaveBeenCalled();
+  expect(getEvents).not.toHaveBeenCalled();
+});
+
+it('sends members without a preferred name to onboarding', async () => {
+  (getMemberProfile as jest.Mock).mockResolvedValue(null);
+
+  await expect(EventsPage()).rejects.toThrow('NEXT_REDIRECT');
+  expect(redirect).toHaveBeenCalledWith('/profile');
   expect(getEvents).not.toHaveBeenCalled();
 });
 

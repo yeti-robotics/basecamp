@@ -1,11 +1,9 @@
-import { redirect } from 'next/navigation';
-import { getSession } from '@/lib/auth';
+import { requireMember } from '@/lib/require-member';
 import { getSeasons } from '@/lib/seasons';
 import { SeasonManager } from './SeasonManager';
 
 export default async function SeasonsPage() {
-  const session = await getSession();
-  if (!session?.user) redirect('/auth');
+  await requireMember();
 
   const view = await getSeasons();
   if (!view) {

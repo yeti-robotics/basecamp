@@ -1,10 +1,9 @@
-import { redirect } from 'next/navigation';
 import { Brand } from '@/components/Brand';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { type AttendanceRecordSearch, getAttendanceRecords } from '@/lib/attendance-records';
-import { getSession } from '@/lib/auth';
 import { getEvents } from '@/lib/events';
+import { requireMember } from '@/lib/require-member';
 import { getRosterView } from '@/lib/roster';
 import { AttendanceManager } from './AttendanceManager';
 
@@ -13,8 +12,7 @@ export default async function AttendancePage({
 }: {
   searchParams: Promise<AttendanceRecordSearch>;
 }) {
-  const session = await getSession();
-  if (!session?.user) redirect('/auth');
+  await requireMember();
 
   const params = await searchParams;
   const search: AttendanceRecordSearch = {
@@ -30,7 +28,13 @@ export default async function AttendancePage({
       : [null, null];
   const members = (roster?.members ?? [])
     .filter((member) => member.state === 'active')
-    .map((member) => ({ userId: member.userId, name: member.name }))
+    .map((member) => ({
+      userId: member.userId,
+      name:
+        member.preferredName && member.preferredName !== member.name
+          ? `${member.preferredName} (Discord: ${member.name})`
+          : member.name,
+    }))
     .sort((a, b) => a.name.localeCompare(b.name));
 
   return (

@@ -1,8 +1,7 @@
-import { redirect } from 'next/navigation';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { typographyVariants } from '@/components/ui/typography';
-import { getSession } from '@/lib/auth';
+import { requireMember } from '@/lib/require-member';
 import { getRosterView } from '@/lib/roster';
 import { RosterTable } from './RosterTable';
 
@@ -11,8 +10,7 @@ export default async function RosterPage({
 }: {
   searchParams: Promise<{ seasonId?: string }>;
 }) {
-  const session = await getSession();
-  if (!session?.user) redirect('/auth');
+  const { session } = await requireMember();
   const params = await searchParams;
   const parsedSeasonId = params.seasonId ? Number(params.seasonId) : undefined;
   const seasonId =

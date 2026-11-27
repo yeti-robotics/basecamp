@@ -11,12 +11,7 @@ export async function ensureSeasonMembership(
     const [activeSeason] = await transaction
       .select({ id: seasons.id })
       .from(seasons)
-      .where(
-        and(
-          lte(seasons.started_at, asOfDate),
-          gte(seasons.ended_at, asOfDate),
-        ),
-      )
+      .where(and(lte(seasons.started_at, asOfDate), gte(seasons.ended_at, asOfDate)))
       .orderBy(desc(seasons.started_at))
       .limit(1);
 

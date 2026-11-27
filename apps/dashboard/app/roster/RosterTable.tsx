@@ -152,7 +152,7 @@ function MemberRow({
           <Avatar aria-hidden="true">
             {member.image && <AvatarImage src={member.image} alt="" />}
             <AvatarFallback className="font-mono text-xs">
-              {member.name
+              {(member.preferredName || member.name)
                 .trim()
                 .split(/\s+/)
                 .slice(0, 2)
@@ -161,7 +161,14 @@ function MemberRow({
                 .toUpperCase()}
             </AvatarFallback>
           </Avatar>
-          <span className="min-w-32 break-words">{member.name}</span>
+          <span className="min-w-32 break-words">
+            {member.preferredName || member.name}
+            {member.preferredName && member.preferredName !== member.name && (
+              <span className="mt-1 block font-normal text-xs text-muted-foreground">
+                Discord: {member.name}
+              </span>
+            )}
+          </span>
         </div>
       </td>
       <td className="px-4 py-4">
@@ -335,7 +342,9 @@ export function RosterTable({
   const [search, setSearch] = useState('');
   const searchWords = search.trim().toLowerCase().split(/\s+/);
   const filteredMembers = members.filter((member) =>
-    searchWords.every((word) => member.name.toLowerCase().includes(word)),
+    searchWords.every((word) =>
+      `${member.name} ${member.preferredName ?? ''}`.toLowerCase().includes(word),
+    ),
   );
   const pastSeasons = seasons.filter((item) => item.readOnly);
   const matchingMemberIds = new Set(filteredMembers.map((member) => member.id));

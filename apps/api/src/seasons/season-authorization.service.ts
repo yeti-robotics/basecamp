@@ -77,8 +77,7 @@ export class SeasonAuthorizationService {
     const canManage = active && membership?.role === 'team_admin';
     const canView = canManage || (active && membership?.role === 'mentor');
     const canManageAttendance =
-      active &&
-      (membership?.role === 'mentor' || membership?.role === 'team_admin');
+      active && (membership?.role === 'mentor' || membership?.role === 'team_admin');
     const canBootstrap =
       !canManage && !canView && (await this.bootstrap.bootstrapDiscordIdForUser(userId)) !== null;
     return {
