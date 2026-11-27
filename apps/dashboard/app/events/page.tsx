@@ -1,4 +1,5 @@
 import { Brand } from '@/components/Brand';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { getEvents } from '@/lib/events';
 import { requireMember } from '@/lib/require-member';
@@ -44,10 +45,10 @@ export default async function EventsPage() {
             />
           </>
         ) : (
-          `<Alert className="mt-8">
+          <Alert className="mt-8">
             <AlertTitle>Events could not be loaded</AlertTitle>
             <AlertDescription>Reload the page to try again.</AlertDescription>
-          </Alert>`
+          </Alert>
         )}
       </main>
     </div>
