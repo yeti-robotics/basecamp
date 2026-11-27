@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { getEvents } from '@/lib/events';
 import { requireMember } from '@/lib/require-member';
 import { getSeasons } from '@/lib/seasons';
-import { EventsList } from '../EventsList';
+import { EventsView } from './EventsView';
 
 export default async function EventsPage() {
   await requireMember();
@@ -33,7 +33,7 @@ export default async function EventsPage() {
           </p>
         </header>
         {events ? (
-          <EventsList
+          <EventsView
             events={events}
             now={now}
             canManage={seasonView?.canManage ?? false}
