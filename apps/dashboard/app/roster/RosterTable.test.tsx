@@ -1,14 +1,14 @@
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { downloadCsv } from '@/lib/csv';
+import { downloadCsv } from '../../lib/csv';
 import type { RosterMember } from '@/lib/roster';
 import { RosterTable } from './RosterTable';
 
 const mockRefresh = jest.fn();
 jest.mock('next/navigation', () => ({ useRouter: () => ({ refresh: mockRefresh }) }));
 
-jest.mock('@/lib/csv', () => ({
-  ...jest.requireActual('@/lib/csv'),
+jest.mock('../../lib/csv', () => ({
+  ...jest.requireActual('../../lib/csv'),
   downloadCsv: jest.fn(),
 }));
 

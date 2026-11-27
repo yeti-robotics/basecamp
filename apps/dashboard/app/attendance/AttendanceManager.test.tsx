@@ -1,12 +1,12 @@
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { downloadCsv } from '@/lib/csv';
+import { downloadCsv } from '../../lib/csv';
 import type { AttendanceRecord } from '../../lib/attendance-records';
 import type { TeamEvent } from '../../lib/events';
 import { AttendanceManager } from './AttendanceManager';
 
-jest.mock('@/lib/csv', () => ({
-  ...jest.requireActual('@/lib/csv'),
+jest.mock('../../lib/csv', () => ({
+  ...jest.requireActual('../../lib/csv'),
   downloadCsv: jest.fn(),
 }));
 

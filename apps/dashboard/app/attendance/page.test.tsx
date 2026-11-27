@@ -7,7 +7,10 @@ import { getMemberProfile, getRosterView } from '../../lib/roster';
 import AttendancePage from './page';
 
 jest.mock('../../lib/auth', () => ({ getSession: jest.fn() }));
-jest.mock('../../lib/attendance-records', () => ({ getAttendanceRecords: jest.fn() }));
+jest.mock('../../lib/attendance-records', () => ({
+  ...jest.requireActual('../../lib/attendance-records'),
+  getAttendanceRecords: jest.fn(),
+}));
 jest.mock('../../lib/events', () => ({ getEvents: jest.fn() }));
 jest.mock('../../lib/roster', () => ({
   getRosterView: jest.fn(),
