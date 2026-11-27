@@ -1,51 +1,33 @@
-import { Injectable } from "@nestjs/common";
-import { and, desc, eq, gt, gte, isNull, lte, or } from "drizzle-orm";
-import {
-  err,
-  errAsync,
-  fromThrowable,
-  ok,
-  okAsync,
-  type Result,
-  ResultAsync,
-} from "neverthrow";
+import { Injectable } from '@nestjs/common';
+import { and, desc, eq, gt, gte, isNull, lte, or } from 'drizzle-orm';
+import { err, errAsync, fromThrowable, ok, okAsync, type Result, ResultAsync } from 'neverthrow';
 
-import { AccessService } from "../access/access.service.js";
-import { DatabaseService } from "../database/database.service.js";
-import {
-  attendance,
-  hour_requirements,
-} from "../database/schema/attendance.js";
-import { events } from "../database/schema/events.js";
-import { season_memberships, seasons } from "../database/schema/seasons.js";
-import { SeasonAuthorizationService } from "../seasons/season-authorization.service.js";
+import { AccessService } from '../access/access.service.js';
+import { DatabaseService } from '../database/database.service.js';
+import { attendance, hour_requirements } from '../database/schema/attendance.js';
+import { events } from '../database/schema/events.js';
+import { season_memberships, seasons } from '../database/schema/seasons.js';
+import { SeasonAuthorizationService } from '../seasons/season-authorization.service.js';
+import { FORGOT_SIGNOUT_CREDIT_MS, STALE_SIGNIN_MIN_HOURS_MS } from './attendance.constants.js';
 import {
   AttendanceRepository,
-  getRequirementStatus,
   type AttendanceUpdate,
-} from "./attendance.repository.js";
-import { AttendanceCodeService } from "./attendance-code.service.js";
-import {
-  FORGOT_SIGNOUT_CREDIT_MS,
-  STALE_SIGNIN_MIN_HOURS_MS,
-} from "./attendance.constants.js";
-import type { Attendance } from "./attendance.schema.js";
-import { calculateMeetingProgress } from "./attendance-progress.js";
+  getRequirementStatus,
+} from './attendance.repository.js';
+import type { Attendance } from './attendance.schema.js';
+import { AttendanceCodeService } from './attendance-code.service.js';
+import { calculateMeetingProgress } from './attendance-progress.js';
 
 type AttendanceRecord = {
   id: number;
-  category: "meeting" | "outreach";
+  category: 'meeting' | 'outreach';
   checkedInAt: Date;
   checkedOutAt: Date | null;
   name: string | null;
 };
 
 // Count completed sessions only; an open sign-in is shown as in progress.
-export function completedHours(
-  record: AttendanceRecord,
-  start: Date,
-  end: Date,
-): number {
+export function completedHours(record: AttendanceRecord, start: Date, end: Date): number {
   if (!record.checkedOutAt) {
     return 0;
   }
@@ -57,7 +39,7 @@ export function completedHours(
   return Math.max(0, milliseconds / 3_600_000);
 }
 
-export type AttendanceOverview = Awaited<ReturnType<AttendanceService["overview"]>>;
+export type AttendanceOverview = Awaited<ReturnType<AttendanceService['overview']>>;
 
 @Injectable()
 export class AttendanceService {
@@ -69,31 +51,25 @@ export class AttendanceService {
     private readonly seasonAuthorization: SeasonAuthorizationService,
   ) {}
 
-  public signInWithCode(
-    discordId: string,
-    code: string,
-  ): ResultAsync<void, Error> {
+  public signInWithCode(discordId: string, code: string): ResultAsync<void, Error> {
     return ResultAsync.fromPromise(
       this.codeService.verify(code),
       (error) => new Error(String(error)),
     ).andThen((valid) =>
       valid
-        ? this.recordAttendance(discordId, "meeting", null)
-        : errAsync(new Error("Invalid attendance code")),
+        ? this.recordAttendance(discordId, 'meeting', null)
+        : errAsync(new Error('Invalid attendance code')),
     );
   }
 
-  public signOutWithCode(
-    discordId: string,
-    code: string,
-  ): ResultAsync<void, Error> {
+  public signOutWithCode(discordId: string, code: string): ResultAsync<void, Error> {
     return ResultAsync.fromPromise(
       this.codeService.verify(code),
       (error) => new Error(String(error)),
     ).andThen((valid) =>
       valid
         ? this.updateAttendance(discordId, { checkedOutAt: new Date() })
-        : errAsync(new Error("Invalid attendance code")),
+        : errAsync(new Error('Invalid attendance code')),
     );
   }
 
@@ -102,7 +78,7 @@ export class AttendanceService {
     targetDiscordId: string,
   ): ResultAsync<void, Error> {
     return this.authorizeAttendanceManager(actorDiscordId).andThen(() =>
-      this.recordAttendance(targetDiscordId, "meeting", null),
+      this.recordAttendance(targetDiscordId, 'meeting', null),
     );
   }
 
@@ -115,29 +91,25 @@ export class AttendanceService {
     );
   }
 
-  private authorizeAttendanceManager(
-    actorDiscordId: string,
-  ): ResultAsync<void, Error> {
-    return this.attendanceRepository
-      .getUserIdByDiscordId(actorDiscordId)
-      .andThen((actorUserId) =>
-        ResultAsync.fromPromise(
-          Promise.all([
-            this.access.isSuspended(actorUserId),
-            this.seasonAuthorization.canManageAttendance(actorUserId),
-          ]).then(([isSuspended, canManageAttendance]) => {
-            if (isSuspended || !canManageAttendance) {
-              throw new Error("Not authorized to manage attendance");
-            }
-          }),
-          (error) => (error instanceof Error ? error : new Error(String(error))),
-        ),
-      );
+  private authorizeAttendanceManager(actorDiscordId: string): ResultAsync<void, Error> {
+    return this.attendanceRepository.getUserIdByDiscordId(actorDiscordId).andThen((actorUserId) =>
+      ResultAsync.fromPromise(
+        Promise.all([
+          this.access.isSuspended(actorUserId),
+          this.seasonAuthorization.canManageAttendance(actorUserId),
+        ]).then(([isSuspended, canManageAttendance]) => {
+          if (isSuspended || !canManageAttendance) {
+            throw new Error('Not authorized to manage attendance');
+          }
+        }),
+        (error) => (error instanceof Error ? error : new Error(String(error))),
+      ),
+    );
   }
 
   public recordAttendance(
     discordId: string,
-    category: "meeting" | "outreach",
+    category: 'meeting' | 'outreach',
     eventId: number | null,
     checkedInAt: Date = new Date(),
   ): ResultAsync<void, Error> {
@@ -146,16 +118,14 @@ export class AttendanceService {
       .andThen((userId) =>
         this.attendanceRepository.getLast(userId).andThen((attendance) => {
           if (attendance && attendance.checkedOutAt === null) {
-            const staleResult = this.isStaleSession(
-              new Date(attendance.checkedInAt),
-            );
+            const staleResult = this.isStaleSession(new Date(attendance.checkedInAt));
 
             if (staleResult.isErr()) {
               return errAsync(staleResult.error);
             }
 
             if (!staleResult.value) {
-              return errAsync(new Error("User is already signed in"));
+              return errAsync(new Error('User is already signed in'));
             }
 
             return this.handleForgotToSignOut(discordId).andThen(() =>
@@ -172,50 +142,37 @@ export class AttendanceService {
       );
   }
 
-  public updateAttendance(
-    discordId: string,
-    updates: AttendanceUpdate,
-  ): ResultAsync<void, Error> {
-    return this.attendanceRepository
-      .getUserIdByDiscordId(discordId)
-      .andThen((userId) => {
-        if (updates.checkedOutAt === undefined || updates.checkedOutAt === null) {
-          return this.attendanceRepository
-            .updateLast(userId, updates)
-            .map(() => undefined);
+  public updateAttendance(discordId: string, updates: AttendanceUpdate): ResultAsync<void, Error> {
+    return this.attendanceRepository.getUserIdByDiscordId(discordId).andThen((userId) => {
+      if (updates.checkedOutAt === undefined || updates.checkedOutAt === null) {
+        return this.attendanceRepository.updateLast(userId, updates).map(() => undefined);
+      }
+
+      return this.attendanceRepository.getLast(userId).andThen((attendance) => {
+        if (!attendance) {
+          return errAsync(new Error('User was not signed out because they have not signed in yet'));
         }
 
-        return this.attendanceRepository.getLast(userId).andThen((attendance) => {
-          if (!attendance) {
-            return errAsync(
-              new Error(
-                "User was not signed out because they have not signed in yet",
-              ),
-            );
-          }
+        if (attendance.checkedOutAt !== null) {
+          return errAsync(new Error('User is already signed out'));
+        }
 
-          if (attendance.checkedOutAt !== null) {
-            return errAsync(new Error("User is already signed out"));
-          }
-
-          return this.attendanceRepository
-            .updateLast(userId, updates)
-            .map(() => undefined);
-        });
+        return this.attendanceRepository.updateLast(userId, updates).map(() => undefined);
       });
+    });
   }
 
   private isStaleSession(signInTime: Date): Result<boolean, Error> {
     const toEasternYMD = fromThrowable(
       (date: Date) => {
-        const parts = new Intl.DateTimeFormat("en-US", {
-          timeZone: "America/New_York",
-          year: "numeric",
-          month: "2-digit",
-          day: "2-digit",
+        const parts = new Intl.DateTimeFormat('en-US', {
+          timeZone: 'America/New_York',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
         }).formatToParts(date);
 
-        const getPart = (type: "year" | "month" | "day") => {
+        const getPart = (type: 'year' | 'month' | 'day') => {
           const part = parts.find((p) => p.type === type);
           if (part == null) {
             throw new Error(`Missing ${type} in date parts`);
@@ -224,13 +181,12 @@ export class AttendanceService {
         };
 
         return {
-          year: getPart("year"),
-          month: getPart("month"),
-          day: getPart("day"),
+          year: getPart('year'),
+          month: getPart('month'),
+          day: getPart('day'),
         };
       },
-      (error) =>
-        error instanceof Error ? error : new Error(String(error)),
+      (error) => (error instanceof Error ? error : new Error(String(error))),
     );
 
     const now = new Date();
@@ -252,58 +208,48 @@ export class AttendanceService {
       nowEastern.year !== signInEastern.year ||
       nowEastern.month !== signInEastern.month ||
       nowEastern.day !== signInEastern.day;
-    const enoughTimeElapsed =
-      now.getTime() - signInTime.getTime() > STALE_SIGNIN_MIN_HOURS_MS;
+    const enoughTimeElapsed = now.getTime() - signInTime.getTime() > STALE_SIGNIN_MIN_HOURS_MS;
 
     return ok(differentDay && enoughTimeElapsed);
   }
 
   // Resolve a stale session.
-  public handleForgotToSignOut(
-    discordId: string,
-  ): ResultAsync<Attendance, Error> {
-    return this.attendanceRepository
-      .getUserIdByDiscordId(discordId)
-      .andThen((userId) =>
-        this.attendanceRepository.getLast(userId).andThen((attendance) => {
-          if (!attendance) {
-            return errAsync(new Error("No attendance record found for user"));
-          }
+  public handleForgotToSignOut(discordId: string): ResultAsync<Attendance, Error> {
+    return this.attendanceRepository.getUserIdByDiscordId(discordId).andThen((userId) =>
+      this.attendanceRepository.getLast(userId).andThen((attendance) => {
+        if (!attendance) {
+          return errAsync(new Error('No attendance record found for user'));
+        }
 
-          if (attendance.checkedOutAt !== null) {
-            return okAsync(attendance);
-          }
+        if (attendance.checkedOutAt !== null) {
+          return okAsync(attendance);
+        }
 
-          const staleResult = this.isStaleSession(
-            new Date(attendance.checkedInAt),
-          );
+        const staleResult = this.isStaleSession(new Date(attendance.checkedInAt));
 
-          if (staleResult.isErr()) {
-            return errAsync(staleResult.error);
-          }
+        if (staleResult.isErr()) {
+          return errAsync(staleResult.error);
+        }
 
-          if (!staleResult.value) {
-            return okAsync(attendance);
-          }
+        if (!staleResult.value) {
+          return okAsync(attendance);
+        }
 
-          const creditTime = new Date(
-            new Date(attendance.checkedInAt).getTime() +
-              FORGOT_SIGNOUT_CREDIT_MS,
-          );
+        const creditTime = new Date(
+          new Date(attendance.checkedInAt).getTime() + FORGOT_SIGNOUT_CREDIT_MS,
+        );
 
-          return this.attendanceRepository
-            .updateLast(userId, { checkedOutAt: creditTime })
-            .andThen((updated) => {
-              if (!updated) {
-                return errAsync(
-                  new Error("Failed to credit forgotten sign-out"),
-                );
-              }
+        return this.attendanceRepository
+          .updateLast(userId, { checkedOutAt: creditTime })
+          .andThen((updated) => {
+            if (!updated) {
+              return errAsync(new Error('Failed to credit forgotten sign-out'));
+            }
 
-              return okAsync(updated);
-            });
-        }),
-      );
+            return okAsync(updated);
+          });
+      }),
+    );
   }
 
   /** The same season overview the dashboard shows, looked up by Discord account. */
@@ -374,17 +320,11 @@ export class AttendanceService {
           and(
             eq(season_memberships.user_id, userId),
             eq(season_memberships.season_id, season.id),
-            eq(season_memberships.state, "active"),
+            eq(season_memberships.state, 'active'),
             lte(season_memberships.started_at, now),
-            or(
-              isNull(season_memberships.ended_at),
-              gt(season_memberships.ended_at, now),
-            ),
+            or(isNull(season_memberships.ended_at), gt(season_memberships.ended_at, now)),
             lte(season_memberships.joined_at, now),
-            or(
-              isNull(season_memberships.removed_at),
-              gt(season_memberships.removed_at, now),
-            ),
+            or(isNull(season_memberships.removed_at), gt(season_memberships.removed_at, now)),
           ),
         )
         .orderBy(desc(season_memberships.started_at))
@@ -396,16 +336,14 @@ export class AttendanceService {
         .where(
           and(
             eq(events.season_id, season.id),
-            eq(events.hour_category, "meeting"),
-            eq(events.status, "scheduled"),
+            eq(events.hour_category, 'meeting'),
+            eq(events.status, 'scheduled'),
           ),
         ),
     ]);
 
     const membership = memberships[0];
-    const requirementStatus = membership
-      ? getRequirementStatus(membership)
-      : null;
+    const requirementStatus = membership ? getRequirementStatus(membership) : null;
 
     const requirements = requirementStatus
       ? await db
@@ -418,26 +356,20 @@ export class AttendanceService {
             ),
           )
       : [];
-    const requiredHours = (category: "meeting" | "outreach", isLeader: boolean) =>
-      requirements.find(
-        (row) => row.category === category && row.is_leader === isLeader,
-      )?.required_hours ?? null;
+    const requiredHours = (category: 'meeting' | 'outreach', isLeader: boolean) =>
+      requirements.find((row) => row.category === category && row.is_leader === isLeader)
+        ?.required_hours ?? null;
     const meetingRequirements = {
-      member: requiredHours("meeting", false),
-      leadership: requiredHours("meeting", true),
+      member: requiredHours('meeting', false),
+      leadership: requiredHours('meeting', true),
     };
     // Student Leaders are measured against the leadership meeting target.
-    const track =
-      membership?.role === "student_leader" ? "leadership" : "member";
+    const track = membership?.role === 'student_leader' ? 'leadership' : 'member';
 
     const hours = { meeting: 0, outreach: 0, total: 0 };
 
     for (const record of records) {
-      hours[record.category] += completedHours(
-        record,
-        season.started_at,
-        now,
-      );
+      hours[record.category] += completedHours(record, season.started_at, now);
     }
 
     hours.total = hours.meeting + hours.outreach;
@@ -448,7 +380,7 @@ export class AttendanceService {
       requirements: membership
         ? {
             meeting: meetingRequirements[track],
-            outreach: requiredHours("outreach", false),
+            outreach: requiredHours('outreach', false),
             track,
           }
         : null,
@@ -462,9 +394,7 @@ export class AttendanceService {
         id: record.id,
         category: record.category,
         status: record.status,
-        name:
-          record.name ??
-          (record.category === "meeting" ? "Team meeting" : "Outreach event"),
+        name: record.name ?? (record.category === 'meeting' ? 'Team meeting' : 'Outreach event'),
         checkedInAt: record.checkedInAt.toISOString(),
         checkedOutAt: record.checkedOutAt?.toISOString() ?? null,
         hours: completedHours(record, season.started_at, now),

@@ -1,41 +1,41 @@
-import { Injectable, Logger } from "@nestjs/common";
-import { and, desc, eq, gte, isNull, lte, sql } from "drizzle-orm";
-import { err, ok, Result, ResultAsync } from "neverthrow";
+import { Injectable, Logger } from '@nestjs/common';
+import { and, desc, eq, gte, isNull, lte, sql } from 'drizzle-orm';
+import { err, ok, Result, ResultAsync } from 'neverthrow';
 
-import { DatabaseService } from "../database/database.service.js";
+import { DatabaseService } from '../database/database.service.js';
 import {
   account,
   attendance,
   hour_requirements,
   season_memberships,
   seasons,
-} from "../database/schema/index.js";
-import { type Attendance, AttendanceSchema } from "./attendance.schema.js";
+} from '../database/schema/index.js';
+import { type Attendance, AttendanceSchema } from './attendance.schema.js';
 
 export type AttendanceCreate = {
   userId: string;
   checkedInAt: Date;
-  category: "meeting" | "outreach";
+  category: 'meeting' | 'outreach';
   eventId: number | null;
 };
 
 export type AttendanceUpdate = {
   checkedInAt?: Date;
   checkedOutAt?: Date | null;
-  category?: "meeting" | "outreach";
+  category?: 'meeting' | 'outreach';
   eventId?: number | null;
 };
 
 type MembershipRequirementFields = Pick<
   typeof season_memberships.$inferSelect,
-  "role" | "student_experience" | "legacy_status"
+  'role' | 'student_experience' | 'legacy_status'
 >;
 
 export function getRequirementStatus(
   membership: MembershipRequirementFields,
 ): typeof hour_requirements.$inferSelect.status | null {
-  if (membership.role === "mentor" || membership.role === "team_admin") {
-    return "mentor";
+  if (membership.role === 'mentor' || membership.role === 'team_admin') {
+    return 'mentor';
   }
 
   return membership.student_experience;
@@ -69,17 +69,12 @@ export class AttendanceRepository {
           const [activeSeason] = await tx
             .select({ id: seasons.id })
             .from(seasons)
-            .where(
-              and(
-                lte(seasons.started_at, asOfDate),
-                gte(seasons.ended_at, asOfDate),
-              ),
-            )
+            .where(and(lte(seasons.started_at, asOfDate), gte(seasons.ended_at, asOfDate)))
             .orderBy(desc(seasons.started_at))
             .limit(1);
 
           if (!activeSeason) {
-            throw new Error("No active season found");
+            throw new Error('No active season found');
           }
 
           const [currentMembership] = await tx
@@ -97,8 +92,8 @@ export class AttendanceRepository {
             .limit(1);
 
           if (currentMembership) {
-            if (currentMembership.state !== "active") {
-              throw new Error("Season membership is removed");
+            if (currentMembership.state !== 'active') {
+              throw new Error('Season membership is removed');
             }
 
             return userId;
@@ -115,14 +110,11 @@ export class AttendanceRepository {
             .values({
               season_id: activeSeason.id,
               user_id: userId,
-              role: "student",
-              student_experience: previousMembership ? "veteran" : "rookie",
+              role: 'student',
+              student_experience: previousMembership ? 'veteran' : 'rookie',
             })
             .onConflictDoNothing({
-              target: [
-                season_memberships.user_id,
-                season_memberships.season_id,
-              ],
+              target: [season_memberships.user_id, season_memberships.season_id],
             });
 
           return userId;
@@ -132,14 +124,10 @@ export class AttendanceRepository {
     );
   }
 
-  createRecord(
-    record: AttendanceCreate,
-  ): ResultAsync<Attendance, Error> {
+  createRecord(record: AttendanceCreate): ResultAsync<Attendance, Error> {
     return ResultAsync.fromPromise<(typeof attendance.$inferSelect)[], Error>(
       this.database.db.transaction(async (tx) => {
-        await tx.execute(
-          sql`SELECT pg_advisory_xact_lock(hashtextextended(${record.userId}, 0))`,
-        );
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${record.userId}, 0))`);
 
         const [last] = await tx
           .select({ checked_out_at: attendance.checked_out_at })
@@ -149,7 +137,7 @@ export class AttendanceRepository {
           .limit(1);
 
         if (last && last.checked_out_at === null) {
-          throw new Error("User is already signed in");
+          throw new Error('User is already signed in');
         }
 
         return tx
@@ -166,15 +154,12 @@ export class AttendanceRepository {
       (error) => (error instanceof Error ? error : new Error(String(error))),
     ).andThen((rows) =>
       this.parseRow(rows[0]).andThen((row) =>
-        row ? ok(row) : err(new Error("Attendance record was not created")),
+        row ? ok(row) : err(new Error('Attendance record was not created')),
       ),
     );
   }
 
-  updateLast(
-    userId: string,
-    updates: AttendanceUpdate,
-  ): ResultAsync<Attendance | null, Error> {
+  updateLast(userId: string, updates: AttendanceUpdate): ResultAsync<Attendance | null, Error> {
     const setObject: Partial<typeof attendance.$inferInsert> = {};
 
     if (updates.checkedInAt !== undefined) {
@@ -192,9 +177,7 @@ export class AttendanceRepository {
 
     return ResultAsync.fromPromise<(typeof attendance.$inferSelect)[], Error>(
       this.database.db.transaction(async (tx) => {
-        await tx.execute(
-          sql`SELECT pg_advisory_xact_lock(hashtextextended(${userId}, 0))`,
-        );
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${userId}, 0))`);
 
         const [last] = await tx
           .select({ id: attendance.id })
@@ -204,7 +187,7 @@ export class AttendanceRepository {
           .limit(1);
 
         if (!last) {
-          throw new Error("No attendance record found to update");
+          throw new Error('No attendance record found to update');
         }
 
         const condition =
@@ -212,16 +195,12 @@ export class AttendanceRepository {
             ? and(eq(attendance.id, last.id), isNull(attendance.checked_out_at))
             : eq(attendance.id, last.id);
 
-        return tx
-          .update(attendance)
-          .set(setObject)
-          .where(condition)
-          .returning();
+        return tx.update(attendance).set(setObject).where(condition).returning();
       }),
       (error) => (error instanceof Error ? error : new Error(String(error))),
     ).andThen((result) =>
       this.parseRow(result[0]).andThen((row) =>
-        row ? ok(row) : err(new Error("Attendance record was not updated")),
+        row ? ok(row) : err(new Error('Attendance record was not updated')),
       ),
     );
   }
@@ -237,9 +216,7 @@ export class AttendanceRepository {
       id: row.id,
       userId: row.user_id,
       checkedInAt: row.checked_in_at.toISOString(),
-      checkedOutAt: row.checked_out_at
-        ? row.checked_out_at.toISOString()
-        : null,
+      checkedOutAt: row.checked_out_at ? row.checked_out_at.toISOString() : null,
       category: row.category,
       eventId: row.event_id,
     };
@@ -259,17 +236,12 @@ export class AttendanceRepository {
       this.database.db
         .select({ userId: account.userId })
         .from(account)
-        .where(
-          and(
-            eq(account.accountId, discordId),
-            eq(account.providerId, "discord"),
-          ),
-        )
+        .where(and(eq(account.accountId, discordId), eq(account.providerId, 'discord')))
         .limit(1),
       (error) => (error instanceof Error ? error : new Error(String(error))),
     ).andThen((result) => {
       if (!result.length) {
-        return err(new Error("User not found"));
+        return err(new Error('User not found'));
       }
 
       return ok(result[0].userId);
