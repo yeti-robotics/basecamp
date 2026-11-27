@@ -1,10 +1,10 @@
 import { Brand } from '@/components/Brand';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { getEvents } from '@/lib/events';
 import { requireMember } from '@/lib/require-member';
 import { getSeasons } from '@/lib/seasons';
 import { EventsList } from '../EventsList';
+import { EventCalendar } from './EventCalendar';
 
 export default async function EventsPage() {
   await requireMember();
@@ -33,17 +33,21 @@ export default async function EventsPage() {
           </p>
         </header>
         {events ? (
-          <EventsList
-            events={events}
-            now={now}
-            canManage={seasonView?.canManage ?? false}
-            seasons={seasonView?.seasons ?? []}
-          />
+          <>
+            <EventCalendar events={events} now={now} />
+
+            <EventsList
+              events={events}
+              now={now}
+              canManage={seasonView?.canManage ?? false}
+              seasons={seasonView?.seasons ?? []}
+            />
+          </>
         ) : (
-          <Alert className="mt-8">
+          `<Alert className="mt-8">
             <AlertTitle>Events could not be loaded</AlertTitle>
             <AlertDescription>Reload the page to try again.</AlertDescription>
-          </Alert>
+          </Alert>`
         )}
       </main>
     </div>
