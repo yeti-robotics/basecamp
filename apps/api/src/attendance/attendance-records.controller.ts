@@ -32,6 +32,14 @@ export class AttendanceRecordsController {
     return this.records.list(this.actorId(request), filter);
   }
 
+  // Export matching attendance records beyond the normal page limit.
+  // The service verifies mentor or Team Admin permissions.
+  @Get('export')
+  @Header('Cache-Control', 'private, no-store')
+  async exportRecords(@Req() request: Request, @Query() filter: AttendanceRecordFilter) {
+    return this.records.exportRecords(this.actorId(request), filter);
+  }
+
   @Post()
   @Header('Cache-Control', 'private, no-store')
   async create(@Req() request: Request, @Body() input: AttendanceRecordInput) {

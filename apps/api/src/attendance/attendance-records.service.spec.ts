@@ -1,6 +1,10 @@
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { AttendanceRecordsService, RECORD_LIST_LIMIT } from './attendance-records.service.js';
+import {
+  AttendanceRecordsService,
+  RECORD_EXPORT_LIMIT,
+  RECORD_LIST_LIMIT,
+} from './attendance-records.service.js';
 
 function selectQuery(rows: unknown[]) {
   const builder = {
@@ -135,6 +139,104 @@ describe('AttendanceRecordsService', () => {
       ['a non-text search', { q: ['ada'] }, 'Search must be text'],
     ])('rejects %s', async (_case, filter, message) => {
       await expect(makeService().list('mentor', filter as never)).rejects.toThrow(message);
+      expect(database.select).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('exportRecords', () => {
+    it('rejects unauthorized members before querying attendance', async () => {
+      authorization.canManageAttendance.mockResolvedValue(false);
+
+      await expect(makeService().exportRecords('student-1')).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
+      expect(authorization.canManageAttendance).toHaveBeenCalledWith('student-1');
+      expect(database.select).not.toHaveBeenCalled();
+    });
+
+    it('exports more than the normal page limit without truncating', async () => {
+      const rows = Array.from({ length: RECORD_LIST_LIMIT + 1 }, (_, id) => ({
+        ...record,
+        id,
+      }));
+      const query = selectQuery(rows);
+      database.select.mockReturnValueOnce(query);
+
+      const result = await makeService().exportRecords('mentor');
+
+      expect(result).toEqual(rows.map((row) => ({ ...row, hours: 2.25 })));
+      expect(query.limit).toHaveBeenCalledWith(RECORD_EXPORT_LIMIT + 1);
+    });
+
+    it('accepts exactly the export limit', async () => {
+      const rows = Array.from({ length: RECORD_EXPORT_LIMIT }, (_, id) => ({ ...record, id }));
+      database.select.mockReturnValueOnce(selectQuery(rows));
+
+      const result = await makeService().exportRecords('mentor');
+
+      expect(result).toHaveLength(RECORD_EXPORT_LIMIT);
+    });
+
+    it('rejects oversized exports instead of returning incomplete reports', async () => {
+      const rows = Array.from({ length: RECORD_EXPORT_LIMIT + 1 }, (_, id) => ({ ...record, id }));
+      const query = selectQuery(rows);
+      database.select.mockReturnValueOnce(query);
+
+      const result = makeService().exportRecords('mentor');
+
+      await expect(result).rejects.toBeInstanceOf(BadRequestException);
+      await expect(result).rejects.toThrow('Narrow the date range and try again.');
+      expect(query.limit).toHaveBeenCalledWith(RECORD_EXPORT_LIMIT + 1);
+    });
+
+    it('returns an empty array when no records match', async () => {
+      database.select.mockReturnValueOnce(selectQuery([]));
+
+      await expect(makeService().exportRecords('mentor')).resolves.toEqual([]);
+    });
+
+    it('uses the same query conditions and ordering as the attendance list', async () => {
+      const filter = {
+        q: ' ada ',
+        from: '2026-11-01T00:00:00.000Z',
+        to: '2026-11-30T23:59:59.999Z',
+        status: 'excused',
+      };
+      const rows = [{ ...record, status: 'excused' }];
+      const listQuery = selectQuery(rows);
+      const exportQuery = selectQuery(rows);
+      database.select.mockReturnValueOnce(listQuery).mockReturnValueOnce(exportQuery);
+      const service = makeService();
+
+      const listed = await service.list('mentor', filter);
+      const exported = await service.exportRecords('mentor', filter);
+
+      expect(exported).toEqual(listed.records);
+      expect(exportQuery.where.mock.calls).toEqual(listQuery.where.mock.calls);
+      expect(exportQuery.orderBy.mock.calls).toEqual(listQuery.orderBy.mock.calls);
+      expect(exportQuery.leftJoin).toHaveBeenCalledTimes(2);
+    });
+
+    it('preserves open sessions and reports zero completed hours', async () => {
+      const openRecord = { ...record, checkedOutAt: null, edited: false };
+      database.select.mockReturnValueOnce(selectQuery([openRecord]));
+
+      await expect(makeService().exportRecords('mentor')).resolves.toEqual([
+        { ...openRecord, hours: 0 },
+      ]);
+    });
+
+    it.each([
+      ['an invalid from date', { from: 'yesterday' }, 'From must be a valid timestamp'],
+      [
+        'a range that ends before it starts',
+        { from: '2026-11-07T00:00:00.000Z', to: '2026-11-01T00:00:00.000Z' },
+        'To must be on or after From',
+      ],
+      ['an unknown status', { status: 'deleted' }, 'Choose a valid status'],
+      ['a non-text search', { q: ['ada'] }, 'Search must be text'],
+    ])('rejects %s before querying the database', async (_case, filter, message) => {
+      await expect(makeService().exportRecords('mentor', filter as never)).rejects.toThrow(message);
       expect(database.select).not.toHaveBeenCalled();
     });
   });

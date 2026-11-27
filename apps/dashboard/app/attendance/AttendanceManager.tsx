@@ -1,6 +1,6 @@
 'use client';
 
-import { ClipboardList, History, Pencil, Plus, Search } from 'lucide-react';
+import { ClipboardList, Download, History, Pencil, Plus, Search } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { type FormEvent, Fragment, useState } from 'react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/empty';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { createAttendanceCsv } from '@/lib/attendance-export';
 import type {
   AttendanceHistoryEntry,
   AttendanceRecord,
@@ -23,6 +24,7 @@ import type {
   AttendanceRecordSnapshot,
   AttendanceStatus,
 } from '@/lib/attendance-records';
+import { downloadCsv } from '@/lib/csv';
 import type { TeamEvent } from '@/lib/events';
 
 export type AttendanceMember = { userId: string; name: string };
@@ -193,12 +195,14 @@ export function AttendanceManager({
   members,
   events,
   search,
+  exportQuery = '',
 }: {
   records: AttendanceRecord[];
   truncated: boolean;
   members: AttendanceMember[];
   events: TeamEvent[];
   search: AttendanceRecordSearch;
+  exportQuery?: string;
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState<AttendanceRecord | null>(null);
@@ -209,6 +213,8 @@ export function AttendanceManager({
   const [historyFor, setHistoryFor] = useState<number | null>(null);
   const [history, setHistory] = useState<AttendanceHistoryEntry[] | null>(null);
   const [historyError, setHistoryError] = useState('');
+  const [exportPending, setExportPending] = useState(false);
+  const [exportError, setExportError] = useState('');
   const filtered = Boolean(search.q || search.from || search.to || search.status);
 
   function updateField<K extends keyof RecordForm>(field: K, value: RecordForm[K]) {
@@ -321,6 +327,31 @@ export function AttendanceManager({
     }
   }
 
+  // Fetch the full matching report rather than exporting the limited table.
+  async function exportAttendance() {
+    if (exportPending) return;
+    setExportPending(true);
+    setExportError('');
+
+    try {
+      const query = exportQuery ? `?${exportQuery}` : '';
+      const response = await fetch(`/api/attendance/records/export${query}`, {
+        cache: 'no-store',
+      });
+      if (!response.ok) {
+        setExportError(await errorMessage(response, 'Attendance could not be exported.'));
+        return;
+      }
+
+      const exportRecords = (await response.json()) as AttendanceRecord[];
+      downloadCsv('attendance-records.csv', createAttendanceCsv(exportRecords));
+    } catch {
+      setExportError('Attendance could not be exported. Check your connection and try again.');
+    } finally {
+      setExportPending(false);
+    }
+  }
+
   async function toggleHistory(record: AttendanceRecord) {
     if (historyFor === record.id) {
       setHistoryFor(null);
@@ -397,10 +428,30 @@ export function AttendanceManager({
         <p className="text-sm text-muted-foreground">
           Every change needs a reason and is kept in the record&apos;s history.
         </p>
-        <Button onClick={startCreate} disabled={pending || members.length === 0}>
-          <Plus aria-hidden="true" /> Add record
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            disabled={exportPending}
+            onClick={() => void exportAttendance()}
+          >
+            <Download aria-hidden="true" />
+            {exportPending ? 'Exporting…' : 'Export attendance CSV'}
+          </Button>
+          <Button onClick={startCreate} disabled={pending || members.length === 0}>
+            <Plus aria-hidden="true" /> Add record
+          </Button>
+        </div>
       </div>
+      <p className="text-xs text-muted-foreground">
+        CSV exports include all matching records for the applied search filters, up to 10,000. Apply
+        your filters with Search before exporting.
+      </p>
+      {exportError && (
+        <Alert variant="destructive">
+          <AlertDescription>{exportError}</AlertDescription>
+        </Alert>
+      )}
 
       {showForm && (
         <Card id="attendance-record-form" className="scroll-mt-6">

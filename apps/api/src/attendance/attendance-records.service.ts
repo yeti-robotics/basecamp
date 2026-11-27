@@ -22,6 +22,7 @@ type AttendanceCategory = (typeof eventCategory.enumValues)[number];
 type MentorStatus = Exclude<AttendanceStatus, 'normal'>;
 
 export const RECORD_LIST_LIMIT = 200;
+export const RECORD_EXPORT_LIMIT = 10_000;
 const REASON_MAX_LENGTH = 500;
 const SEARCH_MAX_LENGTH = 100;
 
@@ -118,6 +119,25 @@ export class AttendanceRecordsService {
   ) {}
 
   async list(actorId: string, filter: AttendanceRecordFilter = {}) {
+    return this.queryRecords(actorId, filter, RECORD_LIST_LIMIT);
+  }
+
+  // Export all matching records within a bounded limit, not just the visible page.
+  async exportRecords(actorId: string, filter: AttendanceRecordFilter = {}) {
+    const result = await this.queryRecords(actorId, filter, RECORD_EXPORT_LIMIT);
+
+    // Reject incomplete reports instead of silently dropping matching records.
+    if (result.truncated) {
+      throw new BadRequestException(
+        'Too many records to export. Narrow the date range and try again.',
+      );
+    }
+
+    return result.records;
+  }
+
+  // Both paths share the same authorization, validation, filtering, and ordering.
+  private async queryRecords(actorId: string, filter: AttendanceRecordFilter, limit: number) {
     await this.requireAttendanceManager(actorId);
     const search = this.optionalSearch(filter.q);
     const from = filter.from ? this.timestamp(filter.from, 'From') : undefined;
@@ -139,11 +159,11 @@ export class AttendanceRecordsService {
         ),
       )
       .orderBy(desc(attendance.checked_in_at), desc(attendance.id))
-      .limit(RECORD_LIST_LIMIT + 1);
+      .limit(limit + 1);
 
     return {
-      records: rows.slice(0, RECORD_LIST_LIMIT).map(toRecord),
-      truncated: rows.length > RECORD_LIST_LIMIT,
+      records: rows.slice(0, limit).map(toRecord),
+      truncated: rows.length > limit,
     };
   }
 
