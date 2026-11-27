@@ -13,7 +13,7 @@ interface EventCalendarProps {
   now: string;
 }
 
-// An event type or "all" for displaying every event type.
+// Allow filtering by a specific event type or all events.
 type EventFilter = TeamEvent['eventType'] | 'all';
 
 const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -39,7 +39,11 @@ const eventColors: Record<TeamEvent['eventType'], string> = {
   other: 'bg-muted text-muted-foreground',
 };
 
-const timeFormatter = new Intl.DateTimeFormat('en-US', {
+// Include the date and time so overnight events are displayed correctly.
+const dateTimeFormatter = new Intl.DateTimeFormat('en-US', {
+  month: 'short',
+  day: 'numeric',
+  year: 'numeric',
   hour: 'numeric',
   minute: '2-digit',
   timeZone: 'America/New_York',
@@ -55,7 +59,6 @@ const dayFormatter = new Intl.DateTimeFormat('en-US', {
   weekday: 'long',
   month: 'long',
   day: 'numeric',
-  year: 'numeric',
   timeZone: 'UTC',
 });
 
@@ -66,29 +69,43 @@ export function EventCalendar({ events, now }: EventCalendarProps) {
   const todayMonth = Number(today.slice(5, 7)) - 1;
   const todayDay = Number(today.slice(8, 10));
 
-  // State represents information that changes through user interaction.
+  // Store the currently displayed month and year.
   const [currentMonth, setCurrentMonth] = useState({
     year: todayYear,
     month: todayMonth,
   });
 
+  // Store the selected date and active filters.
   const [selectedDay, setSelectedDay] = useState(todayDay);
   const [eventFilter, setEventFilter] = useState<EventFilter>('all');
+  const [seasonFilter, setSeasonFilter] = useState('all');
 
   const { year, month } = currentMonth;
 
-  // Derived data is calculated from state instead of stored separately.
+  // Generate calendar cells for the current month.
   const calendarDays = generateCalendarDays(year, month);
 
-  const filteredEvents = events.filter(
-    (event) => eventFilter === 'all' || event.eventType === eventFilter,
+  // Map each unique season ID to its display name.
+  // Using a Map prevents duplicate seasons in the dropdown.
+  const seasonOptions = Array.from(
+    new Map(events.map((event) => [event.seasonId, event.seasonName])),
   );
 
+  // An event must match both the type and season filters.
+  const filteredEvents = events.filter((event) => {
+    const matchesType = eventFilter === 'all' || event.eventType === eventFilter;
+
+    const matchesSeason = seasonFilter === 'all' || String(event.seasonId) === seasonFilter;
+
+    return matchesType && matchesSeason;
+  });
+
+  // Retrieve matching events for the selected calendar date.
   const selectedEvents = getEventsForDay(filteredEvents, year, month, selectedDay);
 
   const monthLabel = monthFormatter.format(new Date(Date.UTC(year, month, 1)));
 
-  // Moving forward or backward also handles year boundaries.
+  // Navigate between months, including transitions between years.
   function changeMonth(direction: number) {
     setCurrentMonth((previous) => {
       const nextDate = new Date(Date.UTC(previous.year, previous.month + direction, 1));
@@ -103,6 +120,7 @@ export function EventCalendar({ events, now }: EventCalendarProps) {
     setSelectedDay(1);
   }
 
+  // Return to today's month and select today's date.
   function goToToday() {
     setCurrentMonth({
       year: todayYear,
@@ -140,11 +158,13 @@ export function EventCalendar({ events, now }: EventCalendarProps) {
           </Button>
         </div>
 
-        <div className="flex items-center gap-2">
+        {/* Calendar controls and filters */}
+        <div className="flex flex-wrap items-center gap-2">
           <Button type="button" variant="outline" size="sm" onClick={goToToday}>
             Today
           </Button>
 
+          {/* Filter events by their type */}
           <select
             aria-label="Filter event type"
             className="h-8 rounded-lg border bg-background px-2 text-sm"
@@ -152,9 +172,26 @@ export function EventCalendar({ events, now }: EventCalendarProps) {
             onChange={(event) => setEventFilter(event.target.value as EventFilter)}
           >
             <option value="all">All events</option>
+
             {Object.entries(eventLabels).map(([value, label]) => (
               <option key={value} value={value}>
                 {label}
+              </option>
+            ))}
+          </select>
+
+          {/* Filter events by their associated season */}
+          <select
+            aria-label="Filter season"
+            className="h-8 rounded-lg border bg-background px-2 text-sm"
+            value={seasonFilter}
+            onChange={(event) => setSeasonFilter(event.target.value)}
+          >
+            <option value="all">All seasons</option>
+
+            {seasonOptions.map(([id, name]) => (
+              <option key={id} value={String(id)}>
+                {name}
               </option>
             ))}
           </select>
@@ -184,6 +221,7 @@ export function EventCalendar({ events, now }: EventCalendarProps) {
                 );
               }
 
+              // Find events matching this date and the active filters.
               const dayEvents = getEventsForDay(filteredEvents, year, month, day);
 
               const isSelected = selectedDay === day;
@@ -210,30 +248,49 @@ export function EventCalendar({ events, now }: EventCalendarProps) {
                     {day}
                   </span>
 
-                  {/* Display the first two events inside each cell. */}
-                  <div className="mt-1 space-y-1">
+                  {/* Display up to two events inside each cell. */}
+                  <span className="mt-1 block space-y-1">
                     {dayEvents.slice(0, 2).map((event) => (
-                      <div
+                      <span
                         key={event.id}
-                        className={`truncate rounded px-1 py-0.5 text-xs ${
+                        className={`block truncate rounded px-1 py-0.5 text-xs ${
                           event.status === 'cancelled'
                             ? 'bg-muted text-muted-foreground line-through'
                             : eventColors[event.eventType]
                         }`}
                       >
                         {event.name}
-                      </div>
+                      </span>
                     ))}
 
+                    {/* Indicate when additional events are available. */}
                     {dayEvents.length > 2 && (
-                      <p className="text-xs text-muted-foreground">+{dayEvents.length - 2} more</p>
+                      <span className="block text-xs text-muted-foreground">
+                        +{dayEvents.length - 2} more
+                      </span>
                     )}
-                  </div>
+                  </span>
                 </button>
               );
             })}
           </div>
         </div>
+      </div>
+
+      {/* Legend explaining the calendar event colors. */}
+      <div className="flex flex-wrap items-center gap-2">
+        {Object.entries(eventLabels).map(([value, label]) => (
+          <span
+            key={value}
+            className={`rounded px-2 py-1 text-xs ${eventColors[value as TeamEvent['eventType']]}`}
+          >
+            {label}
+          </span>
+        ))}
+
+        <span className="rounded bg-muted px-2 py-1 text-xs text-muted-foreground line-through">
+          Cancelled
+        </span>
       </div>
 
       {/* Detailed events for the currently selected date. */}
@@ -255,10 +312,15 @@ export function EventCalendar({ events, now }: EventCalendarProps) {
                 {event.status === 'cancelled' && <Badge variant="destructive">Cancelled</Badge>}
               </div>
 
+              {/* Display complete timestamps for multi-day events. */}
               <p className="text-sm text-muted-foreground">
-                {timeFormatter.format(new Date(event.startsAt))}
+                <time dateTime={event.startsAt}>
+                  {dateTimeFormatter.format(new Date(event.startsAt))}
+                </time>
                 {' – '}
-                {timeFormatter.format(new Date(event.endsAt))}
+                <time dateTime={event.endsAt}>
+                  {dateTimeFormatter.format(new Date(event.endsAt))}
+                </time>
                 {' ET'}
               </p>
 
@@ -268,6 +330,7 @@ export function EventCalendar({ events, now }: EventCalendarProps) {
                 <p className="text-sm text-muted-foreground">{event.description}</p>
               )}
 
+              {/* Cancelled events have no scheduled hour contribution. */}
               <p className="text-xs text-muted-foreground">
                 {event.seasonName}
                 {' · '}

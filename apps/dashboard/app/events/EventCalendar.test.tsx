@@ -107,7 +107,7 @@ describe('EventCalendar', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'December 2026 day 5' }));
 
-    expect(screen.getByText('Cancelled')).toBeInTheDocument();
+    expect(within(screen.getByRole('article')).getByText('Cancelled')).toBeInTheDocument();
     expect(screen.getByText(/No attendance hours/)).toBeInTheDocument();
   });
 });

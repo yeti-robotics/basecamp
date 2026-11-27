@@ -4,8 +4,7 @@ import { Button } from '@/components/ui/button';
 import { getEvents } from '@/lib/events';
 import { requireMember } from '@/lib/require-member';
 import { getSeasons } from '@/lib/seasons';
-import { EventsList } from '../EventsList';
-import { EventCalendar } from './EventCalendar';
+import { EventsView } from './EventsView';
 
 export default async function EventsPage() {
   await requireMember();
@@ -34,16 +33,12 @@ export default async function EventsPage() {
           </p>
         </header>
         {events ? (
-          <>
-            <EventCalendar events={events} now={now} />
-
-            <EventsList
-              events={events}
-              now={now}
-              canManage={seasonView?.canManage ?? false}
-              seasons={seasonView?.seasons ?? []}
-            />
-          </>
+          <EventsView
+            events={events}
+            now={now}
+            canManage={seasonView?.canManage ?? false}
+            seasons={seasonView?.seasons ?? []}
+          />
         ) : (
           <Alert className="mt-8">
             <AlertTitle>Events could not be loaded</AlertTitle>
