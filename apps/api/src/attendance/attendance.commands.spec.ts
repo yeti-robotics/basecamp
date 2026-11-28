@@ -2,15 +2,23 @@ import { MessageFlags } from 'discord.js';
 import { errAsync, okAsync } from 'neverthrow';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AttendanceCommands } from './attendance.commands.js';
+import type { AttendanceLeaderboard, AttendanceOverview } from './attendance.service.js';
+import {
+  formatAttendanceLeaderboard,
+  formatAttendanceOverview,
+  formatAttendanceReadError,
+} from './attendance-response.js';
 
 const discordId = '123456789012345678';
 const targetId = '987654321098765432';
+
 const service = {
   signInWithCode: vi.fn(),
   signOutWithCode: vi.fn(),
   signInForMember: vi.fn(),
   signOutForMember: vi.fn(),
   getOverviewForDiscordUser: vi.fn(),
+  getLeaderboardForDiscordUser: vi.fn(),
 };
 
 function makeInteraction() {
@@ -28,19 +36,65 @@ function makeInteraction() {
   };
 }
 
+function overview(meetingHours = 12): AttendanceOverview {
+  return {
+    season: { id: 1, name: '2026–27' },
+    hours: {
+      meeting: meetingHours,
+      outreach: 0,
+      total: meetingHours,
+    },
+    requirements: {
+      meeting: 26,
+      outreach: 5,
+      track: 'member',
+    },
+    progress: {
+      completedMeetings: 5,
+      attendedMeetings: 3,
+      excusedMeetings: 1,
+      missedMeetings: 1,
+      completedMeetingHours: 16,
+      scheduledMeetingHours: 40,
+      expectedHours: {
+        member: 10.4,
+        leadership: 15.6,
+      },
+    },
+    recentActivity: [],
+  };
+}
+
+const leaderboard: AttendanceLeaderboard = {
+  season: { id: 1, name: '2026–27' },
+  entries: [
+    { rank: 1, name: 'Ada Lovelace', hours: 20 },
+    { rank: 2, name: 'Grace Hopper', hours: 18.5 },
+    { rank: 2, name: 'Alex Morgan', hours: 18.5 },
+    { rank: 4, name: 'Sam Wilson', hours: 15 },
+    { rank: 5, name: 'Taylor Smith', hours: 12 },
+  ],
+};
+
+beforeEach(() => {
+  vi.resetAllMocks();
+});
+
 describe('member attendance commands', () => {
   const commands = new AttendanceCommands(service as never);
-
-  beforeEach(() => vi.clearAllMocks());
 
   it('signs in the Discord actor with the zero-padded display code and replies privately', async () => {
     const interaction = makeInteraction();
     service.signInWithCode.mockReturnValue(okAsync(undefined));
 
-    await commands.SigninCommand([interaction] as never, { code: '0042' });
+    await commands.SigninCommand([interaction] as never, {
+      code: '0042',
+    });
 
     expect(service.signInWithCode).toHaveBeenCalledWith(discordId, '0042');
-    expect(interaction.deferReply).toHaveBeenCalledWith({ flags: [MessageFlags.Ephemeral] });
+    expect(interaction.deferReply).toHaveBeenCalledWith({
+      flags: [MessageFlags.Ephemeral],
+    });
     expect(interaction.editReply).toHaveBeenCalledWith('Signed in.');
   });
 
@@ -48,10 +102,14 @@ describe('member attendance commands', () => {
     const interaction = makeInteraction();
     service.signOutWithCode.mockReturnValue(okAsync(undefined));
 
-    await commands.SignoutCommand([interaction] as never, { code: '0042' });
+    await commands.SignoutCommand([interaction] as never, {
+      code: '0042',
+    });
 
     expect(service.signOutWithCode).toHaveBeenCalledWith(discordId, '0042');
-    expect(interaction.deferReply).toHaveBeenCalledWith({ flags: [MessageFlags.Ephemeral] });
+    expect(interaction.deferReply).toHaveBeenCalledWith({
+      flags: [MessageFlags.Ephemeral],
+    });
     expect(interaction.editReply).toHaveBeenCalledWith('Signed out.');
   });
 
@@ -59,9 +117,13 @@ describe('member attendance commands', () => {
     const interaction = makeInteraction();
     service.signOutWithCode.mockReturnValue(errAsync(new Error('Invalid attendance code')));
 
-    await commands.SignoutCommand([interaction] as never, { code: '9999' });
+    await commands.SignoutCommand([interaction] as never, {
+      code: '9999',
+    });
 
-    expect(interaction.deferReply).toHaveBeenCalledWith({ flags: [MessageFlags.Ephemeral] });
+    expect(interaction.deferReply).toHaveBeenCalledWith({
+      flags: [MessageFlags.Ephemeral],
+    });
     expect(interaction.editReply).toHaveBeenCalledWith(
       'Invalid or expired code. Check the display and try again.',
     );
@@ -75,7 +137,9 @@ describe('member attendance commands', () => {
     await commands.MentorSigninCommand([interaction] as never, { user: target } as never);
 
     expect(service.signInForMember).toHaveBeenCalledWith(discordId, targetId);
-    expect(interaction.deferReply).toHaveBeenCalledWith({ flags: [MessageFlags.Ephemeral] });
+    expect(interaction.deferReply).toHaveBeenCalledWith({
+      flags: [MessageFlags.Ephemeral],
+    });
     expect(interaction.channel.send).toHaveBeenCalledWith(
       `<@${targetId}> has been signed in by <@${discordId}>.`,
     );
@@ -123,94 +187,280 @@ describe('member attendance commands', () => {
     expect(interaction.channel.send).not.toHaveBeenCalled();
     expect(interaction.editReply).toHaveBeenCalledWith(expected);
   });
+
+  it('still confirms mentor sign-in if the announcement fails', async () => {
+    const interaction = makeInteraction();
+    const target = { id: targetId, username: 'Member' };
+
+    service.signInForMember.mockReturnValue(okAsync(undefined));
+    interaction.channel.send.mockRejectedValue(new Error('Missing channel permissions'));
+
+    await commands.MentorSigninCommand([interaction] as never, { user: target } as never);
+
+    expect(interaction.editReply).toHaveBeenCalledWith('Successfully signed in Member.');
+  });
+
+  it('confirms mentor sign-out without a sendable channel', async () => {
+    const interaction = makeInteraction();
+    const target = { id: targetId, username: 'Member' };
+
+    service.signOutForMember.mockReturnValue(okAsync(undefined));
+    interaction.channel.isSendable.mockReturnValue(false);
+
+    await commands.MentorSignoutCommand([interaction] as never, { user: target } as never);
+
+    expect(interaction.channel.send).not.toHaveBeenCalled();
+    expect(interaction.editReply).toHaveBeenCalledWith('Successfully signed out Member.');
+  });
 });
 
 describe('/attendance command', () => {
   const commands = new AttendanceCommands(service as never);
 
-  function overview(meetingHours: number) {
-    return {
-      season: { id: 1, name: '2026–27' },
-      hours: { meeting: meetingHours, outreach: 0, total: meetingHours },
-      requirements: { meeting: 26, outreach: 5, track: 'member' },
-      progress: {
-        completedMeetings: 5,
-        attendedMeetings: 3,
-        excusedMeetings: 1,
-        missedMeetings: 1,
-        completedMeetingHours: 16,
-        scheduledMeetingHours: 40,
-        expectedHours: { member: 10.4, leadership: 15.6 },
-      },
-      recentActivity: [],
-    };
-  }
-
-  beforeEach(() => vi.clearAllMocks());
-
-  it.each([
-    [
-      'above the leadership target',
-      16,
-      "You're currently above the minimum hours for leadership (16.00 hours, 100.0% of 16 possible hours to date)! :tada:",
-    ],
-    [
-      'above the member target only',
-      12,
-      "You're currently above the minimum hours for members (12.00 hours, 75.0% of 16 possible hours to date)! If you're on leadership, you are currently 4 hour(s) behind the leadership requirement.",
-    ],
-    [
-      'behind the member target',
-      6.5,
-      "You've got 6.50 hours (40.6% of 16 possible hours to date). You are currently 4 hour(s) behind the minimum hours goal. :rocket:",
-    ],
-  ])('compares hours with what is expected so far when %s', async (_case, hours, message) => {
+  it('retrieves attendance using the linked Discord identity', async () => {
     const interaction = makeInteraction();
-    service.getOverviewForDiscordUser.mockReturnValue(okAsync(overview(hours)));
+    const data = overview();
+
+    service.getOverviewForDiscordUser.mockReturnValue(okAsync(data));
 
     await commands.AttendanceCommand([interaction] as never);
 
     expect(service.getOverviewForDiscordUser).toHaveBeenCalledWith(discordId);
-    expect(interaction.editReply).toHaveBeenCalledWith(
-      `${message}\nMeetings so far: 3 attended, 1 excused, 1 missed (of 5).`,
-    );
+
+    expect(interaction.editReply).toHaveBeenCalledWith({
+      content: formatAttendanceOverview(data),
+      allowedMentions: { parse: [] },
+    });
   });
 
-  it('shows an infinite percentage before any meetings have finished', async () => {
+  it('defers privately before querying attendance', async () => {
     const interaction = makeInteraction();
-    const empty = overview(0);
-    empty.progress = {
-      ...empty.progress,
-      completedMeetings: 0,
-      attendedMeetings: 0,
-      excusedMeetings: 0,
-      missedMeetings: 0,
-      completedMeetingHours: 0,
-      expectedHours: { member: 0, leadership: null as never },
+
+    service.getOverviewForDiscordUser.mockReturnValue(okAsync(overview()));
+
+    await commands.AttendanceCommand([interaction] as never);
+
+    expect(interaction.deferReply).toHaveBeenCalledWith({
+      flags: [MessageFlags.Ephemeral],
+    });
+
+    expect(interaction.deferReply.mock.invocationCallOrder[0]).toBeLessThan(
+      service.getOverviewForDiscordUser.mock.invocationCallOrder[0],
+    );
+
+    expect(interaction.reply).not.toHaveBeenCalled();
+    expect(interaction.channel.send).not.toHaveBeenCalled();
+  });
+
+  it.each([16, 12, 6.5])('formats attendance progress with %s recorded hours', async (hours) => {
+    const interaction = makeInteraction();
+    const data = overview(hours);
+
+    service.getOverviewForDiscordUser.mockReturnValue(okAsync(data));
+
+    await commands.AttendanceCommand([interaction] as never);
+
+    expect(interaction.editReply).toHaveBeenCalledWith({
+      content: formatAttendanceOverview(data),
+      allowedMentions: { parse: [] },
+    });
+  });
+
+  it('does not display an infinite percentage before meetings finish', async () => {
+    const interaction = makeInteraction();
+
+    const data: AttendanceOverview = {
+      ...overview(0),
+      progress: {
+        completedMeetings: 0,
+        attendedMeetings: 0,
+        excusedMeetings: 0,
+        missedMeetings: 0,
+        completedMeetingHours: 0,
+        scheduledMeetingHours: 40,
+        expectedHours: { member: 0, leadership: 0 },
+      },
     };
-    service.getOverviewForDiscordUser.mockReturnValue(okAsync(empty));
+
+    service.getOverviewForDiscordUser.mockReturnValue(okAsync(data));
 
     await commands.AttendanceCommand([interaction] as never);
 
-    expect(interaction.editReply).toHaveBeenCalledWith(
-      expect.stringContaining('(0.00 hours, ∞% of 0 possible hours to date)! :tada:'),
-    );
+    expect(interaction.editReply).toHaveBeenCalledWith({
+      content: expect.not.stringMatching(/∞|Infinity|NaN/),
+      allowedMentions: { parse: [] },
+    });
   });
 
-  it.each([
-    ['the lookup fails', errAsync(new Error('User not found'))],
-    [
-      'the member has no requirement this season',
-      okAsync({ ...overview(0), requirements: null, progress: null }),
-    ],
-  ])('asks the member to tell a mentor when %s', async (_case, result) => {
+  it('handles an installation without an active season', async () => {
     const interaction = makeInteraction();
-    service.getOverviewForDiscordUser.mockReturnValue(result);
+
+    const data: AttendanceOverview = {
+      season: null,
+      hours: { meeting: 0, outreach: 0, total: 0 },
+      requirements: null,
+      progress: null,
+      recentActivity: [],
+    };
+
+    service.getOverviewForDiscordUser.mockReturnValue(okAsync(data));
 
     await commands.AttendanceCommand([interaction] as never);
 
-    expect(interaction.editReply).toHaveBeenCalledWith(
-      'There was an error getting your attendance or hour requirements. Please let a mentor know.',
-    );
+    expect(interaction.editReply).toHaveBeenCalledWith({
+      content: formatAttendanceOverview(data),
+      allowedMentions: { parse: [] },
+    });
   });
+
+  it('handles a member without an active season assignment', async () => {
+    const interaction = makeInteraction();
+
+    const data: AttendanceOverview = {
+      ...overview(),
+      requirements: null,
+    };
+
+    service.getOverviewForDiscordUser.mockReturnValue(okAsync(data));
+
+    await commands.AttendanceCommand([interaction] as never);
+
+    expect(interaction.editReply).toHaveBeenCalledWith({
+      content: formatAttendanceOverview(data),
+      allowedMentions: { parse: [] },
+    });
+  });
+
+  it.each(['User not found', 'Account is suspended', 'database unavailable'])(
+    'handles attendance lookup error "%s" privately',
+    async (message) => {
+      const interaction = makeInteraction();
+      const error = new Error(message);
+
+      service.getOverviewForDiscordUser.mockReturnValue(errAsync(error));
+
+      await commands.AttendanceCommand([interaction] as never);
+
+      expect(interaction.deferReply).toHaveBeenCalledWith({
+        flags: [MessageFlags.Ephemeral],
+      });
+
+      expect(interaction.editReply).toHaveBeenCalledWith(formatAttendanceReadError(error));
+
+      expect(interaction.channel.send).not.toHaveBeenCalled();
+    },
+  );
+});
+
+describe('/attendance-leaderboard command', () => {
+  const commands = new AttendanceCommands(service as never);
+
+  it('retrieves current-season rankings for the invoking Discord user', async () => {
+    const interaction = makeInteraction();
+
+    service.getLeaderboardForDiscordUser.mockReturnValue(okAsync(leaderboard));
+
+    await commands.AttendanceLeaderboardCommand([interaction] as never);
+
+    expect(service.getLeaderboardForDiscordUser).toHaveBeenCalledWith(discordId);
+
+    expect(interaction.editReply).toHaveBeenCalledWith({
+      content: formatAttendanceLeaderboard(leaderboard),
+      allowedMentions: { parse: [] },
+    });
+  });
+
+  it('keeps identifiable student rankings private', async () => {
+    const interaction = makeInteraction();
+
+    service.getLeaderboardForDiscordUser.mockReturnValue(okAsync(leaderboard));
+
+    await commands.AttendanceLeaderboardCommand([interaction] as never);
+
+    expect(interaction.deferReply).toHaveBeenCalledWith({
+      flags: [MessageFlags.Ephemeral],
+    });
+
+    expect(interaction.deferReply.mock.invocationCallOrder[0]).toBeLessThan(
+      service.getLeaderboardForDiscordUser.mock.invocationCallOrder[0],
+    );
+
+    expect(interaction.reply).not.toHaveBeenCalled();
+    expect(interaction.channel.send).not.toHaveBeenCalled();
+  });
+
+  it('disables mentions in user-controlled leaderboard names', async () => {
+    const interaction = makeInteraction();
+
+    const data: AttendanceLeaderboard = {
+      season: leaderboard.season,
+      entries: [{ rank: 1, name: '@everyone', hours: 10 }],
+    };
+
+    service.getLeaderboardForDiscordUser.mockReturnValue(okAsync(data));
+
+    await commands.AttendanceLeaderboardCommand([interaction] as never);
+
+    expect(interaction.editReply).toHaveBeenCalledWith({
+      content: expect.any(String),
+      allowedMentions: { parse: [] },
+    });
+  });
+
+  it('handles a season without recorded meeting hours', async () => {
+    const interaction = makeInteraction();
+
+    const data: AttendanceLeaderboard = {
+      season: leaderboard.season,
+      entries: [],
+    };
+
+    service.getLeaderboardForDiscordUser.mockReturnValue(okAsync(data));
+
+    await commands.AttendanceLeaderboardCommand([interaction] as never);
+
+    expect(interaction.editReply).toHaveBeenCalledWith({
+      content: formatAttendanceLeaderboard(data),
+      allowedMentions: { parse: [] },
+    });
+  });
+
+  it('handles an installation without an active season', async () => {
+    const interaction = makeInteraction();
+
+    const data: AttendanceLeaderboard = {
+      season: null,
+      entries: [],
+    };
+
+    service.getLeaderboardForDiscordUser.mockReturnValue(okAsync(data));
+
+    await commands.AttendanceLeaderboardCommand([interaction] as never);
+
+    expect(interaction.editReply).toHaveBeenCalledWith({
+      content: formatAttendanceLeaderboard(data),
+      allowedMentions: { parse: [] },
+    });
+  });
+
+  it.each(['Not authorized to manage attendance', 'User not found', 'database unavailable'])(
+    'handles leaderboard error "%s" without publishing rankings',
+    async (message) => {
+      const interaction = makeInteraction();
+      const error = new Error(message);
+
+      service.getLeaderboardForDiscordUser.mockReturnValue(errAsync(error));
+
+      await commands.AttendanceLeaderboardCommand([interaction] as never);
+
+      expect(interaction.deferReply).toHaveBeenCalledWith({
+        flags: [MessageFlags.Ephemeral],
+      });
+
+      expect(interaction.editReply).toHaveBeenCalledWith(formatAttendanceReadError(error));
+
+      expect(interaction.channel.send).not.toHaveBeenCalled();
+      expect(interaction.reply).not.toHaveBeenCalled();
+    },
+  );
 });
