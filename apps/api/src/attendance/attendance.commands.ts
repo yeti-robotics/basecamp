@@ -1,4 +1,5 @@
 import { Injectable, Logger, UseFilters, UseGuards, ValidationPipe } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { type ChatInputCommandInteraction, MessageFlags, type User } from 'discord.js';
 import type { SlashCommandContext } from 'necord';
 import { Context, Options, SlashCommand, UserOption } from 'necord';
@@ -34,6 +35,12 @@ function formatAttendanceError(error: Error): string {
       return 'You need to sign in before signing out.';
     case 'Not authorized to manage attendance':
       return 'Only active mentors and Team Admins can use this command.';
+    case 'Account is suspended':
+      return 'Your Basecamp access is suspended. Contact a Team Admin for assistance.';
+    case 'Season membership is removed':
+      return 'Your membership in this season has been removed. Contact a Team Admin.';
+    case 'No active season membership':
+      return 'You need an active season membership to record attendance.';
     default:
       return 'Attendance could not be updated. Please try again or ask a mentor.';
   }
@@ -51,6 +58,12 @@ function formatMentorAttendanceError(error: Error, target: User): string {
       return `${member} has not signed in yet.`;
     case 'Not authorized to manage attendance':
       return 'Only active mentors and Team Admins can use this command.';
+    case 'Account is suspended':
+      return 'The member’s Basecamp access is suspended.';
+    case 'Season membership is removed':
+      return 'The member has been removed from this season.';
+    case 'No active season membership':
+      return 'The member needs an active season membership.';
     default:
       return `Could not update attendance for ${member}. Please try again or ask a mentor.`;
   }
@@ -60,7 +73,20 @@ function formatMentorAttendanceError(error: Error, target: User): string {
 export class AttendanceCommands {
   private readonly logger = new Logger(AttendanceCommands.name);
 
-  constructor(private readonly attendanceService: AttendanceService) {}
+  constructor(
+    private readonly attendanceService: AttendanceService,
+    private readonly config: ConfigService,
+  ) {}
+
+  private async inConfiguredGuild(interaction: ChatInputCommandInteraction): Promise<boolean> {
+    const guildId = this.config.get<string>('DISCORD_GUILD_ID')?.trim();
+    if (guildId && interaction.guildId === guildId) return true;
+    await interaction.reply({
+      content: 'Use attendance commands in the configured team Discord server.',
+      flags: [MessageFlags.Ephemeral],
+    });
+    return false;
+  }
 
   private async handleMentorAttendanceResult(
     interaction: ChatInputCommandInteraction,
@@ -69,7 +95,7 @@ export class AttendanceCommands {
     result: Result<void, Error>,
   ) {
     if (result.isErr()) {
-      this.logger.error(`Mentor ${action} failed for target ${target.id}: ${result.error.message}`);
+      this.logger.warn(`Mentor ${action} failed for target ${target.id}`);
       return interaction.editReply(formatMentorAttendanceError(result.error, target));
     }
 
@@ -78,7 +104,10 @@ export class AttendanceCommands {
 
     if (channel?.isSendable()) {
       await channel
-        .send(`<@${target.id}> has been ${pastTense} by <@${interaction.user.id}>.`)
+        .send({
+          content: `<@${target.id}> has been ${pastTense} by <@${interaction.user.id}>.`,
+          allowedMentions: { parse: [], users: [target.id, interaction.user.id] },
+        })
         .catch((error: unknown) => {
           this.logger.warn(
             `Could not announce mentor ${action} for ${target.id}: ${
@@ -96,6 +125,7 @@ export class AttendanceCommands {
     description: 'Get your current attendance and meeting progress',
   })
   async AttendanceCommand(@Context() [interaction]: SlashCommandContext) {
+    if (!(await this.inConfiguredGuild(interaction))) return;
     // Personal attendance information should only be visible to its owner.
     await interaction.deferReply({
       flags: [MessageFlags.Ephemeral],
@@ -120,6 +150,7 @@ export class AttendanceCommands {
     description: 'Show the top 5 students by meeting hours (mentors and Team Admins only)',
   })
   async AttendanceLeaderboardCommand(@Context() [interaction]: SlashCommandContext) {
+    if (!(await this.inConfiguredGuild(interaction))) return;
     // Rankings contain identifiable student information.
     await interaction.deferReply({
       flags: [MessageFlags.Ephemeral],
@@ -150,6 +181,7 @@ export class AttendanceCommands {
     @Options(new ValidationPipe({ validateCustomDecorators: true }))
     options: AttendanceCodeOptions,
   ) {
+    if (!(await this.inConfiguredGuild(interaction))) return;
     await interaction.deferReply({
       flags: [MessageFlags.Ephemeral],
     });
@@ -172,6 +204,7 @@ export class AttendanceCommands {
     @Options(new ValidationPipe({ validateCustomDecorators: true }))
     options: AttendanceCodeOptions,
   ) {
+    if (!(await this.inConfiguredGuild(interaction))) return;
     await interaction.deferReply({
       flags: [MessageFlags.Ephemeral],
     });
@@ -191,6 +224,7 @@ export class AttendanceCommands {
     @Context() [interaction]: SlashCommandContext,
     @Options() options: MentorAttendanceOptions,
   ) {
+    if (!(await this.inConfiguredGuild(interaction))) return;
     await interaction.deferReply({
       flags: [MessageFlags.Ephemeral],
     });
@@ -211,6 +245,7 @@ export class AttendanceCommands {
     @Context() [interaction]: SlashCommandContext,
     @Options() options: MentorAttendanceOptions,
   ) {
+    if (!(await this.inConfiguredGuild(interaction))) return;
     await interaction.deferReply({
       flags: [MessageFlags.Ephemeral],
     });

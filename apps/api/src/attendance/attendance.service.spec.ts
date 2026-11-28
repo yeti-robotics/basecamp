@@ -25,7 +25,6 @@ function makeAttendance(checkedInAt: Date, checkedOutAt: Date | null = null) {
 
 describe('AttendanceService', () => {
   const repository = {
-    ensureCurrentSeasonMembership: vi.fn(),
     getLast: vi.fn(),
     createRecord: vi.fn(),
     getUserIdByDiscordId: vi.fn(),
@@ -43,6 +42,17 @@ describe('AttendanceService', () => {
   const seasonAuthorization = {
     canManageAttendance: vi.fn(),
   };
+  const membership = {
+    state: 'active',
+    removed_at: null,
+    started_at: new Date('2026-01-01T00:00:00Z'),
+    joined_at: new Date('2026-01-01T00:00:00Z'),
+    ended_at: null,
+  };
+  const roster = {
+    ensureCurrentMembership: vi.fn(),
+    getOwnCurrent: vi.fn(),
+  };
 
   let service: AttendanceService;
 
@@ -50,6 +60,9 @@ describe('AttendanceService', () => {
     vi.clearAllMocks();
     access.isSuspended.mockResolvedValue(false);
     seasonAuthorization.canManageAttendance.mockResolvedValue(true);
+    repository.getUserIdByDiscordId.mockReturnValue(okAsync(userId));
+    roster.ensureCurrentMembership.mockResolvedValue(membership);
+    roster.getOwnCurrent.mockResolvedValue(membership);
 
     service = new AttendanceService(
       repository as unknown as AttendanceRepository,
@@ -57,6 +70,7 @@ describe('AttendanceService', () => {
       codeService as unknown as AttendanceCodeService,
       access as unknown as AccessService,
       seasonAuthorization as unknown as SeasonAuthorizationService,
+      roster as never,
     );
   });
 
@@ -64,14 +78,13 @@ describe('AttendanceService', () => {
     it('creates a record when the user has no open session', async () => {
       const checkedInAt = new Date('2026-10-15T14:00:00Z');
 
-      repository.ensureCurrentSeasonMembership.mockReturnValue(okAsync(userId));
       repository.getLast.mockReturnValue(okAsync(null));
       repository.createRecord.mockReturnValue(okAsync(makeAttendance(checkedInAt)));
 
       const result = await service.recordAttendance(discordId, 'meeting', null, checkedInAt);
 
       expect(result.isOk()).toBe(true);
-      expect(repository.ensureCurrentSeasonMembership).toHaveBeenCalledWith(discordId, checkedInAt);
+      expect(roster.ensureCurrentMembership).toHaveBeenCalledWith(userId, checkedInAt);
       expect(repository.createRecord).toHaveBeenCalledWith({
         userId,
         checkedInAt,
@@ -86,7 +99,6 @@ describe('AttendanceService', () => {
       const checkedInAt = new Date('2026-10-15T14:00:00Z');
       vi.setSystemTime(checkedInAt);
 
-      repository.ensureCurrentSeasonMembership.mockReturnValue(okAsync(userId));
       repository.getLast.mockReturnValue(okAsync(makeAttendance(new Date('2026-10-15T13:00:00Z'))));
 
       try {
@@ -109,7 +121,6 @@ describe('AttendanceService', () => {
         new Date(staleSignIn.getTime() + 90 * 60 * 1000),
       );
 
-      repository.ensureCurrentSeasonMembership.mockReturnValue(okAsync(userId));
       repository.getLast
         .mockReturnValueOnce(okAsync(staleAttendance))
         .mockReturnValueOnce(okAsync(staleAttendance));
@@ -132,15 +143,64 @@ describe('AttendanceService', () => {
     });
 
     it('returns an error when ensuring the season membership fails', async () => {
-      repository.ensureCurrentSeasonMembership.mockReturnValue(
-        errAsync(new Error('No active season found')),
-      );
+      roster.ensureCurrentMembership.mockRejectedValue(new Error('No active season found'));
 
       const result = await service.recordAttendance(discordId, 'meeting', null);
 
       expect(result.isErr()).toBe(true);
       expect(repository.getLast).not.toHaveBeenCalled();
       expect(repository.createRecord).not.toHaveBeenCalled();
+    });
+
+    it('rejects a suspended member before joining a season or recording attendance', async () => {
+      access.isSuspended.mockResolvedValue(true);
+
+      const result = await service.recordAttendance(discordId, 'meeting', null);
+
+      expect(result._unsafeUnwrapErr().message).toBe('Account is suspended');
+      expect(roster.ensureCurrentMembership).not.toHaveBeenCalled();
+      expect(repository.createRecord).not.toHaveBeenCalled();
+    });
+
+    it('rejects a removed season membership without recording attendance', async () => {
+      roster.ensureCurrentMembership.mockResolvedValue({ ...membership, state: 'removed' });
+
+      const result = await service.recordAttendance(discordId, 'meeting', null);
+
+      expect(result._unsafeUnwrapErr().message).toBe('Season membership is removed');
+      expect(repository.createRecord).not.toHaveBeenCalled();
+    });
+
+    it('fails closed if roster admission cannot be verified', async () => {
+      roster.ensureCurrentMembership.mockRejectedValue(
+        new Error('Discord membership could not be verified'),
+      );
+
+      const result = await service.recordAttendance(discordId, 'meeting', null);
+
+      expect(result.isErr()).toBe(true);
+      expect(repository.createRecord).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('sign-out eligibility', () => {
+    it('rejects a suspended member before updating attendance', async () => {
+      access.isSuspended.mockResolvedValue(true);
+
+      const result = await service.updateAttendance(discordId, { checkedOutAt: new Date() });
+
+      expect(result._unsafeUnwrapErr().message).toBe('Account is suspended');
+      expect(repository.updateLast).not.toHaveBeenCalled();
+    });
+
+    it('rejects a removed membership and never creates one during sign-out', async () => {
+      roster.getOwnCurrent.mockResolvedValue({ ...membership, state: 'removed' });
+
+      const result = await service.updateAttendance(discordId, { checkedOutAt: new Date() });
+
+      expect(result._unsafeUnwrapErr().message).toBe('Season membership is removed');
+      expect(roster.ensureCurrentMembership).not.toHaveBeenCalled();
+      expect(repository.updateLast).not.toHaveBeenCalled();
     });
   });
 
@@ -157,7 +217,13 @@ describe('AttendanceService', () => {
       expect(repository.getUserIdByDiscordId).toHaveBeenCalledWith(discordId);
       expect(access.isSuspended).toHaveBeenCalledWith(actorUserId);
       expect(seasonAuthorization.canManageAttendance).toHaveBeenCalledWith(actorUserId);
-      expect(recordAttendance).toHaveBeenCalledWith(targetDiscordId, 'meeting', null);
+      expect(recordAttendance).toHaveBeenCalledWith(
+        targetDiscordId,
+        'meeting',
+        null,
+        expect.any(Date),
+        false,
+      );
     });
 
     it('allows an active Team Admin to sign out another member', async () => {
@@ -197,6 +263,19 @@ describe('AttendanceService', () => {
       expect(result.isErr()).toBe(true);
       expect(result._unsafeUnwrapErr().message).toBe('Not authorized to manage attendance');
       expect(recordAttendance).not.toHaveBeenCalled();
+    });
+
+    it('does not enroll an unjoined target through a mentor command', async () => {
+      repository.getUserIdByDiscordId.mockImplementation((id: string) =>
+        okAsync(id === discordId ? actorUserId : userId),
+      );
+      roster.getOwnCurrent.mockResolvedValue(null);
+
+      const result = await service.signInForMember(discordId, targetDiscordId);
+
+      expect(result._unsafeUnwrapErr().message).toBe('No active season membership');
+      expect(roster.ensureCurrentMembership).not.toHaveBeenCalled();
+      expect(repository.createRecord).not.toHaveBeenCalled();
     });
   });
 
@@ -259,7 +338,7 @@ describe('AttendanceService', () => {
 
       expect(result.isErr()).toBe(true);
       expect(result._unsafeUnwrapErr().message).toBe('Invalid attendance code');
-      expect(repository.ensureCurrentSeasonMembership).not.toHaveBeenCalled();
+      expect(roster.ensureCurrentMembership).not.toHaveBeenCalled();
     });
   });
 });
@@ -392,6 +471,7 @@ describe('AttendanceService.overview', () => {
       {} as never,
       {} as never,
       {} as never,
+      {} as never,
     );
   }
 
@@ -501,6 +581,7 @@ describe('AttendanceService.getLeaderboardForDiscordUser', () => {
       {} as never,
       access as never,
       authorization as never,
+      {} as never,
     );
   }
 
