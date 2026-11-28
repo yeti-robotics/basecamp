@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { downloadCsv } from '../../lib/csv';
 import type { RosterMember } from '@/lib/roster';
+import { downloadCsv } from '../../lib/csv';
 import { RosterTable } from './RosterTable';
 
 const mockRefresh = jest.fn();

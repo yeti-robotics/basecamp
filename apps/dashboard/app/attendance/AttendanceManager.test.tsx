@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { downloadCsv } from '../../lib/csv';
 import type { AttendanceRecord } from '../../lib/attendance-records';
+import { downloadCsv } from '../../lib/csv';
 import type { TeamEvent } from '../../lib/events';
 import { AttendanceManager } from './AttendanceManager';
 
