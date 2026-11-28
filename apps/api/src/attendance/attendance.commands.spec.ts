@@ -11,6 +11,8 @@ import {
 
 const discordId = '123456789012345678';
 const targetId = '987654321098765432';
+const guildId = '408711970305474560';
+const config = { get: vi.fn(() => guildId) };
 
 const service = {
   signInWithCode: vi.fn(),
@@ -29,6 +31,7 @@ function makeInteraction() {
 
   return {
     user: { id: discordId },
+    guildId,
     channel,
     deferReply: vi.fn().mockResolvedValue(undefined),
     editReply: vi.fn().mockResolvedValue(undefined),
@@ -81,7 +84,38 @@ beforeEach(() => {
 });
 
 describe('member attendance commands', () => {
-  const commands = new AttendanceCommands(service as never);
+  const commands = new AttendanceCommands(service as never, config as never);
+
+  it('rejects attendance writes from another guild before checking a code', async () => {
+    const interaction = { ...makeInteraction(), guildId: '999999999999999999' };
+
+    await commands.SigninCommand([interaction] as never, { code: '0042' });
+
+    expect(service.signInWithCode).not.toHaveBeenCalled();
+    expect(interaction.deferReply).not.toHaveBeenCalled();
+    expect(interaction.reply).toHaveBeenCalledWith({
+      content: 'Use attendance commands in the configured team Discord server.',
+      flags: [MessageFlags.Ephemeral],
+    });
+  });
+
+  it('rejects mentor attendance writes from a direct message', async () => {
+    const interaction = { ...makeInteraction(), guildId: null };
+
+    await commands.MentorSigninCommand(
+      [interaction] as never,
+      {
+        user: { id: targetId, username: 'Member' },
+      } as never,
+    );
+
+    expect(service.signInForMember).not.toHaveBeenCalled();
+    expect(interaction.channel.send).not.toHaveBeenCalled();
+    expect(interaction.reply).toHaveBeenCalledWith({
+      content: 'Use attendance commands in the configured team Discord server.',
+      flags: [MessageFlags.Ephemeral],
+    });
+  });
 
   it('signs in the Discord actor with the zero-padded display code and replies privately', async () => {
     const interaction = makeInteraction();
@@ -140,9 +174,10 @@ describe('member attendance commands', () => {
     expect(interaction.deferReply).toHaveBeenCalledWith({
       flags: [MessageFlags.Ephemeral],
     });
-    expect(interaction.channel.send).toHaveBeenCalledWith(
-      `<@${targetId}> has been signed in by <@${discordId}>.`,
-    );
+    expect(interaction.channel.send).toHaveBeenCalledWith({
+      content: `<@${targetId}> has been signed in by <@${discordId}>.`,
+      allowedMentions: { parse: [], users: [targetId, discordId] },
+    });
     expect(interaction.editReply).toHaveBeenCalledWith('Successfully signed in Member.');
   });
 
@@ -154,9 +189,10 @@ describe('member attendance commands', () => {
     await commands.MentorSignoutCommand([interaction] as never, { user: target } as never);
 
     expect(service.signOutForMember).toHaveBeenCalledWith(discordId, targetId);
-    expect(interaction.channel.send).toHaveBeenCalledWith(
-      `<@${targetId}> has been signed out by <@${discordId}>.`,
-    );
+    expect(interaction.channel.send).toHaveBeenCalledWith({
+      content: `<@${targetId}> has been signed out by <@${discordId}>.`,
+      allowedMentions: { parse: [], users: [targetId, discordId] },
+    });
     expect(interaction.editReply).toHaveBeenCalledWith('Successfully signed out Member.');
   });
 
@@ -215,7 +251,7 @@ describe('member attendance commands', () => {
 });
 
 describe('/attendance command', () => {
-  const commands = new AttendanceCommands(service as never);
+  const commands = new AttendanceCommands(service as never, config as never);
 
   it('retrieves attendance using the linked Discord identity', async () => {
     const interaction = makeInteraction();
@@ -353,7 +389,7 @@ describe('/attendance command', () => {
 });
 
 describe('/attendance-leaderboard command', () => {
-  const commands = new AttendanceCommands(service as never);
+  const commands = new AttendanceCommands(service as never, config as never);
 
   it('retrieves current-season rankings for the invoking Discord user', async () => {
     const interaction = makeInteraction();

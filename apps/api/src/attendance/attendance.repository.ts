@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { and, desc, eq, gte, isNull, lte, sql } from 'drizzle-orm';
+import { and, desc, eq, isNull, sql } from 'drizzle-orm';
 import { err, ok, Result, ResultAsync } from 'neverthrow';
 
 import { DatabaseService } from '../database/database.service.js';
@@ -8,7 +8,6 @@ import {
   attendance,
   hour_requirements,
   season_memberships,
-  seasons,
 } from '../database/schema/index.js';
 import { type Attendance, AttendanceSchema } from './attendance.schema.js';
 
@@ -57,71 +56,6 @@ export class AttendanceRepository {
         .limit(1),
       (error) => (error instanceof Error ? error : new Error(String(error))),
     ).andThen((result) => this.parseRow(result[0]));
-  }
-
-  ensureCurrentSeasonMembership(
-    discordId: string,
-    asOfDate: Date = new Date(),
-  ): ResultAsync<string, Error> {
-    return this.getUserIdByDiscordId(discordId).andThen((userId) =>
-      ResultAsync.fromPromise(
-        this.database.db.transaction(async (tx) => {
-          const [activeSeason] = await tx
-            .select({ id: seasons.id })
-            .from(seasons)
-            .where(and(lte(seasons.started_at, asOfDate), gte(seasons.ended_at, asOfDate)))
-            .orderBy(desc(seasons.started_at))
-            .limit(1);
-
-          if (!activeSeason) {
-            throw new Error('No active season found');
-          }
-
-          const [currentMembership] = await tx
-            .select({
-              id: season_memberships.id,
-              state: season_memberships.state,
-            })
-            .from(season_memberships)
-            .where(
-              and(
-                eq(season_memberships.user_id, userId),
-                eq(season_memberships.season_id, activeSeason.id),
-              ),
-            )
-            .limit(1);
-
-          if (currentMembership) {
-            if (currentMembership.state !== 'active') {
-              throw new Error('Season membership is removed');
-            }
-
-            return userId;
-          }
-
-          const [previousMembership] = await tx
-            .select({ id: season_memberships.id })
-            .from(season_memberships)
-            .where(eq(season_memberships.user_id, userId))
-            .limit(1);
-
-          await tx
-            .insert(season_memberships)
-            .values({
-              season_id: activeSeason.id,
-              user_id: userId,
-              role: 'student',
-              student_experience: previousMembership ? 'veteran' : 'rookie',
-            })
-            .onConflictDoNothing({
-              target: [season_memberships.user_id, season_memberships.season_id],
-            });
-
-          return userId;
-        }),
-        (error) => (error instanceof Error ? error : new Error(String(error))),
-      ),
-    );
   }
 
   createRecord(record: AttendanceCreate): ResultAsync<Attendance, Error> {

@@ -8,6 +8,7 @@ import { attendance, hour_requirements } from '../database/schema/attendance.js'
 import { user } from '../database/schema/auth.js';
 import { events } from '../database/schema/events.js';
 import { season_memberships, seasons } from '../database/schema/seasons.js';
+import { RosterService } from '../roster/roster.service.js';
 import { SeasonAuthorizationService } from '../seasons/season-authorization.service.js';
 import { FORGOT_SIGNOUT_CREDIT_MS, STALE_SIGNIN_MIN_HOURS_MS } from './attendance.constants.js';
 import {
@@ -57,6 +58,7 @@ export class AttendanceService {
     private readonly codeService: AttendanceCodeService,
     private readonly access: AccessService,
     private readonly seasonAuthorization: SeasonAuthorizationService,
+    private readonly roster: RosterService,
   ) {}
 
   public signInWithCode(discordId: string, code: string): ResultAsync<void, Error> {
@@ -86,7 +88,7 @@ export class AttendanceService {
     targetDiscordId: string,
   ): ResultAsync<void, Error> {
     return this.authorizeAttendanceManager(actorDiscordId).andThen(() =>
-      this.recordAttendance(targetDiscordId, 'meeting', null),
+      this.recordAttendance(targetDiscordId, 'meeting', null, new Date(), false),
     );
   }
 
@@ -120,38 +122,37 @@ export class AttendanceService {
     category: 'meeting' | 'outreach',
     eventId: number | null,
     checkedInAt: Date = new Date(),
+    allowSeasonJoin = true,
   ): ResultAsync<void, Error> {
-    return this.attendanceRepository
-      .ensureCurrentSeasonMembership(discordId, checkedInAt)
-      .andThen((userId) =>
-        this.attendanceRepository.getLast(userId).andThen((attendance) => {
-          if (attendance && attendance.checkedOutAt === null) {
-            const staleResult = this.isStaleSession(new Date(attendance.checkedInAt));
+    return this.resolveEligibleMember(discordId, checkedInAt, allowSeasonJoin).andThen((userId) =>
+      this.attendanceRepository.getLast(userId).andThen((attendance) => {
+        if (attendance && attendance.checkedOutAt === null) {
+          const staleResult = this.isStaleSession(new Date(attendance.checkedInAt));
 
-            if (staleResult.isErr()) {
-              return errAsync(staleResult.error);
-            }
-
-            if (!staleResult.value) {
-              return errAsync(new Error('User is already signed in'));
-            }
-
-            return this.handleForgotToSignOut(discordId).andThen(() =>
-              this.attendanceRepository
-                .createRecord({ userId, checkedInAt, category, eventId })
-                .map(() => undefined),
-            );
+          if (staleResult.isErr()) {
+            return errAsync(staleResult.error);
           }
 
-          return this.attendanceRepository
-            .createRecord({ userId, checkedInAt, category, eventId })
-            .map(() => undefined);
-        }),
-      );
+          if (!staleResult.value) {
+            return errAsync(new Error('User is already signed in'));
+          }
+
+          return this.handleForgotToSignOut(discordId).andThen(() =>
+            this.attendanceRepository
+              .createRecord({ userId, checkedInAt, category, eventId })
+              .map(() => undefined),
+          );
+        }
+
+        return this.attendanceRepository
+          .createRecord({ userId, checkedInAt, category, eventId })
+          .map(() => undefined);
+      }),
+    );
   }
 
   public updateAttendance(discordId: string, updates: AttendanceUpdate): ResultAsync<void, Error> {
-    return this.attendanceRepository.getUserIdByDiscordId(discordId).andThen((userId) => {
+    return this.resolveEligibleMember(discordId, new Date(), false).andThen((userId) => {
       if (updates.checkedOutAt === undefined || updates.checkedOutAt === null) {
         return this.attendanceRepository.updateLast(userId, updates).map(() => undefined);
       }
@@ -168,6 +169,36 @@ export class AttendanceService {
         return this.attendanceRepository.updateLast(userId, updates).map(() => undefined);
       });
     });
+  }
+
+  private resolveEligibleMember(
+    discordId: string,
+    now: Date,
+    allowSeasonJoin: boolean,
+  ): ResultAsync<string, Error> {
+    return this.attendanceRepository.getUserIdByDiscordId(discordId).andThen((userId) =>
+      ResultAsync.fromPromise(
+        (async () => {
+          if (await this.access.isSuspended(userId)) throw new Error('Account is suspended');
+          const membership = allowSeasonJoin
+            ? await this.roster.ensureCurrentMembership(userId, now)
+            : await this.roster.getOwnCurrent(userId, now);
+          if (!membership) throw new Error('No active season membership');
+          if (membership.state !== 'active' || membership.removed_at !== null) {
+            throw new Error('Season membership is removed');
+          }
+          if (
+            membership.started_at > now ||
+            membership.joined_at > now ||
+            (membership.ended_at !== null && membership.ended_at <= now)
+          ) {
+            throw new Error('No active season membership');
+          }
+          return userId;
+        })(),
+        (error) => (error instanceof Error ? error : new Error(String(error))),
+      ),
+    );
   }
 
   private isStaleSession(signInTime: Date): Result<boolean, Error> {
