@@ -22,6 +22,32 @@ export interface BotStatus {
   message?: string;
 }
 
+function discordFailureMessage(error: unknown, developmentGuildId?: string): string {
+  const code = error && typeof error === 'object' && 'code' in error ? error.code : undefined;
+  const status = error && typeof error === 'object' && 'status' in error ? error.status : undefined;
+
+  if (code === 50001 || code === 50013 || code === 10004) {
+    return developmentGuildId
+      ? 'Discord could not register commands in the development guild. Check DISCORD_DEVELOPMENT_GUILD_ID and the bot installation permissions.'
+      : 'Discord could not register commands. Check the bot installation permissions.';
+  }
+  if (code === 'TokenInvalid' || code === 'TOKEN_INVALID' || status === 401) {
+    return 'Discord rejected the saved bot token. Replace it in Settings and retry.';
+  }
+  if (status === 429) {
+    return 'Discord is rate limiting the bot. Wait a few minutes, then retry.';
+  }
+  if (
+    code === 'ETIMEDOUT' ||
+    code === 'ECONNRESET' ||
+    code === 'ENOTFOUND' ||
+    code === 'EAI_AGAIN'
+  ) {
+    return 'Discord could not be reached. Check the network and retry.';
+  }
+  return 'Discord bot connection failed. Check the token and configuration, then retry.';
+}
+
 @Injectable()
 export class BotRuntimeService implements OnApplicationBootstrap, OnApplicationShutdown {
   private desiredEnabled = false;
@@ -164,13 +190,20 @@ export class BotRuntimeService implements OnApplicationBootstrap, OnApplicationS
     this.connection = 'connecting';
     this.message = undefined;
     const ciphertext = this.tokenCiphertext;
+    const developmentGuildId =
+      this.config.get<string>('DISCORD_DEVELOPMENT_GUILD_ID')?.trim() || undefined;
     const startup = new AbortController();
     this.startup = startup;
     let startedContext: INestApplicationContext | null = null;
     let failedBeforeContextWasReturned = false;
-    const reportClientError = () => {
+    const reportClientError = (error: unknown) => {
+      if (startedContext) {
+        if (this.context !== startedContext && this.startup !== startup) return;
+      } else if (this.startup !== startup) {
+        return;
+      }
       this.connection = 'failed';
-      this.message = 'Discord bot encountered an error and was stopped';
+      this.message = discordFailureMessage(error, developmentGuildId);
       if (!startedContext) {
         failedBeforeContextWasReturned = true;
         return;
@@ -202,16 +235,15 @@ export class BotRuntimeService implements OnApplicationBootstrap, OnApplicationS
     try {
       const context = await this.contextFactory.start(
         token,
-        this.config.get<string>('DISCORD_DEVELOPMENT_GUILD_ID')?.trim() || undefined,
+        developmentGuildId,
         startup.signal,
         reportClientError,
       );
-      if (this.startup === startup) this.startup = null;
       startedContext = context;
+      if (this.startup === startup) this.startup = null;
       if (failedBeforeContextWasReturned) {
         await context.close();
         this.connection = 'failed';
-        this.message = 'Discord bot encountered an error and was stopped';
         return;
       }
       if (!this.desiredEnabled || this.tokenCiphertext !== ciphertext) {
@@ -220,11 +252,11 @@ export class BotRuntimeService implements OnApplicationBootstrap, OnApplicationS
       }
       this.context = context;
       this.connection = 'connected';
-    } catch {
+    } catch (error) {
       if (this.startup === startup) this.startup = null;
       if (!this.desiredEnabled || this.tokenCiphertext !== ciphertext) return;
       this.connection = 'failed';
-      this.message = 'Discord bot connection failed. Check the token and try again.';
+      this.message = discordFailureMessage(error, developmentGuildId);
     }
   }
 

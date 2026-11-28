@@ -12,7 +12,7 @@ export class BotContextFactory {
     token: string,
     developmentGuildId?: string,
     signal?: AbortSignal,
-    onError?: () => void,
+    onError?: (error: unknown) => void,
   ): Promise<INestApplicationContext> {
     // logger: false calls Logger.overrideLogger(false), which clears the
     // process-wide logger and silences the parent API as well as this context.
@@ -27,10 +27,9 @@ export class BotContextFactory {
       // discord.js uses captureRejections, so a rejected async event handler is
       // re-emitted as `error`. EventEmitter throws when that event has no listener.
       client.on('error', (error: unknown) => {
-        const detail = error instanceof Error ? error.message : 'unknown Discord client error';
-        this.logger.error(`Discord client error: ${detail}`);
+        this.logger.error('Discord client error');
         try {
-          onError?.();
+          onError?.(error);
         } catch {
           // Keep Discord client errors from escaping into the API process.
         }
@@ -63,8 +62,7 @@ export class BotContextFactory {
       if (signal?.aborted) {
         await login?.catch(() => undefined);
       } else {
-        const detail = error instanceof Error ? error.message : 'unknown error';
-        this.logger.error(`Discord bot startup failed: ${detail}`);
+        this.logger.error('Discord bot startup failed');
       }
       await context.close();
       throw error;

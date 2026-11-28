@@ -259,9 +259,14 @@ describe('BotRuntimeService', () => {
 
   it('stops and reports a failed runtime after an async Discord client error', async () => {
     const context = makeContext();
-    let reportClientError!: () => void;
+    let reportClientError!: (error: unknown) => void;
     factory.start.mockImplementationOnce(
-      (_token: string, _guildId: string | undefined, _signal: AbortSignal, onError: () => void) => {
+      (
+        _token: string,
+        _guildId: string | undefined,
+        _signal: AbortSignal,
+        onError: (error: unknown) => void,
+      ) => {
         reportClientError = onError;
         return Promise.resolve(context);
       },
@@ -270,14 +275,46 @@ describe('BotRuntimeService', () => {
     await service.replaceToken(token);
     await service.setEnabled(true);
 
-    reportClientError();
+    reportClientError({ code: 50001, status: 403 });
     await vi.waitFor(async () => {
       await expect(service.status()).resolves.toMatchObject({
         desiredEnabled: true,
         connection: 'failed',
-        message: 'Discord bot encountered an error and was stopped',
+        message: expect.stringContaining('development guild'),
       });
       expect(context.close).toHaveBeenCalledOnce();
+    });
+  });
+
+  it('reports a development guild registration failure without exposing Discord details', async () => {
+    factory.start.mockRejectedValueOnce(
+      Object.assign(new Error('Missing Access token=secret'), { code: 50001, status: 403 }),
+    );
+    const service = makeService();
+    await service.replaceToken(token);
+    await service.setEnabled(true);
+
+    const status = await service.status();
+    expect(status.connection).toBe('failed');
+    expect(status.message).toContain('DISCORD_DEVELOPMENT_GUILD_ID');
+    expect(status.message).not.toContain('secret');
+  });
+
+  it('distinguishes rejected tokens from transient network failures', async () => {
+    factory.start
+      .mockRejectedValueOnce(Object.assign(new Error('secret'), { code: 'TokenInvalid' }))
+      .mockRejectedValueOnce(Object.assign(new Error('secret'), { code: 'ETIMEDOUT' }));
+    const service = makeService();
+    await service.replaceToken(token);
+
+    await service.setEnabled(true);
+    await expect(service.status()).resolves.toMatchObject({
+      message: expect.stringContaining('rejected the saved bot token'),
+    });
+
+    await service.setEnabled(true);
+    await expect(service.status()).resolves.toMatchObject({
+      message: expect.stringContaining('could not be reached'),
     });
   });
 

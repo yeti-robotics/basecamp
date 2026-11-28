@@ -29,6 +29,9 @@ function safeBotStatus(value: unknown): BotStatus | null {
     tokenConfigured: status.tokenConfigured,
     connection: status.connection as BotStatus['connection'],
     statusMessage: status.statusMessage,
+    ...(typeof status.message === 'string' && status.message.length <= 256
+      ? { message: status.message }
+      : {}),
   };
 }
 
@@ -50,14 +53,7 @@ export function BotSettings({ initialStatus }: { initialStatus: BotStatus }) {
   const pendingRequests = useRef(new Set<string>());
 
   useEffect(() => {
-    const waitingForStartup = status.desiredEnabled && status.connection === 'off';
-    if (
-      status.connection !== 'connecting' &&
-      status.connection !== 'failed' &&
-      !waitingForStartup
-    ) {
-      return;
-    }
+    if (!status.desiredEnabled) return;
     const controller = new AbortController();
     const poll = async () => {
       try {
@@ -74,7 +70,10 @@ export function BotSettings({ initialStatus }: { initialStatus: BotStatus }) {
       }
     };
     void poll();
-    const interval = window.setInterval(() => void poll(), 1000);
+    const interval = window.setInterval(
+      () => void poll(),
+      status.connection === 'connected' ? 5000 : 1000,
+    );
     return () => {
       controller.abort();
       window.clearInterval(interval);
@@ -222,7 +221,7 @@ export function BotSettings({ initialStatus }: { initialStatus: BotStatus }) {
             <Alert variant="destructive">
               <AlertTitle>Discord could not connect</AlertTitle>
               <AlertDescription className="flex flex-wrap items-center justify-between gap-3">
-                Check the saved bot token, then retry the connection.
+                {status.message ?? 'Check the saved bot token and configuration, then retry.'}
                 <Button
                   size="sm"
                   variant="outline"

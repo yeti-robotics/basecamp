@@ -136,6 +136,7 @@ it('shows a safe failure state and retries with the saved setting', async () => 
         tokenConfigured: true,
         connection: 'failed',
         statusMessage: 'YETI ARE YOU READY?',
+        message: 'Discord could not register commands in the development guild.',
       }),
     })
     .mockResolvedValue({ ok: true, json: async () => connected }) as jest.Mock;
@@ -146,16 +147,49 @@ it('shows a safe failure state and retries with the saved setting', async () => 
         tokenConfigured: true,
         connection: 'failed',
         statusMessage: 'YETI ARE YOU READY?',
+        message: 'Discord could not register commands in the development guild.',
       }}
     />,
   );
   expect(screen.getByText('Discord could not connect')).toBeInTheDocument();
+  expect(
+    screen.getByText('Discord could not register commands in the development guild.'),
+  ).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Retry connection' }));
   await waitFor(() => expect(screen.getByText('Connected')).toBeInTheDocument());
   expect(global.fetch).toHaveBeenCalledWith(
     '/api/settings/bot/enabled',
     expect.objectContaining({ body: JSON.stringify({ enabled: true }) }),
   );
+});
+
+it('reports a registration failure that arrives after the bot first connects', async () => {
+  global.fetch = jest.fn().mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      ...status,
+      desiredEnabled: true,
+      tokenConfigured: true,
+      connection: 'failed',
+      message: 'Discord could not register commands in the development guild.',
+    }),
+  }) as jest.Mock;
+  render(
+    <BotSettings
+      initialStatus={{
+        ...status,
+        desiredEnabled: true,
+        tokenConfigured: true,
+        connection: 'connected',
+      }}
+    />,
+  );
+
+  await waitFor(() => {
+    expect(
+      screen.getByText('Discord could not register commands in the development guild.'),
+    ).toBeInTheDocument();
+  });
 });
 
 it('saves a custom Discord status message', async () => {

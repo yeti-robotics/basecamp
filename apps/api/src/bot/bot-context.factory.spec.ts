@@ -69,10 +69,11 @@ describe('BotContextFactory', () => {
     const errorLog = vi.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
     await factory.start('bot-token', undefined, undefined, onError);
 
-    client.emit('error', new Error('command registration failed'));
+    const failure = new Error('command registration failed with secret data');
+    client.emit('error', failure);
 
-    expect(errorLog).toHaveBeenCalledWith(expect.stringContaining('command registration failed'));
-    expect(onError).toHaveBeenCalledOnce();
+    expect(errorLog).toHaveBeenCalledWith('Discord client error');
+    expect(onError).toHaveBeenCalledWith(failure);
   });
 
   it('passes a development guild when configured', async () => {
