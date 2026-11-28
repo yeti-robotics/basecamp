@@ -1,3 +1,4 @@
+import { PgDialect } from 'drizzle-orm/pg-core';
 import { errAsync, okAsync } from 'neverthrow';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AccessService } from '../access/access.service.js';
@@ -211,6 +212,29 @@ describe('AttendanceService', () => {
       expect(result._unsafeUnwrap()).toBe(overview);
       expect(repository.getUserIdByDiscordId).toHaveBeenCalledWith(discordId);
       expect(spy).toHaveBeenCalledWith(userId, now);
+    });
+
+    it('rejects suspended users before loading their attendance', async () => {
+      repository.getUserIdByDiscordId.mockReturnValue(okAsync(userId));
+      access.isSuspended.mockResolvedValue(true);
+      const overview = vi.spyOn(service, 'overview');
+
+      const result = await service.getOverviewForDiscordUser(discordId);
+
+      expect(result._unsafeUnwrapErr().message).toBe('Account is suspended');
+      expect(access.isSuspended).toHaveBeenCalledWith(userId);
+      expect(overview).not.toHaveBeenCalled();
+    });
+
+    it('fails closed if the suspension check fails', async () => {
+      repository.getUserIdByDiscordId.mockReturnValue(okAsync(userId));
+      access.isSuspended.mockRejectedValue(new Error('Access check failed'));
+      const overview = vi.spyOn(service, 'overview');
+
+      const result = await service.getOverviewForDiscordUser(discordId);
+
+      expect(result._unsafeUnwrapErr().message).toBe('Access check failed');
+      expect(overview).not.toHaveBeenCalled();
     });
 
     it('returns lookup and overview failures as errors', async () => {
@@ -443,5 +467,206 @@ describe('AttendanceService.overview', () => {
       expectedHours: { member: null, leadership: null },
     });
     expect(db.select).toHaveBeenCalledTimes(4);
+  });
+});
+
+describe('AttendanceService.getLeaderboardForDiscordUser', () => {
+  const now = new Date('2026-11-09T23:00:00.000Z');
+  const season = {
+    id: 1,
+    name: '2026–27',
+    started_at: new Date('2026-05-15T04:00:00.000Z'),
+    ended_at: new Date('2027-05-15T03:59:59.000Z'),
+  };
+  const repository = { getUserIdByDiscordId: vi.fn() };
+  const access = { isSuspended: vi.fn() };
+  const authorization = { canManageAttendance: vi.fn() };
+  const db = { select: vi.fn() };
+
+  function query(rows: unknown[]) {
+    const builder = Object.assign(Promise.resolve(rows), {
+      from: vi.fn(() => builder),
+      innerJoin: vi.fn(() => builder),
+      where: vi.fn((_condition: unknown) => builder),
+      orderBy: vi.fn(() => builder),
+      limit: vi.fn(() => builder),
+    });
+    return builder;
+  }
+
+  function makeService() {
+    return new AttendanceService(
+      repository as never,
+      { db } as never,
+      {} as never,
+      access as never,
+      authorization as never,
+    );
+  }
+
+  function record(
+    userId: string,
+    name: string,
+    hours: number,
+    preferredName: string | null = null,
+  ) {
+    const checkedInAt = new Date('2026-11-01T12:00:00.000Z');
+    return {
+      id: 1,
+      userId,
+      name,
+      preferredName,
+      category: 'meeting' as const,
+      checkedInAt,
+      checkedOutAt: new Date(checkedInAt.getTime() + hours * 3_600_000) as Date | null,
+    };
+  }
+
+  function mockQueries(rows: unknown[]) {
+    const recordsQuery = query(rows);
+    db.select.mockReturnValueOnce(query([season])).mockReturnValueOnce(recordsQuery);
+    return recordsQuery;
+  }
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    repository.getUserIdByDiscordId.mockReturnValue(okAsync(actorUserId));
+    access.isSuspended.mockResolvedValue(false);
+    authorization.canManageAttendance.mockResolvedValue(true);
+  });
+
+  it('rejects unlinked Discord identities before querying attendance', async () => {
+    repository.getUserIdByDiscordId.mockReturnValue(errAsync(new Error('User not found')));
+    const result = await makeService().getLeaderboardForDiscordUser(discordId, now);
+
+    expect(result._unsafeUnwrapErr().message).toBe('User not found');
+    expect(db.select).not.toHaveBeenCalled();
+  });
+
+  it('rejects callers without attendance management permissions', async () => {
+    authorization.canManageAttendance.mockResolvedValue(false);
+    const result = await makeService().getLeaderboardForDiscordUser(discordId, now);
+
+    expect(result._unsafeUnwrapErr().message).toBe('Not authorized to manage attendance');
+    expect(authorization.canManageAttendance).toHaveBeenCalledWith(actorUserId);
+    expect(db.select).not.toHaveBeenCalled();
+  });
+
+  it('rejects suspended attendance managers', async () => {
+    access.isSuspended.mockResolvedValue(true);
+    const result = await makeService().getLeaderboardForDiscordUser(discordId, now);
+
+    expect(result._unsafeUnwrapErr().message).toBe('Not authorized to manage attendance');
+    expect(access.isSuspended).toHaveBeenCalledWith(actorUserId);
+    expect(db.select).not.toHaveBeenCalled();
+  });
+
+  it('returns no entries when no season is active', async () => {
+    db.select.mockReturnValueOnce(query([]));
+    const result = await makeService().getLeaderboardForDiscordUser(discordId, now);
+
+    expect(result._unsafeUnwrap()).toEqual({ season: null, entries: [] });
+    expect(db.select).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns an empty leaderboard when there are no qualifying records', async () => {
+    mockQueries([]);
+    const result = await makeService().getLeaderboardForDiscordUser(discordId, now);
+
+    expect(result._unsafeUnwrap()).toEqual({
+      season: { id: season.id, name: season.name },
+      entries: [],
+    });
+  });
+
+  it('aggregates sessions by persistent user ID, not display name', async () => {
+    mockQueries([
+      record('student-1', 'Discord name', 3, ' Ada '),
+      record('student-1', 'Discord name', 2.5, ' Ada '),
+      record('student-2', 'Ada', 4, ' '),
+    ]);
+    const result = await makeService().getLeaderboardForDiscordUser(discordId, now);
+
+    expect(result._unsafeUnwrap().entries).toEqual([
+      { rank: 1, name: 'Ada', hours: 5.5 },
+      { rank: 2, name: 'Ada', hours: 4 },
+    ]);
+    expect(db.select).toHaveBeenCalledTimes(2);
+  });
+
+  it('returns at most five entries, sorted by hours with shared ranks for ties', async () => {
+    mockQueries([
+      record('a', 'Zoe', 8),
+      record('b', 'Ada', 8),
+      record('c', 'Grace', 7),
+      record('d', 'Sam', 6),
+      record('e', 'Alex', 5),
+      record('f', 'Taylor', 4),
+    ]);
+    const result = await makeService().getLeaderboardForDiscordUser(discordId, now);
+
+    expect(result._unsafeUnwrap().entries).toEqual([
+      { rank: 1, name: 'Ada', hours: 8 },
+      { rank: 1, name: 'Zoe', hours: 8 },
+      { rank: 3, name: 'Grace', hours: 7 },
+      { rank: 4, name: 'Sam', hours: 6 },
+      { rank: 5, name: 'Alex', hours: 5 },
+    ]);
+  });
+
+  it('clips hours to the season start and current time and ignores open sessions', async () => {
+    mockQueries([
+      {
+        ...record('a', 'Ada', 0),
+        checkedInAt: new Date('2026-05-15T03:00:00.000Z'),
+        checkedOutAt: new Date('2026-05-15T05:00:00.000Z'),
+      },
+      {
+        ...record('a', 'Ada', 0),
+        checkedInAt: new Date('2026-11-09T21:30:00.000Z'),
+        checkedOutAt: new Date('2026-11-10T01:00:00.000Z'),
+      },
+      { ...record('b', 'Grace', 0), checkedOutAt: null },
+      record('c', 'Sam', 0),
+    ]);
+    const result = await makeService().getLeaderboardForDiscordUser(discordId, now);
+
+    expect(result._unsafeUnwrap().entries).toEqual([{ rank: 1, name: 'Ada', hours: 2.5 }]);
+  });
+
+  it('rounds totals to two decimals after summing sessions', async () => {
+    mockQueries([record('a', 'Ada', 1.234), record('a', 'Ada', 1.234)]);
+    const result = await makeService().getLeaderboardForDiscordUser(discordId, now);
+
+    expect(result._unsafeUnwrap().entries).toEqual([{ rank: 1, name: 'Ada', hours: 2.47 }]);
+  });
+
+  it('queries only eligible current-season student meeting records', async () => {
+    const recordsQuery = mockQueries([]);
+    await makeService().getLeaderboardForDiscordUser(discordId, now);
+
+    expect(recordsQuery.innerJoin).toHaveBeenCalledTimes(2);
+    const condition = recordsQuery.where.mock.calls[0]?.[0];
+    const compiled = new PgDialect().sqlToQuery(
+      condition as Parameters<PgDialect['sqlToQuery']>[0],
+    );
+    expect(compiled.sql).toContain('"season_memberships"."season_id"');
+    expect(compiled.sql).toContain('"season_memberships"."state"');
+    expect(compiled.sql).toContain('"season_memberships"."role"');
+    expect(compiled.sql).toContain('"user"."banned"');
+    expect(compiled.sql).toContain('"attendance"."category"');
+    expect(compiled.sql).toContain('"attendance"."checked_out_at"');
+    expect(compiled.params).toEqual(
+      expect.arrayContaining([season.id, 'active', 'student', 'student_leader', false, 'meeting']),
+    );
+  });
+
+  it('returns database failures as errors', async () => {
+    db.select.mockImplementationOnce(() => {
+      throw new Error('Database unavailable');
+    });
+    const result = await makeService().getLeaderboardForDiscordUser(discordId, now);
+
+    expect(result._unsafeUnwrapErr().message).toBe('Database unavailable');
   });
 });

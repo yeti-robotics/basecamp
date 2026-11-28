@@ -6,6 +6,11 @@ import type { Result } from 'neverthrow';
 import { AttendanceService } from './attendance.service.js';
 import { AttendanceInteractionFilter } from './attendance-interaction.filter.js';
 import { AttendanceCodeOptions } from './attendance-options.dto.js';
+import {
+  formatAttendanceLeaderboard,
+  formatAttendanceOverview,
+  formatAttendanceReadError,
+} from './attendance-response.js';
 import { AttendanceThrottlerGuard } from './attendance-throttler.guard.js';
 
 class MentorAttendanceOptions {
@@ -88,82 +93,69 @@ export class AttendanceCommands {
 
   @SlashCommand({
     name: 'attendance',
-    description: 'Get your current attendance',
+    description: 'Get your current attendance and meeting progress',
   })
   async AttendanceCommand(@Context() [interaction]: SlashCommandContext) {
-    await interaction.deferReply();
+    // Personal attendance information should only be visible to its owner.
+    await interaction.deferReply({
+      flags: [MessageFlags.Ephemeral],
+    });
 
     const result = await this.attendanceService.getOverviewForDiscordUser(interaction.user.id);
-    const overview = result.isOk() ? result.value : null;
-    const expected = overview?.progress?.expectedHours;
 
-    if (!overview?.progress || !expected || expected.member === null) {
-      this.logger.error(
-        `Error getting attendance for user ${interaction.user.id}: ${
-          result.isErr() ? result.error.message : 'No active season membership or hour requirement'
-        }`,
-      );
+    if (result.isErr()) {
+      this.logger.warn(`Attendance overview failed for user ${interaction.user.id}`);
 
-      await interaction.editReply(
-        'There was an error getting your attendance or hour requirements. Please let a mentor know.',
-      );
-      return;
+      return interaction.editReply(formatAttendanceReadError(result.error));
     }
 
-    const progress = overview.progress;
-    const hours = overview.hours.meeting;
-    const memberRequiredHours = expected.member;
-    const leadershipRequiredHours = expected.leadership ?? memberRequiredHours;
-    const possibleHours = progress.completedMeetingHours;
-    const hoursPercentage =
-      possibleHours > 0 ? `${((hours / possibleHours) * 100).toFixed(1)}` : '∞';
-    const possibleHoursDisplay = Math.floor(possibleHours);
-    const meetings = `\nMeetings so far: ${progress.attendedMeetings} attended, ${progress.excusedMeetings} excused, ${progress.missedMeetings} missed (of ${progress.completedMeetings}).`;
-
-    if (hours >= leadershipRequiredHours) {
-      await interaction.editReply(
-        `You're currently above the minimum hours for leadership (${hours.toFixed(2)} hours, ${hoursPercentage}% of ${possibleHoursDisplay} possible hours to date)! :tada:${meetings}`,
-      );
-      return;
-    }
-
-    if (hours >= memberRequiredHours) {
-      const remainingHours = Math.ceil(leadershipRequiredHours - hours);
-
-      await interaction.editReply(
-        `You're currently above the minimum hours for members (${hours.toFixed(2)} hours, ${hoursPercentage}% of ${possibleHoursDisplay} possible hours to date)! If you're on leadership, you are currently ${remainingHours} hour(s) behind the leadership requirement.${meetings}`,
-      );
-      return;
-    }
-
-    const remainingHours = Math.ceil(memberRequiredHours - hours);
-
-    await interaction.editReply(
-      `You've got ${hours.toFixed(2)} hours (${hoursPercentage}% of ${possibleHoursDisplay} possible hours to date). You are currently ${remainingHours} hour(s) behind the minimum hours goal. :rocket:${meetings}`,
-    );
+    return interaction.editReply({
+      content: formatAttendanceOverview(result.value),
+      allowedMentions: { parse: [] },
+    });
   }
 
   @SlashCommand({
     name: 'attendance-leaderboard',
-    description: 'Show the top 5 members by attendance hours',
+    description: 'Show the top 5 students by meeting hours (mentors and Team Admins only)',
   })
   async AttendanceLeaderboardCommand(@Context() [interaction]: SlashCommandContext) {
-    await interaction.reply('Attendance leaderboard command');
+    // Rankings contain identifiable student information.
+    await interaction.deferReply({
+      flags: [MessageFlags.Ephemeral],
+    });
+
+    const result = await this.attendanceService.getLeaderboardForDiscordUser(interaction.user.id);
+
+    if (result.isErr()) {
+      this.logger.warn(`Attendance leaderboard failed for user ${interaction.user.id}`);
+
+      return interaction.editReply(formatAttendanceReadError(result.error));
+    }
+
+    return interaction.editReply({
+      content: formatAttendanceLeaderboard(result.value),
+      allowedMentions: { parse: [] },
+    });
   }
 
   @UseGuards(AttendanceThrottlerGuard)
   @UseFilters(AttendanceInteractionFilter)
   @SlashCommand({
     name: 'signin',
-    description: 'Sign in to a YETI meeting at the zone',
+    description: 'Sign in to a team meeting',
   })
   async SigninCommand(
     @Context() [interaction]: SlashCommandContext,
     @Options(new ValidationPipe({ validateCustomDecorators: true }))
     options: AttendanceCodeOptions,
   ) {
-    await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
+    await interaction.deferReply({
+      flags: [MessageFlags.Ephemeral],
+    });
+
     const result = await this.attendanceService.signInWithCode(interaction.user.id, options.code);
+
     return interaction.editReply(
       result.isOk() ? 'Signed in.' : formatAttendanceError(result.error),
     );
@@ -173,15 +165,19 @@ export class AttendanceCommands {
   @UseFilters(AttendanceInteractionFilter)
   @SlashCommand({
     name: 'signout',
-    description: 'Sign out of a YETI meeting at the zone',
+    description: 'Sign out of a team meeting',
   })
   async SignoutCommand(
     @Context() [interaction]: SlashCommandContext,
     @Options(new ValidationPipe({ validateCustomDecorators: true }))
     options: AttendanceCodeOptions,
   ) {
-    await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
+    await interaction.deferReply({
+      flags: [MessageFlags.Ephemeral],
+    });
+
     const result = await this.attendanceService.signOutWithCode(interaction.user.id, options.code);
+
     return interaction.editReply(
       result.isOk() ? 'Signed out.' : formatAttendanceError(result.error),
     );
@@ -195,11 +191,15 @@ export class AttendanceCommands {
     @Context() [interaction]: SlashCommandContext,
     @Options() options: MentorAttendanceOptions,
   ) {
-    await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
+    await interaction.deferReply({
+      flags: [MessageFlags.Ephemeral],
+    });
+
     const result = await this.attendanceService.signInForMember(
       interaction.user.id,
       options.user.id,
     );
+
     return this.handleMentorAttendanceResult(interaction, options.user, 'sign in', result);
   }
 
@@ -211,11 +211,15 @@ export class AttendanceCommands {
     @Context() [interaction]: SlashCommandContext,
     @Options() options: MentorAttendanceOptions,
   ) {
-    await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
+    await interaction.deferReply({
+      flags: [MessageFlags.Ephemeral],
+    });
+
     const result = await this.attendanceService.signOutForMember(
       interaction.user.id,
       options.user.id,
     );
+
     return this.handleMentorAttendanceResult(interaction, options.user, 'sign out', result);
   }
 }

@@ -1,10 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { and, desc, eq, gt, gte, isNull, lte, or } from 'drizzle-orm';
+import { and, desc, eq, gt, gte, inArray, isNull, lte, or } from 'drizzle-orm';
 import { err, errAsync, fromThrowable, ok, okAsync, type Result, ResultAsync } from 'neverthrow';
 
 import { AccessService } from '../access/access.service.js';
 import { DatabaseService } from '../database/database.service.js';
 import { attendance, hour_requirements } from '../database/schema/attendance.js';
+import { user } from '../database/schema/auth.js';
 import { events } from '../database/schema/events.js';
 import { season_memberships, seasons } from '../database/schema/seasons.js';
 import { SeasonAuthorizationService } from '../seasons/season-authorization.service.js';
@@ -40,6 +41,13 @@ export function completedHours(record: AttendanceRecord, start: Date, end: Date)
 }
 
 export type AttendanceOverview = Awaited<ReturnType<AttendanceService['overview']>>;
+
+export type AttendanceLeaderboard = {
+  season: { id: number; name: string } | null;
+  entries: { rank: number; name: string; hours: number }[];
+};
+
+const ATTENDANCE_LEADERBOARD_LIMIT = 5;
 
 @Injectable()
 export class AttendanceService {
@@ -257,13 +265,97 @@ export class AttendanceService {
     discordId: string,
     now: Date = new Date(),
   ): ResultAsync<AttendanceOverview, Error> {
-    return this.attendanceRepository
-      .getUserIdByDiscordId(discordId)
-      .andThen((userId) =>
-        ResultAsync.fromPromise(this.overview(userId, now), (error) =>
-          error instanceof Error ? error : new Error(String(error)),
+    return this.attendanceRepository.getUserIdByDiscordId(discordId).andThen((userId) =>
+      ResultAsync.fromPromise(
+        this.access.isSuspended(userId).then((suspended) => {
+          if (suspended) throw new Error('Account is suspended');
+          return this.overview(userId, now);
+        }),
+        (error) => (error instanceof Error ? error : new Error(String(error))),
+      ),
+    );
+  }
+
+  /** Attendance rankings contain student data, so only attendance managers may read them. */
+  public getLeaderboardForDiscordUser(
+    discordId: string,
+    now: Date = new Date(),
+  ): ResultAsync<AttendanceLeaderboard, Error> {
+    return this.authorizeAttendanceManager(discordId).andThen(() =>
+      ResultAsync.fromPromise(this.meetingLeaderboard(now), (error) =>
+        error instanceof Error ? error : new Error(String(error)),
+      ),
+    );
+  }
+
+  private async meetingLeaderboard(now: Date): Promise<AttendanceLeaderboard> {
+    const db = this.database.db;
+    const [season] = await db
+      .select()
+      .from(seasons)
+      .where(and(lte(seasons.started_at, now), gte(seasons.ended_at, now)))
+      .orderBy(desc(seasons.started_at))
+      .limit(1);
+
+    if (!season) return { season: null, entries: [] };
+
+    // Fetch completed meeting records for active, non-suspended students in one query.
+    const records = await db
+      .select({
+        id: attendance.id,
+        userId: user.id,
+        name: user.name,
+        preferredName: user.preferredName,
+        category: attendance.category,
+        checkedInAt: attendance.checked_in_at,
+        checkedOutAt: attendance.checked_out_at,
+      })
+      .from(attendance)
+      .innerJoin(user, eq(attendance.user_id, user.id))
+      .innerJoin(season_memberships, eq(season_memberships.user_id, user.id))
+      .where(
+        and(
+          eq(season_memberships.season_id, season.id),
+          eq(season_memberships.state, 'active'),
+          inArray(season_memberships.role, ['student', 'student_leader']),
+          lte(season_memberships.started_at, now),
+          lte(season_memberships.joined_at, now),
+          or(isNull(season_memberships.ended_at), gt(season_memberships.ended_at, now)),
+          or(isNull(season_memberships.removed_at), gt(season_memberships.removed_at, now)),
+          or(isNull(user.banned), eq(user.banned, false)),
+          eq(attendance.category, 'meeting'),
+          lte(attendance.checked_in_at, now),
+          gt(attendance.checked_out_at, season.started_at),
         ),
       );
+
+    // Use the same duration calculation as the dashboard, including excused credit.
+    const totals = new Map<string, { name: string; hours: number }>();
+    for (const record of records) {
+      const hours = completedHours(record, season.started_at, now);
+      if (hours <= 0) continue;
+
+      const previous = totals.get(record.userId);
+      totals.set(record.userId, {
+        name: record.preferredName?.trim() || record.name,
+        hours: (previous?.hours ?? 0) + hours,
+      });
+    }
+
+    const ranked = [...totals.entries()]
+      .map(([userId, entry]) => ({ userId, ...entry, hours: Math.round(entry.hours * 100) / 100 }))
+      .sort(
+        (a, b) =>
+          b.hours - a.hours || a.name.localeCompare(b.name) || a.userId.localeCompare(b.userId),
+      );
+
+    let rank = 0;
+    const entries = ranked.slice(0, ATTENDANCE_LEADERBOARD_LIMIT).map((entry, index) => {
+      if (index === 0 || entry.hours !== ranked[index - 1]?.hours) rank = index + 1;
+      return { rank, name: entry.name, hours: entry.hours };
+    });
+
+    return { season: { id: season.id, name: season.name }, entries };
   }
 
   async overview(userId: string, now = new Date()) {
