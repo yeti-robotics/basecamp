@@ -73,14 +73,14 @@ it('shows the current season and roster roles with student experience', () => {
   expect(screen.getByRole('heading', { name: '2027–28' })).toBeInTheDocument();
   expect(screen.getByText('Alex Member')).toBeInTheDocument();
   expect(
-    within(screen.getByRole('table')).getByRole('cell', { name: 'Student Leader', exact: true }),
+    within(screen.getByRole('table')).getByRole('cell', { name: /^Student Leader$/ }),
   ).toBeInTheDocument();
   expect(
-    within(screen.getByRole('table')).getByRole('cell', { name: 'Veteran', exact: true }),
+    within(screen.getByRole('table')).getByRole('cell', { name: /^Veteran$/ }),
   ).toBeInTheDocument();
   expect(screen.getByText('Morgan Mentor')).toBeInTheDocument();
   expect(
-    within(screen.getByRole('table')).getByRole('cell', { name: 'Mentor', exact: true }),
+    within(screen.getByRole('table')).getByRole('cell', { name: /^Mentor$/ }),
   ).toBeInTheDocument();
 });
 
@@ -518,19 +518,19 @@ it('offers account restoration for a suspended member', async () => {
 it('combines experience, role, status, and name filters', () => {
   render(<RosterTable season={season} members={searchableMembers} ownMember={null} canManage />);
 
-  fireEvent.change(screen.getByRole('combobox', { name: 'Experience', exact: true }), {
+  fireEvent.change(screen.getByRole('combobox', { name: /^Experience$/ }), {
     target: { value: 'rookie' },
   });
   expect(screen.getByText('Alex Member')).toBeVisible();
   expect(screen.getByText('Morgan Mentor')).not.toBeVisible();
 
-  fireEvent.change(screen.getByRole('combobox', { name: 'Role', exact: true }), {
+  fireEvent.change(screen.getByRole('combobox', { name: /^Role$/ }), {
     target: { value: 'mentor' },
   });
   expect(screen.getByRole('status')).toHaveTextContent('Showing 0 of 2 members');
   expect(screen.getByText('No members match your search')).toBeVisible();
 
-  fireEvent.change(screen.getByRole('combobox', { name: 'Role', exact: true }), {
+  fireEvent.change(screen.getByRole('combobox', { name: /^Role$/ }), {
     target: { value: 'student' },
   });
   fireEvent.change(screen.getByLabelText('Membership or account status'), {
@@ -570,8 +570,8 @@ it('filters removed memberships separately from suspended accounts', () => {
 it('resets every filter and restores all members', () => {
   render(<RosterTable season={season} members={searchableMembers} ownMember={null} canManage />);
   const search = screen.getByRole('searchbox');
-  const role = screen.getByRole('combobox', { name: 'Role', exact: true });
-  const experience = screen.getByRole('combobox', { name: 'Experience', exact: true });
+  const role = screen.getByRole('combobox', { name: /^Role$/ });
+  const experience = screen.getByRole('combobox', { name: /^Experience$/ });
   const status = screen.getByLabelText('Membership or account status');
   fireEvent.change(search, { target: { value: 'Alex' } });
   fireEvent.change(role, { target: { value: 'student' } });
@@ -593,7 +593,7 @@ it('preserves unsaved editor values when an experience filter hides a member', (
   fireEvent.change(screen.getByLabelText('Experience for Alex Member'), {
     target: { value: 'veteran' },
   });
-  const experience = screen.getByRole('combobox', { name: 'Experience', exact: true });
+  const experience = screen.getByRole('combobox', { name: /^Experience$/ });
   fireEvent.change(experience, { target: { value: 'none' } });
   expect(screen.getByText('Alex Member')).not.toBeVisible();
   fireEvent.click(screen.getByRole('button', { name: 'Reset filters' }));
