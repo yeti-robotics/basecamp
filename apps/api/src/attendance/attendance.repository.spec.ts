@@ -1,12 +1,15 @@
 import { Test, type TestingModule } from '@nestjs/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DatabaseService } from '../database/database.service.js';
+import { attendanceAudit } from '../database/schema/attendance.js';
 import {
   AttendanceCreate,
   AttendanceRepository,
   AttendanceUpdate,
   getRequirementStatus,
 } from './attendance.repository.js';
+
+const studentId = 'S'.repeat(32);
 
 describe('AttendanceRepository', () => {
   let repository: AttendanceRepository;
@@ -112,6 +115,79 @@ describe('AttendanceRepository', () => {
   });
 
   describe('createRecord', () => {
+    it('writes a mentor sign-in audit in the same transaction as the record', async () => {
+      const checkedInAt = new Date('2026-10-31T14:00:00Z');
+      const created = {
+        id: 9,
+        user_id: studentId,
+        checked_in_at: checkedInAt,
+        checked_out_at: null,
+        category: 'meeting',
+        event_id: null,
+        status: 'normal',
+      };
+      mockTx.limit.mockResolvedValueOnce([]);
+      mockTx.returning.mockResolvedValueOnce([created]);
+
+      const result = await repository.createRecord(
+        { userId: studentId, checkedInAt, category: 'meeting', eventId: null },
+        {
+          actorUserId: 'mentor-1',
+          action: 'mentor_signed_in',
+          reason: 'Mentor-assisted attendance command',
+        },
+      );
+
+      expect(result.isOk()).toBe(true);
+      expect(mockDb.transaction).toHaveBeenCalledTimes(1);
+      expect(mockTx.insert).toHaveBeenCalledWith(attendanceAudit);
+      expect(mockTx.values).toHaveBeenCalledWith({
+        attendance_id: 9,
+        actor_user_id: 'mentor-1',
+        subject_user_id: studentId,
+        action: 'mentor_signed_in',
+        before: null,
+        after: {
+          userId: studentId,
+          checkedInAt: checkedInAt.toISOString(),
+          checkedOutAt: null,
+          category: 'meeting',
+          eventId: null,
+          status: 'normal',
+        },
+        reason: 'Mentor-assisted attendance command',
+      });
+    });
+
+    it('fails the transaction when the mentor audit insert fails', async () => {
+      const checkedInAt = new Date('2026-10-31T14:00:00Z');
+      mockTx.limit.mockResolvedValueOnce([]);
+      mockTx.returning.mockResolvedValueOnce([
+        {
+          id: 9,
+          user_id: studentId,
+          checked_in_at: checkedInAt,
+          checked_out_at: null,
+          category: 'meeting',
+          event_id: null,
+          status: 'normal',
+        },
+      ]);
+      mockTx.values
+        .mockReturnValueOnce(mockTx)
+        .mockRejectedValueOnce(new Error('Audit unavailable'));
+
+      const result = await repository.createRecord(
+        { userId: studentId, checkedInAt, category: 'meeting', eventId: null },
+        {
+          actorUserId: 'mentor-1',
+          action: 'mentor_signed_in',
+          reason: 'Mentor-assisted attendance command',
+        },
+      );
+
+      expect(result._unsafeUnwrapErr().message).toBe('Audit unavailable');
+    });
     it('creates and returns a record when no open session exists', async () => {
       const record: AttendanceCreate = {
         userId: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
@@ -210,6 +286,75 @@ describe('AttendanceRepository', () => {
   });
 
   describe('updateLast', () => {
+    it('stores the before and after state for a mentor sign-out', async () => {
+      const checkedInAt = new Date('2026-10-31T14:00:00Z');
+      const checkedOutAt = new Date('2026-10-31T17:00:00Z');
+      const before = {
+        id: 9,
+        user_id: studentId,
+        checked_in_at: checkedInAt,
+        checked_out_at: null,
+        category: 'meeting',
+        event_id: null,
+        status: 'normal',
+      };
+      mockTx.limit.mockResolvedValueOnce([before]);
+      mockTx.returning.mockResolvedValueOnce([{ ...before, checked_out_at: checkedOutAt }]);
+
+      const result = await repository.updateLast(
+        studentId,
+        { checkedOutAt },
+        {
+          actorUserId: 'mentor-1',
+          action: 'mentor_signed_out',
+          reason: 'Mentor-assisted attendance command',
+        },
+      );
+
+      expect(result.isOk()).toBe(true);
+      expect(mockDb.transaction).toHaveBeenCalledTimes(1);
+      expect(mockTx.insert).toHaveBeenCalledWith(attendanceAudit);
+      expect(mockTx.values).toHaveBeenCalledWith(
+        expect.objectContaining({
+          attendance_id: 9,
+          actor_user_id: 'mentor-1',
+          subject_user_id: studentId,
+          action: 'mentor_signed_out',
+          before: expect.objectContaining({ checkedOutAt: null }),
+          after: expect.objectContaining({ checkedOutAt: checkedOutAt.toISOString() }),
+        }),
+      );
+    });
+
+    it('fails a mentor sign-out when its audit cannot be stored', async () => {
+      const checkedInAt = new Date('2026-10-31T14:00:00Z');
+      const before = {
+        id: 9,
+        user_id: studentId,
+        checked_in_at: checkedInAt,
+        checked_out_at: null,
+        category: 'meeting',
+        event_id: null,
+        status: 'normal',
+      };
+      mockTx.limit.mockResolvedValueOnce([before]);
+      mockTx.returning.mockResolvedValueOnce([
+        { ...before, checked_out_at: new Date('2026-10-31T17:00:00Z') },
+      ]);
+      mockTx.values.mockRejectedValueOnce(new Error('Audit unavailable'));
+
+      const result = await repository.updateLast(
+        studentId,
+        { checkedOutAt: new Date('2026-10-31T17:00:00Z') },
+        {
+          actorUserId: 'mentor-1',
+          action: 'mentor_signed_out',
+          reason: 'Mentor-assisted attendance command',
+        },
+      );
+
+      expect(result._unsafeUnwrapErr().message).toBe('Audit unavailable');
+    });
     it('updates the last attendance record for a user', async () => {
       const updates: AttendanceUpdate = {
         checkedOutAt: new Date('2026-10-31T17:00:00Z'),

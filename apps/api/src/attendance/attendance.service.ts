@@ -12,6 +12,7 @@ import { RosterService } from '../roster/roster.service.js';
 import { SeasonAuthorizationService } from '../seasons/season-authorization.service.js';
 import { FORGOT_SIGNOUT_CREDIT_MS, STALE_SIGNIN_MIN_HOURS_MS } from './attendance.constants.js';
 import {
+  type AttendanceAuditContext,
   AttendanceRepository,
   type AttendanceUpdate,
   getRequirementStatus,
@@ -87,8 +88,8 @@ export class AttendanceService {
     actorDiscordId: string,
     targetDiscordId: string,
   ): ResultAsync<void, Error> {
-    return this.authorizeAttendanceManager(actorDiscordId).andThen(() =>
-      this.recordAttendance(targetDiscordId, 'meeting', null, new Date(), false),
+    return this.authorizeAttendanceManager(actorDiscordId).andThen((actorUserId) =>
+      this.recordAttendance(targetDiscordId, 'meeting', null, new Date(), false, actorUserId),
     );
   }
 
@@ -96,12 +97,12 @@ export class AttendanceService {
     actorDiscordId: string,
     targetDiscordId: string,
   ): ResultAsync<void, Error> {
-    return this.authorizeAttendanceManager(actorDiscordId).andThen(() =>
-      this.updateAttendance(targetDiscordId, { checkedOutAt: new Date() }),
+    return this.authorizeAttendanceManager(actorDiscordId).andThen((actorUserId) =>
+      this.updateAttendance(targetDiscordId, { checkedOutAt: new Date() }, actorUserId),
     );
   }
 
-  private authorizeAttendanceManager(actorDiscordId: string): ResultAsync<void, Error> {
+  private authorizeAttendanceManager(actorDiscordId: string): ResultAsync<string, Error> {
     return this.attendanceRepository.getUserIdByDiscordId(actorDiscordId).andThen((actorUserId) =>
       ResultAsync.fromPromise(
         Promise.all([
@@ -111,6 +112,7 @@ export class AttendanceService {
           if (isSuspended || !canManageAttendance) {
             throw new Error('Not authorized to manage attendance');
           }
+          return actorUserId;
         }),
         (error) => (error instanceof Error ? error : new Error(String(error))),
       ),
@@ -123,6 +125,7 @@ export class AttendanceService {
     eventId: number | null,
     checkedInAt: Date = new Date(),
     allowSeasonJoin = true,
+    actorUserId?: string,
   ): ResultAsync<void, Error> {
     return this.resolveEligibleMember(discordId, checkedInAt, allowSeasonJoin).andThen((userId) =>
       this.attendanceRepository.getLast(userId).andThen((attendance) => {
@@ -137,24 +140,35 @@ export class AttendanceService {
             return errAsync(new Error('User is already signed in'));
           }
 
-          return this.handleForgotToSignOut(discordId).andThen(() =>
+          return this.handleForgotToSignOut(discordId, actorUserId).andThen(() =>
             this.attendanceRepository
-              .createRecord({ userId, checkedInAt, category, eventId })
+              .createRecord(
+                { userId, checkedInAt, category, eventId },
+                actorUserId ? this.mentorAudit(actorUserId, 'mentor_signed_in') : undefined,
+              )
               .map(() => undefined),
           );
         }
 
         return this.attendanceRepository
-          .createRecord({ userId, checkedInAt, category, eventId })
+          .createRecord(
+            { userId, checkedInAt, category, eventId },
+            actorUserId ? this.mentorAudit(actorUserId, 'mentor_signed_in') : undefined,
+          )
           .map(() => undefined);
       }),
     );
   }
 
-  public updateAttendance(discordId: string, updates: AttendanceUpdate): ResultAsync<void, Error> {
+  public updateAttendance(
+    discordId: string,
+    updates: AttendanceUpdate,
+    actorUserId?: string,
+  ): ResultAsync<void, Error> {
+    const audit = actorUserId ? this.mentorAudit(actorUserId, 'mentor_signed_out') : undefined;
     return this.resolveEligibleMember(discordId, new Date(), false).andThen((userId) => {
       if (updates.checkedOutAt === undefined || updates.checkedOutAt === null) {
-        return this.attendanceRepository.updateLast(userId, updates).map(() => undefined);
+        return this.attendanceRepository.updateLast(userId, updates, audit).map(() => undefined);
       }
 
       return this.attendanceRepository.getLast(userId).andThen((attendance) => {
@@ -166,9 +180,16 @@ export class AttendanceService {
           return errAsync(new Error('User is already signed out'));
         }
 
-        return this.attendanceRepository.updateLast(userId, updates).map(() => undefined);
+        return this.attendanceRepository.updateLast(userId, updates, audit).map(() => undefined);
       });
     });
+  }
+
+  private mentorAudit(
+    actorUserId: string,
+    action: AttendanceAuditContext['action'],
+  ): AttendanceAuditContext {
+    return { actorUserId, action, reason: 'Mentor-assisted attendance command' };
   }
 
   private resolveEligibleMember(
@@ -253,7 +274,10 @@ export class AttendanceService {
   }
 
   // Resolve a stale session.
-  public handleForgotToSignOut(discordId: string): ResultAsync<Attendance, Error> {
+  private handleForgotToSignOut(
+    discordId: string,
+    actorUserId?: string,
+  ): ResultAsync<Attendance, Error> {
     return this.attendanceRepository.getUserIdByDiscordId(discordId).andThen((userId) =>
       this.attendanceRepository.getLast(userId).andThen((attendance) => {
         if (!attendance) {
@@ -279,7 +303,11 @@ export class AttendanceService {
         );
 
         return this.attendanceRepository
-          .updateLast(userId, { checkedOutAt: creditTime })
+          .updateLast(
+            userId,
+            { checkedOutAt: creditTime },
+            actorUserId ? this.mentorAudit(actorUserId, 'stale_session_credited') : undefined,
+          )
           .andThen((updated) => {
             if (!updated) {
               return errAsync(new Error('Failed to credit forgotten sign-out'));

@@ -153,20 +153,25 @@ function HistoryPanel({
     );
   }
 
+  const actionLabels: Record<AttendanceHistoryEntry['action'], string> = {
+    record_created: 'Added',
+    record_updated: 'Edited',
+    mentor_signed_in: 'Signed in by mentor',
+    mentor_signed_out: 'Signed out by mentor',
+    stale_session_credited: 'Credited forgotten sign-out',
+  };
+
   return (
     <ol className="space-y-3">
       {entries.map((entry) => {
         const fields = (Object.keys(fieldLabels) as (keyof AttendanceRecordSnapshot)[]).filter(
-          (field) =>
-            entry.action === 'record_updated' && entry.before?.[field] !== entry.after?.[field],
+          (field) => entry.before !== null && entry.before?.[field] !== entry.after?.[field],
         );
         return (
           <li key={entry.id} className="space-y-1 text-sm">
             <p>
-              <span className="font-medium">
-                {entry.action === 'record_created' ? 'Added' : 'Edited'}
-              </span>{' '}
-              by {entry.actorName ?? 'an unknown user'} ·{' '}
+              <span className="font-medium">{actionLabels[entry.action] ?? 'Changed'}</span> by{' '}
+              {entry.actorName ?? 'an unknown user'} ·{' '}
               <time dateTime={entry.createdAt}>
                 {historyDate.format(new Date(entry.createdAt))}
               </time>

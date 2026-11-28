@@ -349,6 +349,46 @@ it('shows the creation entry for a record a mentor added', async () => {
   expect(screen.getByText(/by an unknown user/)).toBeInTheDocument();
 });
 
+it('labels mentor-assisted sign-out and stale credit in record history', async () => {
+  const before = {
+    userId: 'student-1',
+    checkedInAt: signedIn.checkedInAt,
+    checkedOutAt: null,
+    category: 'meeting',
+    eventId: null,
+    status: 'normal',
+  };
+  global.fetch = jest.fn().mockResolvedValue(
+    jsonResponse([
+      {
+        id: 3,
+        action: 'mentor_signed_out',
+        actorName: 'Mia Mentor',
+        before,
+        after: { ...before, checkedOutAt: signedIn.checkedOutAt },
+        reason: 'Mentor-assisted attendance command',
+        createdAt: '2026-11-08T15:00:00.000Z',
+      },
+      {
+        id: 4,
+        action: 'stale_session_credited',
+        actorName: 'Mia Mentor',
+        before,
+        after: { ...before, checkedOutAt: signedIn.checkedOutAt },
+        reason: 'Mentor-assisted attendance command',
+        createdAt: '2026-11-08T15:01:00.000Z',
+      },
+    ]),
+  );
+  renderManager();
+
+  fireEvent.click(row('Ada Lovelace').getByRole('button', { name: /History/ }));
+
+  expect(await screen.findByText('Signed out by mentor')).toBeInTheDocument();
+  expect(screen.getByText('Credited forgotten sign-out')).toBeInTheDocument();
+  expect(screen.getAllByText(/End: — →/)).toHaveLength(2);
+});
+
 it('explains when a record has no history or the history cannot load', async () => {
   global.fetch = jest
     .fn()

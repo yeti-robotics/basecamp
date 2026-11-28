@@ -85,12 +85,15 @@ describe('AttendanceService', () => {
 
       expect(result.isOk()).toBe(true);
       expect(roster.ensureCurrentMembership).toHaveBeenCalledWith(userId, checkedInAt);
-      expect(repository.createRecord).toHaveBeenCalledWith({
-        userId,
-        checkedInAt,
-        category: 'meeting',
-        eventId: null,
-      });
+      expect(repository.createRecord).toHaveBeenCalledWith(
+        {
+          userId,
+          checkedInAt,
+          category: 'meeting',
+          eventId: null,
+        },
+        undefined,
+      );
     });
 
     it('errors when the user already has a recent open session', async () => {
@@ -131,15 +134,22 @@ describe('AttendanceService', () => {
       const result = await service.recordAttendance(discordId, 'meeting', null, checkedInAt);
 
       expect(result.isOk()).toBe(true);
-      expect(repository.updateLast).toHaveBeenCalledWith(userId, {
-        checkedOutAt: new Date(staleSignIn.getTime() + 90 * 60 * 1000),
-      });
-      expect(repository.createRecord).toHaveBeenCalledWith({
+      expect(repository.updateLast).toHaveBeenCalledWith(
         userId,
-        checkedInAt,
-        category: 'meeting',
-        eventId: null,
-      });
+        {
+          checkedOutAt: new Date(staleSignIn.getTime() + 90 * 60 * 1000),
+        },
+        undefined,
+      );
+      expect(repository.createRecord).toHaveBeenCalledWith(
+        {
+          userId,
+          checkedInAt,
+          category: 'meeting',
+          eventId: null,
+        },
+        undefined,
+      );
     });
 
     it('returns an error when ensuring the season membership fails', async () => {
@@ -223,6 +233,7 @@ describe('AttendanceService', () => {
         null,
         expect.any(Date),
         false,
+        actorUserId,
       );
     });
 
@@ -238,6 +249,7 @@ describe('AttendanceService', () => {
       expect(updateAttendance).toHaveBeenCalledWith(
         targetDiscordId,
         expect.objectContaining({ checkedOutAt: expect.any(Date) }),
+        actorUserId,
       );
     });
 
@@ -276,6 +288,81 @@ describe('AttendanceService', () => {
       expect(result._unsafeUnwrapErr().message).toBe('No active season membership');
       expect(roster.ensureCurrentMembership).not.toHaveBeenCalled();
       expect(repository.createRecord).not.toHaveBeenCalled();
+    });
+
+    it('passes the persistent mentor ID to the sign-in audit', async () => {
+      repository.getUserIdByDiscordId.mockImplementation((id: string) =>
+        okAsync(id === discordId ? actorUserId : userId),
+      );
+      repository.getLast.mockReturnValue(okAsync(null));
+      repository.createRecord.mockReturnValue(okAsync(makeAttendance(new Date())));
+
+      const result = await service.signInForMember(discordId, targetDiscordId);
+
+      expect(result.isOk()).toBe(true);
+      expect(repository.createRecord).toHaveBeenCalledWith(
+        expect.objectContaining({ userId, category: 'meeting' }),
+        {
+          actorUserId,
+          action: 'mentor_signed_in',
+          reason: 'Mentor-assisted attendance command',
+        },
+      );
+    });
+
+    it('passes the persistent mentor ID to the sign-out audit', async () => {
+      repository.getUserIdByDiscordId.mockImplementation((id: string) =>
+        okAsync(id === discordId ? actorUserId : userId),
+      );
+      repository.getLast.mockReturnValue(okAsync(makeAttendance(new Date())));
+      repository.updateLast.mockReturnValue(okAsync(makeAttendance(new Date(), new Date())));
+
+      const result = await service.signOutForMember(discordId, targetDiscordId);
+
+      expect(result.isOk()).toBe(true);
+      expect(repository.updateLast).toHaveBeenCalledWith(
+        userId,
+        expect.objectContaining({ checkedOutAt: expect.any(Date) }),
+        {
+          actorUserId,
+          action: 'mentor_signed_out',
+          reason: 'Mentor-assisted attendance command',
+        },
+      );
+    });
+
+    it('audits a stale-session credit before a mentor-assisted sign-in', async () => {
+      vi.useFakeTimers();
+      const now = new Date('2026-11-28T16:00:00.000Z');
+      const staleSignIn = new Date('2026-11-26T14:00:00.000Z');
+      vi.setSystemTime(now);
+      repository.getUserIdByDiscordId.mockImplementation((id: string) =>
+        okAsync(id === discordId ? actorUserId : userId),
+      );
+      repository.getLast
+        .mockReturnValueOnce(okAsync(makeAttendance(staleSignIn)))
+        .mockReturnValueOnce(okAsync(makeAttendance(staleSignIn)));
+      repository.updateLast.mockReturnValue(
+        okAsync(makeAttendance(staleSignIn, new Date(staleSignIn.getTime() + 90 * 60 * 1000))),
+      );
+      repository.createRecord.mockReturnValue(okAsync(makeAttendance(now)));
+
+      try {
+        const result = await service.signInForMember(discordId, targetDiscordId);
+
+        expect(result.isOk()).toBe(true);
+        expect(repository.updateLast).toHaveBeenCalledWith(
+          userId,
+          { checkedOutAt: new Date(staleSignIn.getTime() + 90 * 60 * 1000) },
+          {
+            actorUserId,
+            action: 'stale_session_credited',
+            reason: 'Mentor-assisted attendance command',
+          },
+        );
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 
