@@ -1,8 +1,14 @@
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { AttendanceRecord } from '../../lib/attendance-records';
+import { downloadCsv } from '../../lib/csv';
 import type { TeamEvent } from '../../lib/events';
 import { AttendanceManager } from './AttendanceManager';
+
+jest.mock('../../lib/csv', () => ({
+  ...jest.requireActual('../../lib/csv'),
+  downloadCsv: jest.fn(),
+}));
 
 const mockRefresh = jest.fn();
 jest.mock('next/navigation', () => ({ useRouter: () => ({ refresh: mockRefresh }) }));
@@ -70,6 +76,7 @@ function jsonResponse(body: unknown, status = 200) {
 function renderManager(
   records: AttendanceRecord[] = [signedIn, forgotSignOut, excused],
   search = {},
+  exportQuery = '',
 ) {
   return render(
     <AttendanceManager
@@ -78,6 +85,7 @@ function renderManager(
       members={members}
       events={[meeting]}
       search={search}
+      exportQuery={exportQuery}
     />,
   );
 }
@@ -353,4 +361,134 @@ it('explains when a record has no history or the history cannot load', async () 
 
   fireEvent.click(row('Grace Hopper').getByRole('button', { name: /History/ }));
   expect(await screen.findByText('Attendance record not found')).toBeInTheDocument();
+});
+
+describe('attendance CSV export', () => {
+  function exportButton() {
+    return screen.getByRole('button', { name: 'Export attendance CSV' });
+  }
+
+  it('exports all matching API records rather than only the displayed rows', async () => {
+    global.fetch = jest.fn().mockResolvedValue(jsonResponse([signedIn, forgotSignOut]));
+    renderManager([signedIn]);
+
+    fireEvent.click(exportButton());
+
+    await waitFor(() => expect(downloadCsv).toHaveBeenCalledTimes(1));
+    expect(global.fetch).toHaveBeenCalledWith('/api/attendance/records/export', {
+      cache: 'no-store',
+    });
+    expect(downloadCsv).toHaveBeenCalledWith(
+      'attendance-records.csv',
+      expect.stringContaining('Ada Lovelace'),
+    );
+    expect(downloadCsv).toHaveBeenCalledWith(
+      'attendance-records.csv',
+      expect.stringContaining('Grace Hopper'),
+    );
+    expect(mockRefresh).not.toHaveBeenCalled();
+  });
+
+  it('uses applied server filters rather than unsubmitted form values', async () => {
+    const query = new URLSearchParams({
+      q: 'ada',
+      from: '2026-11-01T04:00:00.000Z',
+      to: '2026-12-01T04:59:59.999Z',
+      status: 'excused',
+    }).toString();
+    global.fetch = jest.fn().mockResolvedValue(jsonResponse([excused]));
+    renderManager([excused], { q: 'ada', status: 'excused' }, query);
+
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'Grace' } });
+    fireEvent.click(exportButton());
+
+    await waitFor(() => expect(downloadCsv).toHaveBeenCalledTimes(1));
+    expect(global.fetch).toHaveBeenCalledWith(`/api/attendance/records/export?${query}`, {
+      cache: 'no-store',
+    });
+  });
+
+  it('allows exporting when the displayed list is truncated', async () => {
+    const records = Array.from({ length: 201 }, (_, id) => attendanceRecord({ id: id + 1 }));
+    global.fetch = jest.fn().mockResolvedValue(jsonResponse(records));
+    render(
+      <AttendanceManager
+        records={[signedIn]}
+        truncated
+        members={members}
+        events={[]}
+        search={{}}
+      />,
+    );
+
+    fireEvent.click(exportButton());
+
+    await waitFor(() => expect(downloadCsv).toHaveBeenCalledTimes(1));
+    const csv = (downloadCsv as jest.Mock).mock.calls[0][1] as string;
+    expect(csv.split('\r\n')).toHaveLength(202);
+  });
+
+  it('disables duplicate export requests while loading', async () => {
+    let resolveRequest: (response: ReturnType<typeof jsonResponse>) => void = () => {};
+    global.fetch = jest.fn().mockReturnValue(
+      new Promise<ReturnType<typeof jsonResponse>>((resolve) => {
+        resolveRequest = resolve;
+      }),
+    );
+    renderManager();
+
+    fireEvent.click(exportButton());
+    const loading = screen.getByRole('button', { name: 'Exporting…' });
+    expect(loading).toBeDisabled();
+    fireEvent.click(loading);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+
+    resolveRequest(jsonResponse([signedIn]));
+    await waitFor(() => expect(exportButton()).toBeEnabled());
+    expect(downloadCsv).toHaveBeenCalledTimes(1);
+  });
+
+  it('exports headers for an empty report', async () => {
+    global.fetch = jest.fn().mockResolvedValue(jsonResponse([]));
+    renderManager([]);
+
+    fireEvent.click(exportButton());
+
+    await waitFor(() => expect(downloadCsv).toHaveBeenCalledTimes(1));
+    const csv = (downloadCsv as jest.Mock).mock.calls[0][1] as string;
+    expect(csv).toContain('Recorded Hours');
+    expect(csv.split('\r\n')).toHaveLength(1);
+  });
+
+  it.each<[number, string]>([
+    [400, 'Too many records to export. Narrow the date range and try again.'],
+    [403, 'Only active mentors and Team Admins can manage attendance'],
+  ])('shows an API error for status %s without downloading', async (status, message) => {
+    global.fetch = jest.fn().mockResolvedValue(jsonResponse({ message }, status));
+    renderManager();
+
+    fireEvent.click(exportButton());
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(message);
+    expect(downloadCsv).not.toHaveBeenCalled();
+    expect(exportButton()).toBeEnabled();
+  });
+
+  it('handles network failures and permits retrying', async () => {
+    global.fetch = jest
+      .fn()
+      .mockRejectedValueOnce(new Error('Network unavailable'))
+      .mockResolvedValueOnce(jsonResponse([signedIn]));
+    renderManager();
+
+    fireEvent.click(exportButton());
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Attendance could not be exported. Check your connection and try again.',
+    );
+    expect(downloadCsv).not.toHaveBeenCalled();
+
+    fireEvent.click(exportButton());
+    await waitFor(() => expect(downloadCsv).toHaveBeenCalledTimes(1));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
 });

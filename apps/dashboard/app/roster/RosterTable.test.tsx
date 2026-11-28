@@ -1,10 +1,16 @@
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { RosterMember } from '@/lib/roster';
+import { downloadCsv } from '../../lib/csv';
 import { RosterTable } from './RosterTable';
 
 const mockRefresh = jest.fn();
 jest.mock('next/navigation', () => ({ useRouter: () => ({ refresh: mockRefresh }) }));
+
+jest.mock('../../lib/csv', () => ({
+  ...jest.requireActual('../../lib/csv'),
+  downloadCsv: jest.fn(),
+}));
 
 const season = { id: 4, name: '2027–28', startsOn: '2027-05-15', endsOn: '2028-05-14' };
 const searchableMembers: RosterMember[] = [
@@ -31,6 +37,7 @@ const searchableMembers: RosterMember[] = [
 beforeEach(() => {
   global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({}) }) as jest.Mock;
   mockRefresh.mockClear();
+  jest.mocked(downloadCsv).mockClear();
 });
 
 it('shows the current season and roster roles with student experience', () => {
@@ -65,10 +72,16 @@ it('shows the current season and roster roles with student experience', () => {
 
   expect(screen.getByRole('heading', { name: '2027–28' })).toBeInTheDocument();
   expect(screen.getByText('Alex Member')).toBeInTheDocument();
-  expect(screen.getByText('Student Leader')).toBeInTheDocument();
-  expect(screen.getByText('Veteran')).toBeInTheDocument();
+  expect(
+    within(screen.getByRole('table')).getByRole('cell', { name: 'Student Leader', exact: true }),
+  ).toBeInTheDocument();
+  expect(
+    within(screen.getByRole('table')).getByRole('cell', { name: 'Veteran', exact: true }),
+  ).toBeInTheDocument();
   expect(screen.getByText('Morgan Mentor')).toBeInTheDocument();
-  expect(screen.getByText('Mentor')).toBeInTheDocument();
+  expect(
+    within(screen.getByRole('table')).getByRole('cell', { name: 'Mentor', exact: true }),
+  ).toBeInTheDocument();
 });
 
 it('shows preferred names with Discord identity and searches either name', () => {
@@ -498,5 +511,154 @@ it('offers account restoration for a suspended member', async () => {
       '/api/access/users/member-10/restore',
       expect.objectContaining({ method: 'POST' }),
     ),
+  );
+});
+
+// The filter controls must work together and preserve the existing member editor.
+it('combines experience, role, status, and name filters', () => {
+  render(<RosterTable season={season} members={searchableMembers} ownMember={null} canManage />);
+
+  fireEvent.change(screen.getByRole('combobox', { name: 'Experience', exact: true }), {
+    target: { value: 'rookie' },
+  });
+  expect(screen.getByText('Alex Member')).toBeVisible();
+  expect(screen.getByText('Morgan Mentor')).not.toBeVisible();
+
+  fireEvent.change(screen.getByRole('combobox', { name: 'Role', exact: true }), {
+    target: { value: 'mentor' },
+  });
+  expect(screen.getByRole('status')).toHaveTextContent('Showing 0 of 2 members');
+  expect(screen.getByText('No members match your search')).toBeVisible();
+
+  fireEvent.change(screen.getByRole('combobox', { name: 'Role', exact: true }), {
+    target: { value: 'student' },
+  });
+  fireEvent.change(screen.getByLabelText('Membership or account status'), {
+    target: { value: 'active' },
+  });
+  fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'Alex' } });
+  expect(screen.getByRole('status')).toHaveTextContent('Showing 1 of 2 members');
+  expect(screen.getByText('Alex Member')).toBeVisible();
+});
+
+it('filters members without student experience', () => {
+  render(
+    <RosterTable season={season} members={searchableMembers} ownMember={null} canManage={false} />,
+  );
+  fireEvent.change(screen.getByLabelText('Experience', { selector: '#roster-experience' }), {
+    target: { value: 'none' },
+  });
+  expect(screen.getByText('Morgan Mentor')).toBeVisible();
+  expect(screen.getByText('Alex Member')).not.toBeVisible();
+});
+
+it('filters removed memberships separately from suspended accounts', () => {
+  const members: RosterMember[] = [
+    { ...searchableMembers[0]!, state: 'removed' },
+    { ...searchableMembers[1]!, suspended: true },
+  ];
+  render(<RosterTable season={season} members={members} ownMember={null} canManage />);
+  const status = screen.getByLabelText('Membership or account status');
+  fireEvent.change(status, { target: { value: 'removed' } });
+  expect(screen.getByText('Alex Member')).toBeVisible();
+  expect(screen.getByText('Morgan Mentor')).not.toBeVisible();
+  fireEvent.change(status, { target: { value: 'suspended' } });
+  expect(screen.getByText('Alex Member')).not.toBeVisible();
+  expect(screen.getByText('Morgan Mentor')).toBeVisible();
+});
+
+it('resets every filter and restores all members', () => {
+  render(<RosterTable season={season} members={searchableMembers} ownMember={null} canManage />);
+  const search = screen.getByRole('searchbox');
+  const role = screen.getByRole('combobox', { name: 'Role', exact: true });
+  const experience = screen.getByRole('combobox', { name: 'Experience', exact: true });
+  const status = screen.getByLabelText('Membership or account status');
+  fireEvent.change(search, { target: { value: 'Alex' } });
+  fireEvent.change(role, { target: { value: 'student' } });
+  fireEvent.change(experience, { target: { value: 'rookie' } });
+  fireEvent.change(status, { target: { value: 'active' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Reset filters' }));
+  expect(search).toHaveValue('');
+  expect(role).toHaveValue('all');
+  expect(experience).toHaveValue('all');
+  expect(status).toHaveValue('all');
+  expect(screen.getByRole('status')).toHaveTextContent('Showing 2 of 2 members');
+  expect(screen.getByText('Alex Member')).toBeVisible();
+  expect(screen.getByText('Morgan Mentor')).toBeVisible();
+});
+
+it('preserves unsaved editor values when an experience filter hides a member', () => {
+  render(<RosterTable season={season} members={searchableMembers} ownMember={null} canManage />);
+  fireEvent.click(screen.getByRole('button', { name: 'Edit member Alex Member' }));
+  fireEvent.change(screen.getByLabelText('Experience for Alex Member'), {
+    target: { value: 'veteran' },
+  });
+  const experience = screen.getByRole('combobox', { name: 'Experience', exact: true });
+  fireEvent.change(experience, { target: { value: 'none' } });
+  expect(screen.getByText('Alex Member')).not.toBeVisible();
+  fireEvent.click(screen.getByRole('button', { name: 'Reset filters' }));
+  expect(screen.getByLabelText('Experience for Alex Member')).toHaveValue('veteran');
+  expect(screen.getByLabelText('Experience for Alex Member')).toBeVisible();
+});
+
+it('keeps season-wide statistics unchanged when filtering', () => {
+  render(<RosterTable season={season} members={searchableMembers} ownMember={null} canManage />);
+  const total = screen.getByText('Total members').parentElement?.parentElement;
+  if (!total) throw new Error('Missing total members card');
+  expect(within(total).getByText('2')).toBeVisible();
+  fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'Alex' } });
+  expect(screen.getByRole('status')).toHaveTextContent('Showing 1 of 2 members');
+  expect(within(total).getByText('2')).toBeVisible();
+});
+
+it('exports only the matching members in the selected season', () => {
+  render(<RosterTable season={season} members={searchableMembers} ownMember={null} canManage />);
+  fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'Alex' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Export filtered CSV' }));
+  expect(downloadCsv).toHaveBeenCalledTimes(1);
+  expect(downloadCsv).toHaveBeenCalledWith(
+    'roster-season-4.csv',
+    expect.stringContaining(
+      '"Alex Member","Alex Member","student","rookie","active","No","2027–28"',
+    ),
+  );
+  expect(downloadCsv).toHaveBeenCalledWith(
+    expect.any(String),
+    expect.not.stringContaining('Morgan Mentor'),
+  );
+  expect(global.fetch).not.toHaveBeenCalled();
+});
+
+it('disables export when no members match', () => {
+  render(<RosterTable season={season} members={searchableMembers} ownMember={null} canManage />);
+  fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'Nobody' } });
+  const button = screen.getByRole('button', { name: 'Export filtered CSV' });
+  expect(button).toBeDisabled();
+  fireEvent.click(button);
+  expect(downloadCsv).not.toHaveBeenCalled();
+});
+
+it('does not expose administrator-only roster export or removed membership options to viewers', () => {
+  render(
+    <RosterTable season={season} members={searchableMembers} ownMember={null} canManage={false} />,
+  );
+  expect(screen.queryByRole('button', { name: 'Export filtered CSV' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('option', { name: 'Removed membership' })).not.toBeInTheDocument();
+  expect(screen.queryByText('Removed memberships')).not.toBeInTheDocument();
+});
+
+it('uses the historical season ID when exporting a past roster', () => {
+  render(
+    <RosterTable
+      season={{ ...season, id: 3, readOnly: true }}
+      members={searchableMembers}
+      ownMember={null}
+      canManage
+    />,
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Export filtered CSV' }));
+  expect(downloadCsv).toHaveBeenCalledWith(
+    'roster-season-3.csv',
+    expect.stringContaining('Alex Member'),
   );
 });

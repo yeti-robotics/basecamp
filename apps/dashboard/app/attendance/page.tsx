@@ -1,7 +1,11 @@
 import { Brand } from '@/components/Brand';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { type AttendanceRecordSearch, getAttendanceRecords } from '@/lib/attendance-records';
+import {
+  type AttendanceRecordSearch,
+  getAttendanceRecords,
+  recordQuery,
+} from '@/lib/attendance-records';
 import { getEvents } from '@/lib/events';
 import { requireMember } from '@/lib/require-member';
 import { getRosterView } from '@/lib/roster';
@@ -12,20 +16,30 @@ export default async function AttendancePage({
 }: {
   searchParams: Promise<AttendanceRecordSearch>;
 }) {
+  // Require an authenticated Basecamp member.
   await requireMember();
 
   const params = await searchParams;
+
+  // Normalize the search parameters before querying the API.
   const search: AttendanceRecordSearch = {
     q: typeof params.q === 'string' ? params.q : undefined,
     from: typeof params.from === 'string' ? params.from : undefined,
     to: typeof params.to === 'string' ? params.to : undefined,
     status: typeof params.status === 'string' ? params.status : undefined,
   };
+
   const result = await getAttendanceRecords(search);
+
+  // Use the same normalized filters for the attendance export.
+  const exportQuery = recordQuery(search).toString();
+
+  // Only retrieve additional management data for authorized users.
   const [roster, events] =
     result && result !== 'forbidden'
       ? await Promise.all([getRosterView(), getEvents()])
       : [null, null];
+
   const members = (roster?.members ?? [])
     .filter((member) => member.state === 'active')
     .map((member) => ({
@@ -42,27 +56,34 @@ export default async function AttendancePage({
       <header className="border-b bg-card">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-4 sm:px-8">
           <Brand />
+
           <Button asChild variant="ghost" size="sm">
             <a href="/">Dashboard</a>
           </Button>
         </div>
       </header>
+
       <main className="mx-auto min-h-svh max-w-7xl px-5 py-9 sm:px-8 sm:py-12">
         <header>
           <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
             YETI Robotics
           </p>
+
           <h1 className="mt-2 text-3xl font-semibold tracking-tight">Attendance</h1>
+
           <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground">
-            Find and correct attendance, add missed sign-ins, and excuse absences.
+            Find and correct attendance, add missed sign-ins, and excuse absences. Export filtered
+            attendance records for team reporting.
           </p>
         </header>
+
         {result === 'forbidden' ? (
           <Alert className="mt-8">
             <AlertTitle>Attendance management is for mentors</AlertTitle>
+
             <AlertDescription>
-              Only active mentors and Team Admins can view and correct team attendance. Your own
-              hours are on the dashboard.
+              Only active mentors and Team Admins can view, correct, and export team attendance.
+              Your own hours are on the dashboard.
             </AlertDescription>
           </Alert>
         ) : result ? (
@@ -72,10 +93,12 @@ export default async function AttendancePage({
             members={members}
             events={events ?? []}
             search={search}
+            exportQuery={exportQuery}
           />
         ) : (
           <Alert className="mt-8">
             <AlertTitle>Attendance could not be loaded</AlertTitle>
+
             <AlertDescription>Reload the page to try again.</AlertDescription>
           </Alert>
         )}

@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   CalendarDays,
   ChevronDown,
+  Download,
   Search,
   Settings2,
   ShieldCheck,
@@ -35,7 +36,15 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { typographyVariants } from '@/components/ui/typography';
+import { downloadCsv } from '@/lib/csv';
 import type { RosterMember, RosterSeason } from '@/lib/roster';
+import {
+  createRosterCsv,
+  defaultRosterFilters,
+  filterRosterMembers,
+  getRosterStatistics,
+  type RosterFilters,
+} from './roster-utils';
 
 type RosterTableProps = {
   season: (RosterSeason & { readOnly?: boolean }) | null;
@@ -339,33 +348,38 @@ export function RosterTable({
   selectedSeasonId,
   canManage,
 }: RosterTableProps) {
-  const [search, setSearch] = useState('');
-  const searchWords = search.trim().toLowerCase().split(/\s+/);
-  const filteredMembers = members.filter((member) =>
-    searchWords.every((word) =>
-      `${member.name} ${member.preferredName ?? ''}`.toLowerCase().includes(word),
-    ),
-  );
+  // Keep filters in one object so they can be updated independently or reset together.
+  const [filters, setFilters] = useState<RosterFilters>(defaultRosterFilters);
+
+  function updateFilter<K extends keyof RosterFilters>(key: K, value: RosterFilters[K]) {
+    setFilters((previous) => ({ ...previous, [key]: value }));
+  }
+
+  const search = filters.search;
+  const filteredMembers = filterRosterMembers(members, filters);
   const pastSeasons = seasons.filter((item) => item.readOnly);
+
+  // Hide unmatched rows instead of unmounting them, preserving unsaved edits.
   const matchingMemberIds = new Set(filteredMembers.map((member) => member.id));
+
+  // Summary cards describe the full roster returned for this season, not the filtered subset.
+  const statistics = getRosterStatistics(members);
   const summary = [
-    {
-      label: 'Total members',
-      value: members.length,
-      icon: Users,
-    },
-    {
-      label: 'Active memberships',
-      value: members.filter((member) => member.state === 'active').length,
-      icon: ShieldCheck,
-    },
-    {
-      label: 'Mentors',
-      value: members.filter((member) => member.role === 'mentor' && member.state === 'active')
-        .length,
-      icon: Users,
-    },
+    { label: 'Total members', value: statistics.total, icon: Users },
+    { label: 'Active memberships', value: statistics.active, icon: ShieldCheck },
+    { label: 'Active rookies', value: statistics.rookies, icon: Users },
+    { label: 'Active veterans', value: statistics.veterans, icon: Users },
+    { label: 'Mentors', value: statistics.mentors, icon: Users },
+    ...(canManage
+      ? [{ label: 'Removed memberships', value: statistics.removed, icon: Users }]
+      : []),
   ];
+
+  function exportRoster() {
+    // Export only authorized, visible roster data; never include hidden rows.
+    if (!canManage || !season || ownMember || filteredMembers.length === 0) return;
+    downloadCsv(`roster-season-${season.id}.csv`, createRosterCsv(filteredMembers, season));
+  }
 
   return (
     <div className="min-h-svh bg-background text-foreground">
@@ -466,7 +480,7 @@ export function RosterTable({
           </Card>
         ) : season ? (
           <section aria-label="Season roster" className="mt-8 space-y-6">
-            <div className="grid gap-4 sm:grid-cols-3">
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
               {summary.map(({ label, value, icon: Icon }) => (
                 <Card key={label} size="sm" className="gap-4 p-5">
                   <div className="flex items-center justify-between gap-3 text-muted-foreground">
@@ -498,7 +512,7 @@ export function RosterTable({
                       type="search"
                       placeholder="Search by name…"
                       value={search}
-                      onChange={(event) => setSearch(event.target.value)}
+                      onChange={(event) => updateFilter('search', event.target.value)}
                       className="h-9 pr-9 pl-9 [&::-webkit-search-cancel-button]:appearance-none"
                     />
                     {search && (
@@ -507,7 +521,7 @@ export function RosterTable({
                         size="icon-xs"
                         aria-label="Clear search"
                         className="absolute top-1/2 right-1.5 -translate-y-1/2"
-                        onClick={() => setSearch('')}
+                        onClick={() => updateFilter('search', '')}
                       >
                         <X aria-hidden="true" />
                       </Button>
@@ -515,6 +529,84 @@ export function RosterTable({
                   </div>
                 </div>
               </CardHeader>
+              {/* Combine filters with name search without losing member editor state. */}
+              <div className="flex flex-wrap items-end gap-3 border-b px-5 py-4 sm:px-6">
+                <div className="min-w-32 flex-1 space-y-2">
+                  <Label htmlFor="roster-experience">Experience</Label>
+                  <select
+                    id="roster-experience"
+                    className={selectClassName}
+                    value={filters.experience ?? 'none'}
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      // HTML select values are strings; the database uses null for no experience.
+                      updateFilter(
+                        'experience',
+                        value === 'none' ? null : (value as RosterFilters['experience']),
+                      );
+                    }}
+                  >
+                    <option value="all">All experience</option>
+                    <option value="rookie">Rookie</option>
+                    <option value="veteran">Veteran</option>
+                    <option value="none">Not applicable</option>
+                  </select>
+                </div>
+                <div className="min-w-32 flex-1 space-y-2">
+                  <Label htmlFor="roster-role">Role</Label>
+                  <select
+                    id="roster-role"
+                    className={selectClassName}
+                    value={filters.role}
+                    onChange={(event) =>
+                      updateFilter('role', event.target.value as RosterFilters['role'])
+                    }
+                  >
+                    <option value="all">All roles</option>
+                    {Object.entries(roleLabels).map(([value, label]) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="min-w-32 flex-1 space-y-2">
+                  <Label htmlFor="roster-status">Membership or account status</Label>
+                  <select
+                    id="roster-status"
+                    className={selectClassName}
+                    value={filters.status}
+                    onChange={(event) =>
+                      updateFilter('status', event.target.value as RosterFilters['status'])
+                    }
+                  >
+                    <option value="all">All statuses</option>
+                    <option value="active">Active membership</option>
+                    {canManage && <option value="removed">Removed membership</option>}
+                    <option value="suspended">Suspended account</option>
+                  </select>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setFilters(defaultRosterFilters)}
+                >
+                  Reset filters
+                </Button>
+                {canManage && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={filteredMembers.length === 0}
+                    onClick={exportRoster}
+                  >
+                    <Download aria-hidden="true" />
+                    Export filtered CSV
+                  </Button>
+                )}
+              </div>
               <CardContent className="overflow-x-auto px-0">
                 <table className="w-full border-collapse text-left text-sm">
                   <caption className="sr-only">Members of {season.name}</caption>
