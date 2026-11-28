@@ -6,6 +6,7 @@ import { DatabaseService } from '../database/database.service.js';
 import {
   account,
   attendance,
+  attendanceAudit,
   hour_requirements,
   season_memberships,
 } from '../database/schema/index.js';
@@ -24,6 +25,23 @@ export type AttendanceUpdate = {
   category?: 'meeting' | 'outreach';
   eventId?: number | null;
 };
+
+export type AttendanceAuditContext = {
+  actorUserId: string;
+  action: 'mentor_signed_in' | 'mentor_signed_out' | 'stale_session_credited';
+  reason: string;
+};
+
+function auditSnapshot(row: typeof attendance.$inferSelect) {
+  return {
+    userId: row.user_id,
+    checkedInAt: row.checked_in_at.toISOString(),
+    checkedOutAt: row.checked_out_at?.toISOString() ?? null,
+    category: row.category,
+    eventId: row.event_id,
+    status: row.status,
+  };
+}
 
 type MembershipRequirementFields = Pick<
   typeof season_memberships.$inferSelect,
@@ -58,7 +76,10 @@ export class AttendanceRepository {
     ).andThen((result) => this.parseRow(result[0]));
   }
 
-  createRecord(record: AttendanceCreate): ResultAsync<Attendance, Error> {
+  createRecord(
+    record: AttendanceCreate,
+    audit?: AttendanceAuditContext,
+  ): ResultAsync<Attendance, Error> {
     return ResultAsync.fromPromise<(typeof attendance.$inferSelect)[], Error>(
       this.database.db.transaction(async (tx) => {
         await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${record.userId}, 0))`);
@@ -74,7 +95,7 @@ export class AttendanceRepository {
           throw new Error('User is already signed in');
         }
 
-        return tx
+        const [created] = await tx
           .insert(attendance)
           .values({
             user_id: record.userId,
@@ -84,6 +105,18 @@ export class AttendanceRepository {
             event_id: record.eventId,
           })
           .returning();
+        if (created && audit) {
+          await tx.insert(attendanceAudit).values({
+            attendance_id: created.id,
+            actor_user_id: audit.actorUserId,
+            subject_user_id: record.userId,
+            action: audit.action,
+            before: null,
+            after: auditSnapshot(created),
+            reason: audit.reason,
+          });
+        }
+        return created ? [created] : [];
       }),
       (error) => (error instanceof Error ? error : new Error(String(error))),
     ).andThen((rows) =>
@@ -93,7 +126,11 @@ export class AttendanceRepository {
     );
   }
 
-  updateLast(userId: string, updates: AttendanceUpdate): ResultAsync<Attendance | null, Error> {
+  updateLast(
+    userId: string,
+    updates: AttendanceUpdate,
+    audit?: AttendanceAuditContext,
+  ): ResultAsync<Attendance | null, Error> {
     const setObject: Partial<typeof attendance.$inferInsert> = {};
 
     if (updates.checkedInAt !== undefined) {
@@ -114,7 +151,7 @@ export class AttendanceRepository {
         await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${userId}, 0))`);
 
         const [last] = await tx
-          .select({ id: attendance.id })
+          .select()
           .from(attendance)
           .where(eq(attendance.user_id, userId))
           .orderBy(desc(attendance.checked_in_at))
@@ -129,7 +166,19 @@ export class AttendanceRepository {
             ? and(eq(attendance.id, last.id), isNull(attendance.checked_out_at))
             : eq(attendance.id, last.id);
 
-        return tx.update(attendance).set(setObject).where(condition).returning();
+        const [updated] = await tx.update(attendance).set(setObject).where(condition).returning();
+        if (updated && audit) {
+          await tx.insert(attendanceAudit).values({
+            attendance_id: updated.id,
+            actor_user_id: audit.actorUserId,
+            subject_user_id: userId,
+            action: audit.action,
+            before: auditSnapshot(last),
+            after: auditSnapshot(updated),
+            reason: audit.reason,
+          });
+        }
+        return updated ? [updated] : [];
       }),
       (error) => (error instanceof Error ? error : new Error(String(error))),
     ).andThen((result) =>

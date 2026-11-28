@@ -36,7 +36,12 @@ export interface AttendanceRecordSnapshot {
 
 export interface AttendanceHistoryEntry {
   id: number;
-  action: 'record_created' | 'record_updated';
+  action:
+    | 'record_created'
+    | 'record_updated'
+    | 'mentor_signed_in'
+    | 'mentor_signed_out'
+    | 'stale_session_credited';
   actorName: string | null;
   before: AttendanceRecordSnapshot | null;
   after: AttendanceRecordSnapshot | null;
