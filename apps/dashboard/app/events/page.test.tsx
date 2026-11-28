@@ -157,7 +157,7 @@ it('hides management controls for non-admin members', async () => {
 
   expect(screen.queryByRole('button', { name: 'Add event' })).not.toBeInTheDocument();
 
-  expect(screen.queryByRole('button', { name: 'Edit', exact: true })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /^Edit$/ })).not.toBeInTheDocument();
 
   expect(screen.queryByRole('button', { name: 'Cancel event' })).not.toBeInTheDocument();
 });
