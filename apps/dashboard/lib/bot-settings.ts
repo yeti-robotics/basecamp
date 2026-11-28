@@ -7,6 +7,7 @@ export type BotStatus = {
   tokenConfigured: boolean;
   connection: 'off' | 'connecting' | 'connected' | 'failed';
   statusMessage: string;
+  message?: string;
 };
 
 function safeBotStatus(value: unknown): BotStatus | null {
@@ -26,6 +27,9 @@ function safeBotStatus(value: unknown): BotStatus | null {
     tokenConfigured: status.tokenConfigured,
     connection: status.connection as BotStatus['connection'],
     statusMessage: status.statusMessage,
+    ...(typeof status.message === 'string' && status.message.length <= 256
+      ? { message: status.message }
+      : {}),
   };
 }
 
